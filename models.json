@@ -1,0 +1,30 @@
+{
+  "models": [
+    {
+      "id": "ministral-uncensored",
+      "name": "Ministral-3-3B-Reasoning-UNCENSORED-heretic, Q4_K_M",
+      "role": "chat",
+      "default": true,
+      "hf_repo": "virtuehearts/ministral-uncensored-gguf",
+      "file": "Ministral-3-3B-Reasoning-UNCENSORED-heretic-Q4_K_M-32k.gguf",
+      "size": 2146495872,
+      "sha256": "0c86dfb183a91ea35b9dd1cac24008fb0e7ccab6f057a537137521cb5431141c",
+      "context": 32768,
+      "kv_cache": "q8_0",
+      "description": "Heretic/ARA-decensored Ministral 3B reasoning model, 32k context default, tuned for laptop VRAM."
+    },
+    {
+      "id": "embeddinggemma",
+      "name": "EmbeddingGemma-2, UD-Q4_K_XL (768d embeddings)",
+      "role": "embed",
+      "default": true,
+      "hf_repo": "unsloth/embeddinggemma-2-GGUF",
+      "file": "embeddinggemma-2-UD-Q4_K_XL.gguf",
+      "size": 175673856,
+      "sha256": "ea905fd08e8061db77a0031cbb5096d459d7cfd2bdd0ad2ba66e483f16719493",
+      "context": 8192,
+      "kv_cache": null,
+      "description": "Embedding model for vector memory. 768 dimensions, small enough to run alongside the chat model."
+    }
+  ]
+}

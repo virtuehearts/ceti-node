@@ -1,0 +1,3130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:,">
+<title>CETI: Uncensored Node</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d10; --panel:#111418; --panel-2:#15181d; --panel-3:#1e2228; --bubble:#1e2228;
+  --line:#22262d; --line-bright:#31363f; --ink:#d3d9df; --ink-bright:#f2f5f7;
+  --dim:#7d8590; --faint:#4a5058; --phos:#17cfff; --phos-dim:#0d6e8f;
+  --amber:#ffb340; --cyan:#17cfff; --red:#ff5470; --green:#33ff99;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+  font-size:14px;line-height:1.5;display:flex;flex-direction:column;height:100dvh;
+  background-image:repeating-linear-gradient(0deg,rgba(255,255,255,0.014) 0 1px,transparent 1px 3px);
+}
+::selection{background:var(--phos);color:#03161d}
+[hidden]{display:none!important}
+a{color:var(--phos)}
+button{
+  font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  background:var(--panel-3);color:var(--ink);border:1px solid var(--line-bright);
+  padding:6px 12px;cursor:pointer;
+}
+button:hover{color:var(--phos);border-color:var(--phos-dim)}
+button:active{transform:translateY(1px)}
+button.primary{background:var(--phos);color:#02120a;border-color:var(--phos)}
+button.primary:hover{background:#6dffba}
+input,select,textarea{
+  font:inherit;font-size:12px;color:var(--ink-bright);background:#0c0f12;
+  border:1px solid var(--line-bright);padding:4px 6px;border-radius:0;
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--phos-dim);box-shadow:0 0 0 1px var(--phos-dim)}
+pre{background:#16191f!important;color:var(--ink);max-width:100%;overflow:auto}
+code{color:var(--amber)}
+
+/* ---------- Title bar (Amiga echo: gadgets + drag bar) ---------- */
+.titlebar{
+  display:flex;align-items:stretch;border-bottom:1px solid var(--line-bright);
+  background:linear-gradient(180deg,#171a1f,#111418);min-height:34px;flex:0 0 auto;
+}
+.gadgets{display:flex;align-items:center;gap:5px;padding:0 10px;border-right:1px solid var(--line)}
+.gadget{width:13px;height:13px;border:1px solid var(--line-bright);background:var(--panel-3);position:relative;flex:0 0 auto}
+.gadget.close::before,.gadget.close::after{
+  content:"";position:absolute;inset:2px;
+  background:linear-gradient(to bottom right,transparent calc(50% - 1px),var(--dim) 0 calc(50% + 1px),transparent 0);
+}
+.gadget.close::after{transform:scaleX(-1)}
+.gadget.zoom::before{content:"";position:absolute;inset:2px;border:1px solid var(--dim)}
+.gadget.depth::before{content:"";position:absolute;left:2px;top:2px;width:6px;height:6px;border:1px solid var(--dim);background:var(--panel)}
+.gadget.depth::after{content:"";position:absolute;right:2px;bottom:2px;width:6px;height:6px;border:1px solid var(--dim);background:var(--panel)}
+.titlebar .name{
+  display:flex;align-items:center;gap:10px;padding:4px 12px;
+  font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-bright);
+  white-space:nowrap;overflow:hidden;
+}
+.titlebar .name b{color:var(--phos);font-weight:700}
+.titlebar .spacer{flex:1 1 auto}
+.titlebar .readout{
+  display:flex;align-items:center;gap:16px;padding:4px 12px;border-left:1px solid var(--line);
+  font-size:11px;color:var(--dim);white-space:nowrap;
+}
+.titlebar .readout .on{color:var(--phos)}
+.titlebar .readout .clock{color:var(--ink-bright);font-weight:600}
+.node-mark{flex:0 0 auto;align-self:center;margin-left:10px;image-rendering:pixelated}
+.view-tabs{display:flex;align-items:stretch}
+.view-tab{
+  font:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  background:none;border:none;border-left:1px solid var(--line);
+  color:var(--dim);padding:0 16px;cursor:pointer;
+}
+.view-tab:last-child{border-right:1px solid var(--line)}
+.view-tab:hover{color:var(--ink-bright)}
+.view-tab[aria-pressed="true"]{color:var(--phos);background:var(--panel-3)}
+
+/* ---------- Views: chat deck, system, other tabs ---------- */
+#view-chat{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.system-view{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px;background:var(--bg)}
+.tabview{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--bg)}
+
+/* ---------- Deck grid ---------- */
+.deck{flex:1 1 auto;display:grid;grid-template-columns:218px minmax(0,1fr);min-height:0}
+.col{min-height:0;display:flex;flex-direction:column}
+.col.channels{border-right:1px solid var(--line);background:var(--panel)}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:7px 10px;border-bottom:1px solid var(--line);
+  font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+  background:var(--panel-2);flex:0 0 auto;
+}
+.panel-head .val{color:var(--phos);letter-spacing:.05em}
+
+/* ---------- Channels (tracker descendant) ---------- */
+.chan-list{padding:6px 0;overflow-y:auto;overscroll-behavior:contain}
+.chan{
+  display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;
+  padding:7px 10px;border-left:3px solid transparent;cursor:pointer;
+}
+.chan:hover{background:var(--panel-2)}
+.chan.active:hover{background:var(--panel-3)}
+.chan:focus-visible{outline:1px solid var(--phos-dim);outline-offset:-1px}
+button.chan{
+  font:inherit;color:inherit;text-align:left;width:100%;background:none;
+  border:none;border-top:1px dashed var(--line);margin-top:4px;
+  text-transform:none;letter-spacing:0;padding:7px 10px;
+}
+button.chan .id{color:var(--phos)}
+button.chan .label{color:var(--dim)}
+.chan.active{background:var(--panel-3);border-left-color:var(--phos)}
+.chan .id{font-size:11px;color:var(--faint);font-weight:700}
+.chan.active .id{color:var(--phos)}
+.chan .label{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chan .label small{display:block;font-size:10px;color:var(--dim)}
+.vu{display:flex;align-items:flex-end;gap:2px;height:16px}
+.vu i{width:3px;background:var(--phos-dim);display:block}
+.vu i.hot{background:var(--phos)}
+.vu i.peak{background:var(--amber)}
+.chan.idle .vu i{background:#22262d}
+.nodelist{border-top:1px solid var(--line);padding:8px 10px;font-size:11px;color:var(--dim)}
+.nodelist .row{display:flex;justify-content:space-between;padding:2px 0}
+.nodelist .row b{color:var(--ink);font-weight:500}
+.nodelist .ok{color:var(--phos)}
+.mockpill{display:inline-block;background:#3a2a10;color:#ffb454;padding:1px 8px;font-size:10px;font-weight:700;letter-spacing:.5px}
+
+/* ---------- Chat zone ---------- */
+.col.chat{background:var(--bg);position:relative}
+.chat-scroll{flex:1 1 auto;overflow-y:auto;padding:14px 18px 8px;min-height:0;overscroll-behavior:contain}
+.msg{max-width:860px;margin:0 auto 16px}
+.msg .meta{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  font-size:11px;color:var(--dim);margin-bottom:4px;
+}
+.msg .who{font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:11.5px}
+.msg.you .who{color:var(--ink-bright)}
+.msg.hub .who{color:var(--phos)}
+.msg.sys .who{color:var(--amber)}
+.msg .body{
+  border:1px solid var(--line);background:var(--bubble);padding:10px 13px;
+  font-size:13.5px;color:var(--ink);white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;
+}
+.msg.hub .body{border-color:#173f4d;background:var(--bubble);color:var(--ink)}
+.msg.sys .body{border-style:dashed;background:transparent;color:var(--dim);font-size:12.5px}
+.msg .body p{margin:0 0 8px}
+.msg .body p:last-child{margin-bottom:0}
+.msg .body code{color:var(--amber);font-size:12.5px}
+.msg .foot{display:flex;gap:14px;flex-wrap:wrap;margin-top:5px;font-size:11px;color:var(--faint);align-items:center}
+.msg .foot .tps{color:var(--phos)}
+.msg .foot button{
+  font:inherit;font-size:11px;color:var(--dim);background:none;border:none;padding:0;cursor:pointer;
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.msg .foot button:hover{color:var(--ink-bright)}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--phos);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.stream-line{font-size:11px;color:var(--phos);margin-top:5px;min-height:16px}
+
+/* Provider strip under the chat panel-head */
+.provbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:6px 12px;border-bottom:1px solid var(--line);background:var(--panel-2);
+  font-size:11px;color:var(--dim);flex:0 0 auto;
+}
+.provbar select{font-size:12px;padding:4px 6px}
+.provbar .small{font-size:11px}
+
+/* ---------- Telemetry ---------- */
+.tele{padding:10px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;overscroll-behavior:contain}
+.tele-block{border:1px solid var(--line);background:var(--panel-2)}
+.tele-block .panel-head{border-bottom:1px solid var(--line)}
+.big-tps{padding:8px 12px 10px}
+.big-tps .num{font-size:44px;font-weight:700;line-height:1;color:var(--phos);letter-spacing:-.02em}
+.big-tps .num small{font-size:13px;color:var(--dim);font-weight:500;letter-spacing:.1em}
+.big-tps .note{font-size:10.5px;color:var(--dim);margin-top:4px}
+.meter{padding:9px 12px 11px}
+.meter .top{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:5px}
+.meter .top b{color:var(--ink);font-weight:600}
+.bar{height:10px;border:1px solid var(--line-bright);background:#0c0f12;display:flex;gap:1px;padding:1px}
+.bar i{flex:1 1 0;background:#1a1f26}
+.bar i.on{background:var(--phos)}
+.bar i.warn{background:var(--amber)}
+.kv{padding:6px 12px 9px;font-size:11.5px}
+.kv .row{display:flex;justify-content:space-between;gap:10px;padding:2.5px 0}
+.kv .row span{color:var(--dim)}
+.kv .row b{color:var(--ink);font-weight:500;text-align:right}
+.kv .row b.g{color:var(--phos)}
+.kv .row b.a{color:var(--amber)}
+
+/* ---------- Telemetry window (opened from the chat-area button) ---------- */
+.tele-btn{
+  position:absolute;right:14px;bottom:10px;z-index:5;
+  font:inherit;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--phos);background:var(--panel-2);border:1px solid var(--phos-dim);
+  padding:6px 10px;cursor:pointer;
+}
+.tele-btn:hover{background:var(--panel-3);color:var(--ink-bright)}
+.tele-btn .dot{display:inline-block;width:7px;height:7px;background:var(--phos);margin-right:6px}
+#teleWindow{
+  position:fixed;top:52px;right:12px;bottom:12px;width:302px;z-index:50;
+  background:var(--panel);border:1px solid var(--line-bright);
+  display:none;flex-direction:column;
+}
+#teleWindow.open{display:flex}
+#teleWindow .tele{flex:1 1 auto;min-height:0}
+.tele-window-head{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;
+  border-bottom:1px solid var(--line);background:var(--panel-2);flex:0 0 auto;
+  font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+}
+.tele-window-head .val{color:var(--phos);letter-spacing:.05em}
+.tele-window-head .tele-live{flex-basis:100%;font-size:10.5px;letter-spacing:.05em;text-transform:none;color:var(--dim)}
+.tele-window-head .tele-live b{color:var(--phos)}
+.tele-window-head .x{margin-left:auto;background:none;border:1px solid var(--line);color:var(--dim);font:inherit;font-size:13px;padding:2px 8px;cursor:pointer}
+.tele-window-head .x:hover{color:var(--phos);border-color:var(--phos-dim)}
+
+/* ---------- Composer ---------- */
+.composer{flex:0 0 auto;border-top:1px solid var(--line-bright);background:var(--panel);padding:10px 14px 8px}
+.composer-inner{max-width:1180px;margin:0 auto}
+.prompt-row{display:flex;gap:8px;align-items:stretch}
+.prompt-wrap{
+  flex:1 1 auto;display:flex;align-items:center;gap:10px;
+  border:1px solid var(--line-bright);background:#0c0f12;padding:0 12px;
+}
+.prompt-wrap:focus-within{border-color:var(--phos-dim);box-shadow:0 0 0 1px var(--phos-dim)}
+.prompt-wrap .sigil{color:var(--phos);font-weight:700}
+#chatInput{
+  flex:1 1 auto;min-width:0;background:none;border:none;outline:none;
+  color:var(--ink-bright);font:inherit;font-size:14px;padding:11px 0;
+  resize:vertical;min-height:44px;
+}
+#chatInput::placeholder{color:var(--faint)}
+.send{
+  font:inherit;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  background:var(--phos);color:#02120a;border:1px solid var(--phos);
+  padding:0 26px;cursor:pointer;font-size:13px;
+}
+.send:hover{background:#6dffba}
+.send:active{transform:translateY(1px)}
+.send:disabled{background:var(--panel-3);color:var(--dim);border-color:var(--line-bright);cursor:wait}
+.controls{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--dim)}
+.ctl{display:flex;align-items:center;gap:8px}
+.ctl label{text-transform:uppercase;letter-spacing:.12em;font-size:10.5px}
+.ctl .ctl-label{text-transform:uppercase;letter-spacing:.12em;font-size:10.5px}
+.ctl .ctl-label.lit{text-transform:none;letter-spacing:.02em}
+.switch{
+  width:38px;height:18px;flex:0 0 auto;border:1px solid var(--line-bright);
+  background:#0c0f12;position:relative;cursor:pointer;padding:0;
+}
+.switch::after{
+  content:"";position:absolute;top:2px;left:2px;width:14px;height:12px;background:var(--faint);
+  transition:left 120ms ease,background 120ms ease;
+}
+.switch[aria-pressed="true"]{border-color:var(--phos-dim)}
+.switch[aria-pressed="true"]::after{left:20px;background:var(--phos)}
+.switch-state{font-size:10.5px;color:var(--faint);min-width:24px;text-transform:uppercase;letter-spacing:.08em}
+.switch[aria-pressed="true"] + .switch-state{color:var(--phos)}
+.controls .live{margin-left:auto;font-size:11px;color:var(--dim);display:flex;gap:14px;align-items:center}
+.controls .live b{color:var(--phos);font-weight:600}
+.outNote{font-size:11px;color:var(--dim);max-width:1180px;margin:6px auto 0}
+
+/* ---------- Status bar ---------- */
+.statusbar{
+  flex:0 0 auto;display:flex;align-items:stretch;flex-wrap:wrap;
+  border-top:1px solid var(--line-bright);background:var(--panel-2);
+  font-size:10.5px;color:var(--dim);
+}
+.statusbar .seg{
+  padding:5px 12px;border-right:1px solid var(--line);
+  display:flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.statusbar .seg b{color:var(--ink);font-weight:500}
+.dot{width:7px;height:7px;background:var(--phos);flex:0 0 auto}
+.dot.amber{background:var(--amber)}
+.statusbar .grow{flex:1 1 auto;border-right:none}
+
+/* ---------- Reasoning (thinking) panel ---------- */
+.think{border:1px dashed var(--line-bright);background:rgba(23,207,255,.03);margin-bottom:6px}
+.think-head{
+  display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;
+  color:var(--dim);font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 10px;cursor:pointer;text-align:left;
+}
+.think-head:hover{color:var(--ink-bright)}
+.think-head::before{
+  content:"";flex:0 0 auto;width:0;height:0;
+  border-left:5px solid var(--dim);border-top:4px solid transparent;border-bottom:4px solid transparent;
+  transition:transform 120ms ease;
+}
+.think-head[aria-expanded="true"]::before{transform:rotate(90deg)}
+.think-body{border-top:1px dashed var(--line);padding:8px 11px;font-size:12px;color:var(--dim)}
+.think-body p{margin:0 0 6px}
+.think-body p:last-child{margin-bottom:0}
+.thinkText{white-space:pre-wrap;font-size:12px;color:var(--dim)}
+
+/* ---------- System view ---------- */
+.sys-grid{
+  display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);
+  gap:12px;max-width:1180px;margin:0 auto;align-items:start;
+}
+.sys-stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sys-card{border:1px solid var(--line);background:var(--panel)}
+.srv{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+.srv-name{font-size:12.5px;font-weight:600;letter-spacing:.06em;color:var(--ink-bright)}
+.srv-sub{font-size:11px;color:var(--dim)}
+.srv-status{font-size:11px;letter-spacing:.1em;color:var(--phos)}
+.srv-status.busy{color:var(--amber)}
+.srv-actions{margin-left:auto;display:flex;gap:8px}
+.srv-btn{
+  font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  background:var(--panel-3);color:var(--ink);border:1px solid var(--line-bright);padding:6px 12px;cursor:pointer;
+}
+.srv-btn:hover{color:var(--phos);border-color:var(--phos-dim)}
+.srv-btn:active{transform:translateY(1px)}
+.log{
+  padding:8px 12px 10px;font-size:11px;line-height:1.65;color:var(--dim);
+  max-height:248px;overflow-y:auto;overscroll-behavior:contain;
+}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log div b{color:var(--ink);font-weight:500}
+.ledger{width:100%;border-collapse:collapse;font-size:12px}
+.ledger th{color:var(--dim);text-align:left;font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+.ledger td{padding:5px 6px;border-bottom:1px solid #1a1e24;white-space:nowrap}
+.ledger td.hash{color:var(--phos)}
+.ok{color:var(--green);font-weight:700}
+
+/* ---------- Other tabs (panels) ---------- */
+.panel{max-width:860px;margin:0 auto;padding:20px;width:100%}
+.panel label{display:block;margin:12px 0 4px;color:var(--dim);font-size:13px;font-weight:600}
+.panel input,.panel select,.panel textarea{width:100%;padding:9px;font-size:14px}
+.small{color:var(--dim);font-size:13px}
+.card{background:#16191f;border:1px solid var(--line);padding:14px;margin:10px 0}
+.beat{border-left:4px solid var(--phos);padding:10px 12px;margin:8px 0;background:#16191f}
+.beat.done{border-color:var(--green);background:#12261c}
+.pill{display:inline-block;background:#1e2a33;color:var(--phos);padding:2px 10px;font-size:12px;font-weight:600;margin-right:6px}
+
+/* ---------- Node tab: menu on the left, one screen per page ---------- */
+.node-gate{margin-top:10px;padding:8px 10px;border:1px solid var(--amber);color:var(--amber);font-size:13px}
+.node-layout{display:flex;gap:20px;align-items:flex-start}
+.node-menu{flex:0 0 168px;display:flex;flex-direction:column;gap:4px}
+.node-menu-btn{text-align:left;text-transform:none;letter-spacing:0;font-size:13px;padding:8px 10px}
+.node-menu-btn[aria-pressed="true"]{color:var(--phos);border-color:var(--phos-dim);background:var(--panel-3)}
+.node-pages{flex:1 1 auto;min-width:0}
+.node-page h3{margin-top:0}
+.lobby-list{display:flex;flex-direction:column;gap:10px}
+.lobby-msg{border-bottom:1px solid var(--line);padding-bottom:8px}
+.lobby-name{font-weight:700;color:var(--ink-bright)}
+.lobby-ts{color:var(--dim);font-size:11px;margin-left:8px}
+.lobby-nodeid{display:block;font-size:11px;color:var(--phos);word-break:break-all}
+.lobby-msg.mine .lobby-name{color:var(--phos)}
+.lobby-name-btn{background:none;border:none;padding:0;font:inherit;font-weight:700;color:var(--phos);cursor:pointer}
+.lobby-name-btn:hover{text-decoration:underline}
+#nodePage-lobby,#nodeLobby{background:#000}
+#nodeLobbyText{caret-color:var(--phos);background:#000}
+/* IRC room fills the screen: the Node tab breaks out of the narrow panel. */
+#view-node .panel{max-width:none}
+#nodeLobby{height:60vh;min-height:420px;overflow-y:auto;padding-right:8px}
+#nodeLobby .lobby-msg,#nodeChat .lobby-msg{font-size:15px}
+#nodeChat{height:55vh;min-height:360px;overflow-y:auto;padding-right:8px}
+#nodeLobbyText,#nodeChatText{display:block;width:100%;box-sizing:border-box;margin:8px 0}
+.irc-row{display:flex;gap:16px;align-items:flex-start;margin-top:10px}
+.irc-main{flex:1;min-width:0}
+.irc-roster{width:210px;flex:none;border-left:1px solid var(--line);padding-left:12px}
+.presence-user{margin-bottom:10px}
+.presence-nodeid{display:block;font-size:11px;color:var(--phos);word-break:break-all}
+@media (max-width:700px){.irc-row{flex-direction:column}.irc-roster{width:auto;border-left:none;padding-left:0}}
+.console-cursor{display:inline-block;width:9px;height:16px;background:var(--phos);margin-left:6px;vertical-align:middle;animation:consoleBlink 1s steps(1) infinite}
+@keyframes consoleBlink{50%{opacity:0}}
+#nodeCard{border:1px solid var(--phos-dim);padding:12px;margin:10px 0;background:#000}
+@media (max-width:700px){
+  .node-layout{flex-direction:column}
+  .node-menu{flex:0 0 auto;flex-direction:row;flex-wrap:wrap}
+}
+
+/* ---------- Sessions rail: recent 3 + More drawer ---------- */
+.recent-hidden{display:none!important}
+.scrim{
+  position:fixed;inset:0;z-index:40;background:rgba(2,6,9,.62);
+  opacity:0;pointer-events:none;transition:opacity 160ms ease;
+}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;left:0;bottom:0;z-index:50;width:min(340px,86vw);
+  background:var(--panel);border-right:1px solid var(--line-bright);
+  transform:translateX(-105%);transition:transform 200ms ease;
+  display:flex;flex-direction:column;
+}
+.drawer.open{transform:none}
+.drawer-head{
+  display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;
+  border-bottom:1px solid var(--line);background:var(--panel-2);
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);flex:0 0 auto;
+}
+.drawer-head .val{color:var(--phos)}
+.drawer-close{
+  margin-left:auto;width:44px;height:44px;flex:0 0 auto;
+  background:var(--panel-3);border:1px solid var(--line-bright);
+  color:var(--ink);font:inherit;font-size:14px;cursor:pointer;
+}
+.drawer-close:hover{color:var(--phos);border-color:var(--phos-dim)}
+.drawer-nav{
+  display:flex;flex-direction:column;gap:4px;padding:8px;
+  border-bottom:1px solid var(--line);flex:0 0 auto;
+}
+.drawer-navbtn{
+  display:block;width:100%;text-align:left;background:var(--panel);
+  color:var(--ink);border:1px solid transparent;
+  font:inherit;font-size:13px;text-transform:none;letter-spacing:0;padding:8px 10px;
+}
+.drawer-navbtn:hover,.drawer-navbtn.active{background:var(--panel-3);color:var(--phos);border-left:3px solid var(--phos)}
+.drawer-list{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:6px;display:flex;flex-direction:column;gap:4px}
+.drawer-item{
+  display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:8px 10px;
+  background:none;border:1px solid transparent;border-left:3px solid transparent;
+  color:var(--ink);font:inherit;text-align:left;cursor:pointer;
+  text-transform:none;letter-spacing:0;
+}
+.drawer-item:hover{background:var(--panel-2)}
+.drawer-item.active{background:var(--panel-3);border-left-color:var(--phos)}
+.drawer-item .d-id{font-size:11px;font-weight:700;color:var(--faint);flex:0 0 auto}
+.drawer-item.active .d-id{color:var(--phos)}
+.drawer-item .d-main{flex:1 1 auto;min-width:0}
+.drawer-item .d-label{display:block;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-item .d-sub{display:block;font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-item .d-tag{flex:0 0 auto;font-size:9px;letter-spacing:.08em;color:var(--phos);border:1px solid var(--phos-dim);padding:2px 5px}
+.drawer-item .d-live{flex:0 0 auto;font-size:9.5px;letter-spacing:.1em;color:var(--amber)}
+.drawer-item .d-del{flex:0 0 auto;color:#ff6b8a;font-weight:700;font-size:14px;background:none;border:none;padding:4px 6px;cursor:pointer}
+.drawer-foot{padding:10px;border-top:1px solid var(--line);flex:0 0 auto}
+.drawer-new{
+  width:100%;min-height:48px;font:inherit;font-size:12px;font-weight:700;letter-spacing:.12em;
+  background:var(--phos);color:#02120a;border:1px solid var(--phos);cursor:pointer;
+}
+
+/* ---------- New workspace picker ---------- */
+.picker-overlay{
+  position:fixed;inset:0;z-index:60;background:rgba(2,6,9,.66);
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.picker{
+  background:var(--panel);border:1px solid var(--line-bright);
+  width:min(480px,100%);max-height:92dvh;overflow-y:auto;overscroll-behavior:contain;
+}
+.picker-head{padding:16px 16px 2px}
+.picker-head h2{margin:0;font-size:16px;font-weight:700;letter-spacing:.05em;color:var(--ink-bright)}
+.picker-head p{margin:5px 0 0;font-size:12.5px;color:var(--dim)}
+.picker-grid{display:flex;flex-direction:column;gap:8px;padding:12px 16px 4px}
+.pick{
+  display:flex;gap:12px;align-items:flex-start;width:100%;min-height:56px;padding:11px 12px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+  font:inherit;text-align:left;cursor:pointer;text-transform:none;letter-spacing:0;
+}
+.pick:hover,.pick:focus-visible{border-color:var(--phos-dim);background:var(--panel-3)}
+.pick-tag{flex:0 0 auto;margin-top:2px;padding:3px 6px;font-size:9.5px;letter-spacing:.08em;color:var(--phos);border:1px solid var(--phos-dim)}
+.pick-main{min-width:0}
+.pick-main b{display:block;font-size:13.5px;font-weight:600;color:var(--ink-bright)}
+.pick-desc{display:block;font-size:12px;color:var(--dim);margin-top:2px}
+.picker-cancel{
+  display:block;width:calc(100% - 32px);margin:10px 16px 16px;min-height:48px;
+  font:inherit;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  background:none;border:1px solid var(--line-bright);color:var(--dim);cursor:pointer;
+}
+.picker-cancel:hover{color:var(--ink-bright)}
+
+/* ---------- Memory constellation (Orbit's node display) ---------- */
+.constellation-wrap{position:relative;padding:6px 4px 0}
+.constellation-wrap::before{
+  content:"";position:absolute;inset:14% 8%;
+  background:radial-gradient(circle,rgba(23,207,255,.12),transparent 65%);pointer-events:none;
+}
+.constellation-wrap svg{width:100%;height:auto;display:block;position:relative}
+.edge{stroke:rgba(160,175,190,.28);stroke-width:1}
+.edge.hot{stroke:var(--phos);stroke-opacity:.75}
+.node-dot{fill:#aeb9c4}
+.node-ring{fill:none;stroke:rgba(160,175,190,.35)}
+.node-group{cursor:pointer}
+.node-group text{fill:var(--dim);font-family:var(--mono);font-size:10px}
+.node-group.core text{fill:var(--ink-bright);font-size:10.5px}
+.node-group.active .node-dot{fill:var(--phos)}
+.node-group.active .node-ring{stroke:var(--phos)}
+.node-group.active text{fill:var(--phos)}
+.node-group.inctx .node-dot{fill:var(--phos)}
+.node-group.inctx .node-ring{stroke:var(--phos)}
+.node-group:focus-visible{outline:none}
+.node-group:focus-visible .node-ring{stroke:var(--phos)}
+.pulse{
+  fill:none;stroke:var(--phos);stroke-opacity:.5;
+  transform-origin:center;transform-box:fill-box;animation:nodePulse 3.2s ease-out infinite;
+}
+@keyframes nodePulse{0%{transform:scale(.55);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+.glow-dot{fill:var(--phos);opacity:0;transform-origin:center;transform-box:fill-box}
+.node-group.active .glow-dot{animation:glowPulse 2.8s ease-in-out infinite}
+@keyframes glowPulse{0%,100%{opacity:.1;transform:scale(.8)}50%{opacity:.3;transform:scale(1.25)}}
+.memory-detail{border-top:1px solid var(--line);padding:9px 12px 10px;min-height:62px;font-size:12px;color:var(--dim)}
+.memory-detail .md-title{font-size:11px;letter-spacing:.08em;color:var(--phos);margin-bottom:3px}
+.memory-legend{display:flex;gap:14px;padding:0 12px 10px;font-size:10px;letter-spacing:.06em;color:var(--faint)}
+.memory-legend i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#aeb9c4;margin-right:5px}
+.memory-legend i.hot{background:var(--phos)}
+.memory-block.mem-off .constellation-wrap,.memory-block.mem-off .memory-legend{opacity:.35}
+#vecInspector{border:1px solid var(--line);background:#0c0f12;padding:8px;margin:10px 12px 12px}
+#vecInspector .vmeta{font-size:11px;color:var(--dim);line-height:1.6}
+#vecInspector .vmeta b{color:var(--phos)}
+#vecStrip{display:block;width:100%;height:48px;background:#0b0d10;border:1px solid var(--line);margin:6px 0}
+#vecPreview{font-size:11px;white-space:pre-wrap;word-break:break-all;color:var(--ink)}
+#vecAll{display:none;max-height:220px;overflow:auto;font-size:11px;color:var(--ink);white-space:pre-wrap;word-break:break-all;margin:6px 0 0}
+
+/* Scroll containers never chain out to the page (no pull-to-refresh) */
+.chat-scroll,.tele,.system-view,.log,.chan-list,.tabview{overscroll-behavior:contain}
+
+/* ---------- Responsive ---------- */
+@media (max-width:720px){
+  .deck{display:flex;flex-direction:column}
+  .gadgets{display:none}
+  .titlebar .name{font-size:11px;letter-spacing:.1em;padding:4px 10px}
+  .titlebar .readout{padding:4px 10px;gap:8px;font-size:11px}
+  .titlebar .readout .hideable{display:none}
+  .node-mark{margin-left:8px}
+  .view-tab{padding:0 9px;font-size:10.5px;letter-spacing:.1em}
+  /* Channels: one horizontal chip strip above the chat */
+  .col.channels{order:1;flex:0 0 auto;border-right:none;border-bottom:1px solid var(--line)}
+  .col.channels > .panel-head,.col.channels .nodelist{display:none}
+  .chan-list{
+    display:flex;flex-direction:row;gap:8px;padding:8px 10px;
+    overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  }
+  .chan{
+    display:flex;align-items:center;gap:7px;flex:0 0 auto;min-height:44px;
+    padding:0 12px;border:1px solid var(--line);border-left:1px solid var(--line);background:var(--panel-2);
+  }
+  .chan.active{border-color:var(--phos-dim);background:var(--panel-3)}
+  .chan .label{font-size:12.5px}
+  .chan .label small,.chan .vu{display:none}
+  button.chan{width:auto;border-top:1px solid var(--line);margin-top:0}
+  /* Telemetry lives in the window now: no strip on top of the phone chat */
+  #teleWindow{top:auto;left:0;right:0;bottom:0;width:auto;max-height:88dvh}
+  .tele-btn{right:10px;bottom:8px}
+  .big-tps .num{font-size:30px}
+  /* Chat: full width, fills the rest of the screen */
+  .col.chat{order:2;flex:1 1 auto;min-height:0}
+  .chat-scroll{padding:12px 12px 8px}
+  .msg{margin-bottom:14px}
+  .msg .body{font-size:15.5px;padding:11px 13px}
+  .msg.sys .body{font-size:15px}
+  .msg .foot{align-items:center}
+  .msg .foot button{min-height:44px;padding:10px 6px;display:inline-flex;align-items:center}
+  /* Composer: pinned at the bottom, 44px+ touch targets */
+  .composer{padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
+  .prompt-wrap{min-height:48px;padding:0 10px}
+  #chatInput{font-size:16px;padding:13px 0}
+  .send{min-height:48px;padding:0 18px}
+  .controls{flex-wrap:nowrap;gap:8px;margin-top:6px}
+  .ctl{min-height:30px;gap:6px}
+  .ctl label,.ctl .ctl-label{font-size:10px}
+  .ctl label[for="outMult"]{display:none}
+  select{height:30px;font-size:12px;padding:0 6px}
+  .switch{width:38px;height:22px}
+  .switch::after{width:16px;height:16px;top:2px;left:2px}
+  .switch[aria-pressed="true"]::after{left:18px}
+  .switch-state{display:none}
+  .controls .live{margin-left:0;width:100%;min-height:16px;font-size:10px}
+  /* Status bar: keep only the essentials */
+  .statusbar .seg.hide-sm{display:none}
+  /* System view: cards stack, controls stay thumb-sized */
+  .system-view{padding:10px}
+  .sys-grid{grid-template-columns:minmax(0,1fr)}
+  .srv-actions{margin-left:0;width:100%}
+  .srv-btn{min-height:44px;padding:0 16px;flex:1 1 0}
+  .think-head{min-height:44px}
+  .log div{white-space:normal}
+  .panel{padding:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  .cursor{animation:none}
+  .pulse,.glow-dot{animation:none}
+  .drawer,.scrim{transition:none}
+  .switch::after{transition:none}
+  .think-head::before{transition:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Title bar ===== -->
+<header class="titlebar">
+  <div class="gadgets" aria-hidden="true">
+    <span class="gadget close"></span>
+    <span class="gadget zoom"></span>
+    <span class="gadget depth"></span>
+  </div>
+  <svg class="node-mark" width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+    <rect x="7" y="0" width="2" height="4" fill="#0d6e8f"/>
+    <rect x="7" y="12" width="2" height="4" fill="#0d6e8f"/>
+    <rect x="0" y="7" width="4" height="2" fill="#0d6e8f"/>
+    <rect x="12" y="7" width="4" height="2" fill="#0d6e8f"/>
+    <rect x="2" y="2" width="2" height="2" fill="#0d6e8f"/>
+    <rect x="12" y="2" width="2" height="2" fill="#0d6e8f"/>
+    <rect x="2" y="12" width="2" height="2" fill="#0d6e8f"/>
+    <rect x="12" y="12" width="2" height="2" fill="#0d6e8f"/>
+    <rect x="5" y="5" width="6" height="6" fill="#17cfff"/>
+    <rect x="7" y="7" width="2" height="2" fill="#0b0d10"/>
+  </svg>
+  <div class="name"><span><b>CETI: Uncensored Node</b> 0.0.1 · Built by AI for Humanity</span></div>
+  <nav class="view-tabs" aria-label="View">
+    <button class="view-tab" data-tab="chat" type="button" aria-pressed="true" onclick="showTab('chat')">Chat</button>
+    <button class="view-tab" data-tab="system" type="button" aria-pressed="false" onclick="showTab('system')">System</button>
+    <button class="view-tab" data-tab="node" type="button" aria-pressed="false" onclick="showTab('node')">Node</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="readout">
+    <span class="hideable">NODE <span class="on" id="tbNode">—</span></span>
+    <span class="hideable">LINK <span class="on">LOCAL</span></span>
+    <span class="clock" id="deckClock">--:--:--</span>
+  </div>
+</header>
+
+<!-- ===== Chat view: deck + composer ===== -->
+<div id="view-chat">
+<div class="deck">
+
+  <!-- Channels -->
+  <aside class="col channels" aria-label="Sessions">
+    <div class="panel-head"><span>Sessions</span><span class="val" id="sess-count">00</span></div>
+    <div class="chan-list" id="chan-list"></div>
+    <div class="nodelist">
+      <div class="row"><span>REGULA_CORE</span><b class="ok">OK</b></div>
+      <div class="row"><span>BLOCK LEDGER</span><b class="ok">OK</b></div>
+      <div class="row"><span>PEERS</span><b>—</b></div>
+      <div class="row"><span>UPTIME</span><b id="readUptime">0s</b></div>
+    </div>
+  </aside>
+
+  <!-- Chat -->
+  <section class="col chat" aria-label="Conversation">
+    <div class="panel-head">
+      <span id="chat-title">NEW CHAT</span>
+      <span style="display:flex;gap:10px;align-items:center"><span class="val" id="msg-count">0 MESSAGES</span><button type="button" id="pkgBtn" onclick="packageCurrent()">📦 Package</button></span>
+    </div>
+    <div class="provbar">
+      <select id="provider" onchange="onProvider()">
+        <option value="local">Local — uncensored (private)</option>
+        <option value="openrouter">OpenRouter (cloud)</option>
+        <option value="nvidia">Nvidia (cloud)</option>
+      </select>
+      <select id="peerBackend" title="Chat via a peer node's text endpoint"><option value="">Peer chat: local model</option></select>
+      <select id="cloudModel" style="display:none;min-width:240px"></select>
+      <button type="button" onclick="refreshCloudModels()" id="refreshModelsBtn" style="display:none">List models</button>
+      <span class="small" id="topStatus"></span>
+    </div>
+    <div class="chat-scroll" id="msgs"></div>
+    <button class="tele-btn" id="tele-btn" type="button" aria-label="Open telemetry"><span class="dot" aria-hidden="true"></span>Telemetry</button>
+  </section>
+
+</div>
+  <div class="scrim" id="tele-scrim" hidden></div>
+  <aside id="teleWindow" aria-label="Telemetry" aria-hidden="true">
+    <div class="tele-window-head"><span>Telemetry</span><span class="val">LIVE</span><button class="x" id="tele-close" type="button" aria-label="Close telemetry">✕</button><span class="tele-live"><b id="tele-tps">--</b>&nbsp;tok/s · OUT&nbsp;<b id="tele-ctx">--%</b></span></div>
+    <div class="tele" id="tele-body">
+      <div class="tele-block">
+        <div class="panel-head"><span>Gen rate</span><span class="val">TOK/S</span></div>
+        <div class="big-tps">
+          <div class="num"><span id="tps-num">--</span><small> TOK/S</small></div>
+          <div class="note" id="tps-note">no answers yet this session</div>
+        </div>
+      </div>
+      <div class="tele-block">
+        <div class="panel-head"><span>Output budget</span><span class="val" id="teleCtxPct">--%</span></div>
+        <div class="meter">
+          <div class="top"><span>LAST ANSWER VS CAP</span><b id="teleCtx">--%</b></div>
+          <div class="bar" id="out-bar" aria-hidden="true"></div>
+          <div class="top" style="margin:6px 0 0"><span>LAST</span><b><span id="teleToks">--</span> TOKENS · CAP <span id="teleCap">--</span></b></div>
+        </div>
+      </div>
+      <div class="tele-block">
+        <div class="panel-head"><span>Engine</span><span class="val">LOCAL</span></div>
+        <div class="kv">
+          <div class="row"><span>PROVIDER</span><b id="teleEngine">local</b></div>
+          <div class="row"><span>MEMORY BANK</span><b id="teleMem">--</b></div>
+          <div class="row"><span>SAMPLES</span><b id="teleSamples">0 SELECTED</b></div>
+          <div class="row"><span>QUEUE</span><b>EMPTY</b></div>
+          <div class="row"><span>CHAT</span><b id="teleChat">--</b></div>
+          <div class="row"><span>EMBED</span><b id="teleEmbed">--</b></div>
+          <div class="row"><span>TEMP</span><b class="a" id="teleTemp">0.7</b></div>
+        </div>
+      </div>
+      <div class="tele-block">
+        <div class="panel-head"><span>Session</span><span class="val" id="sess-id-val">—</span></div>
+        <div class="kv">
+          <div class="row"><span>TYPE</span><b id="sess-type">CHAT</b></div>
+          <div class="row"><span>MESSAGES</span><b id="teleMsgs">0</b></div>
+          <div class="row"><span>EXCHANGES</span><b id="sess-exch">0</b></div>
+          <div class="row"><span>TOKENS GEN</span><b id="sess-tok">--</b></div>
+          <div class="row"><span>AVG RATE</span><b id="sess-avg">—</b></div>
+          <div class="row"><span>EGRESS</span><b class="g">0 BYTES</b></div>
+        </div>
+      </div>
+      <div class="tele-block memory-block" id="memory-block">
+        <div class="panel-head"><span>Memory</span><span class="val" id="mem-node-count">0 NODES</span></div>
+        <div class="constellation-wrap">
+          <svg id="constellation" viewBox="0 0 300 300" role="img" aria-label="Memory constellation: linked memory nodes around the session core. Activate a node to read that memory."></svg>
+        </div>
+        <div class="memory-detail" id="memory-detail"></div>
+        <div class="memory-legend"><span><i class="hot"></i>IN CONTEXT</span><span><i></i>ONE HOP AWAY</span></div>
+        <div id="vecInspector" style="display:none">
+          <div class="vmeta" id="vecMeta"></div>
+          <canvas id="vecStrip" width="218" height="48"></canvas>
+          <div id="vecPreview"></div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" id="vecShowAll" onclick="toggleVecAll()">Show all values</button><button type="button" onclick="collapseVec()">Collapse</button></div>
+          <pre id="vecAll"></pre>
+        </div>
+        <div style="padding:0 12px 10px"><button type="button" onclick="loadConstellation(currentSid)">↻ Refresh constellation</button></div>
+        <div style="padding:0 12px 10px"><button type="button" onclick="loadNodeView()">Full node view — all memories, models, traces</button><div id="nodeView" style="margin-top:8px"></div></div>
+      </div>
+    </div>
+  </aside>
+
+<!-- ===== Composer ===== -->
+<div class="composer">
+  <div class="composer-inner">
+    <form class="prompt-row" id="prompt-form">
+      <div class="prompt-wrap">
+        <span class="sigil" aria-hidden="true">&gt;</span>
+        <textarea id="chatInput" rows="1" autocomplete="off" placeholder="Message the deck — it answers locally…" aria-label="Message"></textarea>
+      </div>
+      <button class="send" id="send-btn" type="submit">Send</button>
+    </form>
+    <div class="controls" style="margin-top:6px">
+      <div class="ctl">
+        <label for="peerImageBackend">Image peer</label>
+        <select id="peerImageBackend"><option value="">no image peer selected</option></select>
+        <button type="button" onclick="sendPeerImage()">Generate image from input</button>
+        <span class="small" id="peerImageOut"></span>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <label for="outMult">Output</label>
+        <select id="outMult">
+          <option value="1" selected>normal</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+          <option value="16">16×</option>
+        </select>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label">Thinking</span>
+        <button class="switch" type="button" id="sw-think" aria-pressed="true" aria-label="Toggle thinking"></button>
+        <span class="switch-state" id="sw-think-state">On</span>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label lit">memory:</span>
+        <button class="switch" type="button" id="sw-mem" aria-pressed="true" aria-label="Toggle memory"></button>
+        <span class="switch-state" id="sw-mem-state">On</span>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label lit">samples:</span>
+        <button class="switch" type="button" id="sw-samp" aria-pressed="true" aria-label="Toggle samples"></button>
+        <span class="switch-state" id="sw-samp-state">On</span>
+      </div>
+      <div class="live" aria-live="polite">
+        <span id="live-status">IDLE</span>
+        <span>STREAM <b id="live-tps">— TOK/S</b></span>
+      </div>
+    </div>
+    <div class="outNote" id="outNote"></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== System view ===== -->
+<section class="system-view" id="view-system" hidden aria-label="System">
+  <div class="sys-grid">
+    <div class="sys-stack">
+      <div class="sys-card">
+        <div class="panel-head"><span>Servers</span><span class="val">LOCAL</span></div>
+        <div class="srv">
+          <div>
+            <div class="srv-name">CHAT SERVER</div>
+            <div class="srv-sub">llama.cpp · 127.0.0.1 · on-device</div>
+          </div>
+          <span class="srv-status" id="srv-chat-status">—</span>
+          <div class="srv-actions">
+            <button class="srv-btn" type="button" onclick="restartServer('chat')">Start</button>
+            <button class="srv-btn" type="button" onclick="restartServer('chat')">Restart</button>
+          </div>
+        </div>
+        <div class="srv">
+          <div>
+            <div class="srv-name">EMBED SERVER</div>
+            <div class="srv-sub">EmbeddingGemma · CPU/RAM · vector memory</div>
+          </div>
+          <span class="srv-status" id="srv-embed-status">—</span>
+          <div class="srv-actions">
+            <button class="srv-btn" type="button" onclick="restartServer('embed')">Start</button>
+            <button class="srv-btn" type="button" onclick="restartServer('embed')">Restart</button>
+          </div>
+        </div>
+        <div class="srv">
+          <div>
+            <div class="srv-name">NODE POLLER</div>
+            <div class="srv-sub">mailbox · text-only · node.darknet.ca</div>
+          </div>
+          <span class="srv-status" id="srv-poller-status">—</span>
+          <div class="srv-actions">
+            <button class="srv-btn" type="button" onclick="pollerControl('start')">Start</button>
+            <button class="srv-btn" type="button" onclick="pollerControl('stop')">Stop</button>
+          </div>
+        </div>
+        <div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" onclick="restartServer('both')">Restart both</button>
+          <button type="button" onclick="loadServers()">Refresh servers</button>
+        </div>
+        <div id="serverOut" style="padding:0 12px 10px;font-size:11px;color:var(--dim)">Loading servers…</div>
+        <div class="panel-head"><span>Log — last lines</span><span class="val" id="log-count">0</span></div>
+        <div class="log" id="sys-log"></div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>Chat packages — verify</span></div>
+        <div style="padding:10px 12px">
+          <p class="small">A package is a chat export signed by a node. Verification uses only the public key inside the package — open a package file shared by another node to check it here. Nothing is sent anywhere else.</p>
+          <input type="file" id="pkgFile" accept=".json,application/json">
+          <button type="button" onclick="verifyPackageFile()" style="margin-top:8px">Verify package</button>
+          <p class="small" id="pkgVerifyOut"></p>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>Block ledger</span><span class="val" id="sys-ledger-val">LIVE</span></div>
+        <div style="padding:10px 12px">
+          <p class="small">This node's own ledger: signed, hash-chained events from data/ledger.json, re-verified on every refresh. 50MB chunks live in data/blocks/ for node-to-node transfer.</p>
+          <div id="sys-ledger-table"></div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>regula_core</span><span class="val" id="sys-regula-val">LIVE</span></div>
+        <div style="padding:10px 12px">
+          <p class="small">Live identity + signing proof from this node's identity.dat — nothing sampled.</p>
+          <div id="sys-regula-lines" style="font-size:13px;line-height:1.8"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sys-stack">
+      <div class="sys-card">
+        <div class="panel-head"><span>GPU</span><span class="val">LIVE</span></div>
+        <div class="big-tps">
+          <div class="num"><span id="gpu-val">—</span><small> % UTIL</small></div>
+          <div class="note" id="gpu-note">LOCAL GPU · TEMP — · CHAT ON GPU</div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>System RAM</span><span class="val">LIVE</span></div>
+        <div class="big-tps">
+          <div class="num"><span id="ram-val">—</span><small> % USED</small></div>
+          <div class="note">EMBEDDINGS ON CPU/RAM · MODEL + KV CACHE RESIDENT</div>
+        </div>
+        <div class="meter">
+          <div class="top"><span>RAM USED</span><b id="ram-label">—</b></div>
+          <div class="bar" id="ram-bar" aria-hidden="true"></div>
+          <div class="top" style="margin:6px 0 0"><span>SWAP</span><b id="ram-swap">0%</b></div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>Node</span><span class="val" id="sys-node-val">—</span></div>
+        <div class="kv">
+          <div class="row"><span>REGULA_CORE</span><b class="g" id="sys-regula-core">…</b></div>
+          <div class="row"><span>BLOCK LEDGER</span><b class="g" id="sys-block-ledger">…</b></div>
+          <div class="row"><span>PEERS</span><b>—</b></div>
+          <div class="row"><span>EGRESS</span><b>—</b></div>
+          <div class="row"><span>HUB VERSION</span><b>0.0.1</b></div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>System detail</span></div>
+        <div id="systemOut" style="padding:10px 12px;font-size:12px;color:var(--dim)"></div>
+      </div>
+      <button type="button" onclick="loadSystem()">Refresh now</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Other tabs ===== -->
+<div id="view-node" class="tabview" hidden><div class="panel">
+<div class="node-layout">
+<nav class="node-menu" aria-label="Node pages">
+<button type="button" class="node-menu-btn" data-nodepage="identity" aria-pressed="false" onclick="showNodePage('identity')">◈ Identity</button>
+<button type="button" class="node-menu-btn active" data-nodepage="lobby" aria-pressed="true" onclick="showNodePage('lobby')"># Lobby</button>
+<button type="button" class="node-menu-btn" data-nodepage="peers" aria-pressed="false" onclick="showNodePage('peers')">◎ Peers</button>
+<button type="button" class="node-menu-btn" data-nodepage="chat" aria-pressed="false" onclick="showNodePage('chat')">✉ Private chat</button>
+<button type="button" class="node-menu-btn" data-nodepage="files" aria-pressed="false" onclick="showNodePage('files')">▦ Files</button>
+<button type="button" class="node-menu-btn" data-nodepage="jobs" aria-pressed="false" onclick="showNodePage('jobs')">▶ Jobs</button>
+<button type="button" class="node-menu-btn" data-nodepage="transfers" aria-pressed="false" onclick="showNodePage('transfers')">⇄ Transfers</button>
+<button type="button" class="node-menu-btn" data-nodepage="serving" aria-pressed="false" onclick="showNodePage('serving')">⚙ Serving</button>
+<button type="button" class="node-menu-btn" data-nodepage="poller" aria-pressed="false" onclick="showNodePage('poller')">● Poller</button>
+</nav>
+<div class="node-pages">
+<div class="node-page" id="nodePage-lobby">
+<h3>Lobby — public IRC chat</h3>
+<p class="small">Everyone listed can read this. A message shows the sender's announced name, with their node_id small underneath — the node_id comes from their public key, so someone can't just type another node's name and pass as them. No name set, no sending (see Identity in the left menu).</p>
+<div id="nodeCard" hidden></div>
+<div class="irc-row">
+<div class="irc-main">
+<div id="nodeLobby" class="lobby-list"></div>
+<div id="nodeLobbyGate" class="node-gate" hidden>Set a name first — you can't chat in the lobby until you set a name.</div>
+<input id="nodeLobbyText" placeholder="public message…"><span class="console-cursor" aria-hidden="true"></span>
+<button type="button" id="nodeLobbySendBtn" onclick="sendLobby()">Send to lobby</button>
+<button type="button" onclick="pollNodeLobby();refreshPresence()">Refresh lobby</button>
+<button type="button" onclick="announceNode()">Announce</button>
+<div id="nodeLobbyOut" class="small"></div>
+</div>
+<aside id="nodePresence" class="irc-roster" aria-label="Present now"></aside>
+</div>
+</div>
+<div class="node-page" id="nodePage-identity" hidden>
+<h3>Identity</h3>
+<p class="small">This node on node.darknet.ca (Gopher model: the list is open, the gates are per-node). One identity.dat serves both the Hub and the node — the HUB- and NODE- fingerprints below come from the same key. Identity is created on first run; set a name below to announce it. Your node_id comes from your public key, so it can't be spoofed.</p>
+<label>Node name</label><input id="nodeName" placeholder="set a name to announce">
+<button type="button" onclick="saveNodeName()">Save name</button>
+<button type="button" onclick="announceNode()">Announce</button>
+<div id="nodeIdent" style="margin-top:10px"></div>
+<div id="nodeAnnounceOut" class="small"></div>
+<div id="nodeListNameHint" class="small" hidden></div>
+<div id="nodeNameGate" class="node-gate" hidden>Set a name first — you can read the lobby, but you can't chat until you set a name.</div>
+<p class="small">Endpoint: the Hub announces without an endpoint, so direct node-to-node connections use the mailbox until an endpoint is set. A peer's card shows its shared endpoint when it has one.</p>
+</div>
+<div class="node-page" id="nodePage-peers" hidden>
+<h3>Peers</h3>
+<button type="button" onclick="loadNode()">Refresh peers</button>
+<div id="nodePeers" style="margin-top:10px"></div>
+<div id="nodePeersOut" class="small"></div>
+</div>
+<div class="node-page" id="nodePage-chat" hidden>
+<h3>Private chat</h3>
+<p class="small">Sysop chat, peer to peer — a separate chatbox queue, so the job poller can never eat these messages.</p>
+<button type="button" onclick="pollNodeChat()">Fetch my chat messages</button>
+<div id="nodeChat" style="margin-top:10px"></div>
+<input id="nodeChatTo" placeholder="recipient pubkey (66 hex)">
+<input id="nodeChatText" placeholder="private message…">
+<button type="button" onclick="sendNodeChat()">Send private message</button>
+</div>
+<div class="node-page" id="nodePage-files" hidden>
+<h3>Files</h3>
+<p class="small">Public file offers from listed nodes. Each receiver decides its own downloads — there is no central accept step.</p>
+<button type="button" onclick="loadNode()">Refresh files</button>
+<div id="nodeUploads" style="margin-top:10px"></div>
+<h4 style="margin-top:16px">Local shared files (regula ledger)</h4>
+<p class="small">Voices stored here from the waveform player, each with a signed ledger event. Publish one to list it as a public file offer.</p>
+<div id="nodeSharedFiles" style="margin-top:10px"></div>
+<h4 style="margin-top:16px">Ledger — latest block events</h4>
+<p class="small">Every session, story, ezine, code file, sample, model, and shared file lands here as a signed, chained event. 50MB chunks live in data/blocks/ for node-to-node transfer.</p>
+<div id="nodeLedgerEvents" style="margin-top:10px"></div>
+</div>
+<div class="node-page" id="nodePage-jobs" hidden>
+<h3>Jobs — use a peer's model, voice, or image queue</h3>
+<input id="nodeJobTo" placeholder="peer pubkey (66 hex)">
+<select id="nodeJobCap"><option value="text">text</option><option value="tts">tts</option><option value="image">image</option></select>
+<input id="nodeJobText" placeholder="ask the peer's model… (text / tts)">
+<input id="nodeJobVoice" placeholder="voice (tts, default mya-03)">
+<input id="nodeJobPrompt" placeholder="image prompt">
+<input id="nodeJobSize" placeholder="image size WxH (default 512x512)">
+<input id="nodeJobSeed" placeholder="image seed (blank = server picks)">
+<input id="nodeJobEngine" placeholder="image engine (blank = peer default, e.g. z-image)">
+<button type="button" onclick="sendNodeJob()">Send job</button>
+<button type="button" onclick="pollNodeJobs()">Fetch job replies</button>
+<button type="button" onclick="saveDefaultVoicePeer()">Save as default voice peer</button>
+<span id="defaultVoicePeerOut" class="small"></span>
+<div id="nodeJobOut" style="margin-top:10px"></div>
+</div>
+<div class="node-page" id="nodePage-transfers" hidden>
+<h3>Transfers — node-to-node jobs, tracked</h3>
+<p class="small">Every text, voice, and image job you send, with its status — like a torrent client. Auto-refreshes every 5 seconds while this page is open; Fetch pulls fresh replies from your mailbox now.</p>
+<button type="button" onclick="refreshTransfers()">Fetch replies + refresh</button>
+<div id="nodeTransfers" style="margin-top:10px"></div>
+<div id="nodeTransfersReplies" style="margin-top:10px"></div>
+<div id="nodeTransfersOut" class="small"></div>
+</div>
+<div class="node-page" id="nodePage-serving" hidden>
+<h3>Serving — what this node serves by default</h3>
+<p class="small">These defaults decide what your node runs when a peer sends it a job, and what your next Announce shares (including a public endpoint for direct connections). Leave the backend blank to keep the poller's command-line default.</p>
+<label>Text backend</label>
+<select id="nodeServeBackend"><option value="">(poller default)</option><option value="llama">Local LFM3 (llama-server)</option><option value="ollama">Local Ollama</option><option value="openrouter">Cloud: OpenRouter</option><option value="nvidia">Cloud: Nvidia</option></select>
+<label>Cloud model (cloud backends only)</label><input id="nodeServeModel" placeholder="e.g. liquid/lfm-2.5-2.6b:free">
+<label>Cloud key (cloud backends only)</label><input id="nodeServeKey" type="password" placeholder="leave blank to keep the stored key">
+<p class="small">A cloud key is stored on disk (0600) so this node can serve while you are away. Only set it if you mean it — switching back to a local backend deletes the stored key.</p>
+<label>Default TTS voice</label><input id="nodeServeVoice" placeholder="voice (default mya-03)">
+<label>Public endpoint (optional, https://)</label><input id="nodeServeEndpoint" placeholder="e.g. https://your-tunnel.trycloudflare.com">
+<p class="small">Shared on your next Announce so peers that can reach it may connect direct; peers behind NAT still use the mailbox relay.</p>
+<button type="button" onclick="saveServing()">Save serving defaults</button>
+<span id="nodeServeOut" class="small"></span>
+</div>
+<div class="node-page" id="nodePage-poller" hidden>
+<h3>Poller</h3>
+<div id="nodePollerStatus"></div>
+<button type="button" onclick="pollerControl('start')">Start poller</button>
+<button type="button" onclick="pollerControl('stop')">Stop poller</button>
+<button type="button" onclick="loadNodePollerLog()">Refresh log</button>
+<div id="nodePollerLog" class="log" style="margin-top:10px"></div>
+</div>
+</div>
+</div>
+</div></div>
+
+<div id="view-stories" class="tabview" hidden><div class="panel">
+<h2>Stories &amp; Storyboard</h2>
+<p class="small">Context stays within the configured window. Total output grows on disk, to 256k tokens and beyond. Writing is resumable — if it stops, write again and it continues at the next block.</p>
+<label>Premise</label><input id="sPremise" placeholder="A lighthouse keeper finds a door in the water">
+<label>Genre</label><input id="sGenre" placeholder="horror">
+<label>Perspective</label><select id="sPersp"><option value="">3rd (default)</option><option value="1st">1st person</option><option value="2nd">2nd person</option><option value="3rd">3rd person</option><option value="omniscient">Omniscient</option></select>
+<label>Rating</label><select id="sRating"><option>PG-13</option><option>G</option><option>PG</option><option>R</option><option>X</option></select>
+<label>Plot</label><textarea id="sPlot" placeholder="Keeper finds a door, something comes through…"></textarea>
+<label>Outline</label><textarea id="sOutline" placeholder="1. The door appears 2. The first visitor…"></textarea>
+<label>Samples to use as reference (tick to use)</label><div id="storySamples"></div>
+<button type="button" onclick="newStory()">Create story</button>
+<button type="button" onclick="loadStories()">Refresh list</button>
+<div id="storyList"></div>
+<div id="storyboard" style="margin-top:16px"></div>
+<div id="storyOut" style="margin-top:14px"><pre id="storyText" style="white-space:pre-wrap"></pre></div>
+</div></div>
+
+<div id="view-ezines" class="tabview" hidden><div class="panel">
+<h2>Ezines — for darknet.ca subscribers</h2>
+<p class="small">An ezine is a collection: cover + table of contents + pieces (stories and articles). 100 pages = 20,000 words, 300 pages = 60,000 words. Compile exports a single darknet.ca-style HTML file you can post as-is.</p>
+<label>Title</label><input id="ezTitle" placeholder="Darknet Ezine">
+<label>Issue</label><input id="ezIssue" placeholder="1">
+<label>Tagline</label><input id="ezTagline" placeholder="Stories from the underground">
+<button type="button" onclick="newEzine()">Create ezine</button>
+<button type="button" onclick="loadEzines()">Refresh</button>
+<div id="ezineList"></div>
+</div></div>
+
+<div id="view-code" class="tabview" hidden><div class="panel">
+<h2>Uncensored Code</h2>
+<p class="small">Ask for code, get it in fenced blocks, save it to <code>data/code/</code> — and it is embedded into vector memory, so future code questions retrieve your own patterns.</p>
+<label>What should the code do?</label><textarea id="codePrompt" placeholder="Write a Python function that…"></textarea>
+<label>Save as (optional, e.g. helper.py)</label><input id="codeFile" placeholder="helper.py">
+<button type="button" onclick="askCode()">Generate code</button>
+<pre id="codeOut" style="white-space:pre-wrap"></pre>
+</div></div>
+
+<div id="view-search" class="tabview" hidden><div class="panel">
+<h2>Library Search — EmbeddingGemma, full use</h2>
+<p class="small">One vector DB for everything: chat, story blocks, ezine pieces, code, samples, PDFs. Search it by meaning, not keywords.</p>
+<label>Search the library</label><input id="searchQ" placeholder="Italy travel facts, lighthouse stories, python helpers…">
+<button type="button" onclick="doSearch()">Search</button>
+<div id="searchOut" style="margin-top:14px"></div>
+</div></div>
+
+<div id="view-memory" class="tabview" hidden><div class="panel">
+<h2>Memory</h2>
+<p class="small">Embed model runs by default. Every chat (local or cloud) is embedded and saved here, and relevant memories are pulled into the next answer when “Use memory” is on.</p>
+<label>Remember this</label><textarea id="memText"></textarea>
+<button type="button" onclick="remember()">Remember</button>
+<label>Recall</label><input id="recallQ" placeholder="lighthouse keeper door">
+<button type="button" onclick="recall()">Recall</button>
+<div id="memOut" style="margin-top:14px"></div>
+</div></div>
+
+<div id="view-samples" class="tabview" hidden><div class="panel">
+<h2>Samples &amp; PDFs</h2>
+<p class="small">Drop .txt/.md files in <code>data/samples/</code>, or upload a PDF here (e.g. a travel guide to Italy). Text is extracted, chunked, and embedded with EmbeddingGemma-2. Samples are style/fact inspiration only — never copied verbatim into a story, unless they are facts you asked to use (like travel facts from an ingested guide).</p>
+<input type="file" id="pdfFile" accept=".pdf,.txt,.md">
+<button type="button" onclick="uploadPdf()">Upload &amp; ingest</button>
+<button type="button" onclick="ingestSamples()">Ingest samples folder</button>
+<button type="button" onclick="loadSamples()">Refresh</button>
+<div id="samplesOut" style="margin-top:14px"></div>
+<div id="sampleChecks" style="margin-top:14px"></div>
+</div></div>
+
+<div id="view-settings" class="tabview" hidden><div class="panel">
+<h2>Settings &amp; API Test</h2>
+<p class="small">Keys are stored in <b>your browser only</b> (localStorage) and sent with each cloud request. The server never writes them to disk. You can also set <code>OPENROUTER_API_KEY</code> / <code>NVIDIA_API_KEY</code> in WSL instead.</p>
+<label>OpenRouter API key</label><input id="keyOR" type="password" placeholder="sk-or-…">
+<label>OpenRouter model for test</label><input id="testModelOR" placeholder="recursive/flint-v1.0:free">
+<button type="button" onclick="testApi('openrouter')">Test OpenRouter</button>
+<label>Nvidia API key</label><input id="keyNV" type="password" placeholder="nvapi-…">
+<label>Nvidia model for test</label><input id="testModelNV" placeholder="nvidia/llama-3.1-nemotron-70b-instruct">
+<button type="button" onclick="testApi('nvidia')">Test Nvidia</button>
+<button type="button" onclick="testLocal()">Test local chat + embed</button>
+<p class="small" id="apiTestOut"></p>
+<label>Chat temperature</label><input id="tempInput" type="number" step="0.1" min="0" max="2" value="0.7">
+<label>Max tokens per answer</label><input id="maxTokInput" type="number" value="2048">
+<button type="button" onclick="saveKeys()">Save keys in this browser</button>
+<button type="button" onclick="clearKeys()">Clear keys</button>
+<p class="small" id="keyNote"></p>
+</div></div>
+
+<!-- ===== Status bar ===== -->
+<footer class="statusbar">
+  <span class="seg"><span class="dot"></span><b>LINK OK</b></span>
+  <span class="seg hide-sm">ENGINE <b>READY</b></span>
+  <span class="seg hide-sm">MEMORY <b>MOUNTED</b></span>
+  <span class="seg"><span class="dot amber"></span>NET <b>ISOLATED</b></span>
+  <span class="seg grow"></span>
+  <span class="seg hide-sm">regula_core: <b>OK</b> · block ledger: <b>OK</b></span>
+  <span class="seg hide-sm" id="bottomStatus">loading…</span>
+</footer>
+
+<!-- ===== Models view ===== -->
+<div id="view-models" class="tabview" hidden><div class="panel">
+<h2>Models — Hugging Face</h2>
+<p class="small">Browse a collection or a single repo and download GGUF files into <code>models/</code>. Downloading a model does <b>not</b> switch the active chat model — pick it in Chat after it lands.</p>
+<label>Collection slug</label><input id="hfCollection" value="chwoo/uncensored-models" placeholder="owner/collection">
+<label>Repo id (optional — overrides the collection above)</label><input id="hfRepo" placeholder="owner/repo">
+<label>HF token (optional — only for gated/private repos)</label><input id="hfToken" type="password" placeholder="hf_…">
+<p class="small">The token is sent with this request only. It is never written to disk, never logged, and never returned by the server. Public collections and repos need no token.</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button type="button" onclick="loadHfModels()">Load list</button>
+<button type="button" onclick="loadHfLocal()">Local files</button>
+</div>
+<p class="small" id="hfStatus"></p>
+<p class="small">GPU memory required is an <b>ESTIMATE</b>: file size × 1.2 (weights + ~20% overhead allowance for KV cache / context) — not measured. Quantization is parsed from the filename; a dash means the API gave no size or no known quant token — never a fabricated number.</p>
+<div id="hfResults"></div>
+<h3 style="margin-top:14px">On disk — models/</h3>
+<div id="hfLocal"></div>
+</div></div>
+
+<!-- ===== All-sessions drawer ===== -->
+<div class="scrim" id="drawer-scrim" hidden></div>
+<aside class="drawer" id="session-drawer" aria-label="All sessions" aria-hidden="true">
+  <div class="drawer-head"><span>All sessions</span><span class="val" id="drawer-count">0 TOTAL</span><button class="drawer-close" id="drawer-close" type="button" aria-label="Close session list">✕</button></div>
+  <div class="drawer-nav" aria-label="Navigate">
+    <button class="drawer-navbtn" data-tab="chat" type="button" onclick="showTab('chat')">Chat</button>
+    <button class="drawer-navbtn" data-tab="stories" type="button" onclick="showTab('stories')">Stories &amp; Storyboard</button>
+    <button class="drawer-navbtn" data-tab="ezines" type="button" onclick="showTab('ezines')">Ezines (100–300 pages)</button>
+    <button class="drawer-navbtn" data-tab="code" type="button" onclick="showTab('code')">Code</button>
+    <button class="drawer-navbtn" data-tab="search" type="button" onclick="showTab('search')">Library Search</button>
+    <button class="drawer-navbtn" data-tab="memory" type="button" onclick="showTab('memory')">Memory</button>
+    <button class="drawer-navbtn" data-tab="samples" type="button" onclick="showTab('samples')">Samples &amp; PDFs</button>
+    <button class="drawer-navbtn" data-tab="system" type="button" onclick="showTab('system')">System</button>
+    <button class="drawer-navbtn" data-tab="models" type="button" onclick="showTab('models')">Models</button>
+    <button class="drawer-navbtn" data-tab="settings" type="button" onclick="showTab('settings')">Settings &amp; API Test</button>
+  </div>
+  <div class="drawer-list" id="drawer-list"></div>
+  <div class="drawer-foot"><button class="drawer-new" id="drawer-new" type="button">+ NEW WORKSPACE</button></div>
+</aside>
+
+<!-- ===== New workspace picker ===== -->
+<div class="picker-overlay" id="picker" hidden>
+  <div class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <div class="picker-head">
+      <h2 id="picker-title">New workspace</h2>
+      <p>What kind of work is this? Pick one — you can always start more later.</p>
+    </div>
+    <div class="picker-grid">
+      <button class="pick" type="button" data-type="chat">
+        <span class="pick-tag">CHAT</span>
+        <span class="pick-main"><b>Chat</b><span class="pick-desc">Everyday talk — questions, drafts, decisions, thinking out loud.</span></span>
+      </button>
+      <button class="pick" type="button" data-type="story">
+        <span class="pick-tag">STORY/EZINE</span>
+        <span class="pick-main"><b>Story / Ezine</b><span class="pick-desc">Long-form writing — chapters, scenes, and serial parts that build over time.</span></span>
+      </button>
+      <button class="pick" type="button" data-type="code">
+        <span class="pick-tag">CODE SPACES</span>
+        <span class="pick-main"><b>Code spaces</b><span class="pick-desc">Build and debug — snippets, tests, and fixes with the runner close at hand.</span></span>
+      </button>
+      <button class="pick" type="button" data-type="research">
+        <span class="pick-tag">RESEARCH</span>
+        <span class="pick-main"><b>Research</b><span class="pick-desc">Look things up — sources, notes, and comparisons kept together.</span></span>
+      </button>
+    </div>
+    <button class="picker-cancel" id="picker-cancel" type="button">Cancel</button>
+  </div>
+</div>
+
+<script>
+let messages=[], currentSid=null, currentType='CHAT', provider='local', selectedSamples=[];
+let allSessions=[];
+const TYPE_TAGS={chat:'CHAT',story:'STORY/EZINE',code:'CODE SPACES',research:'RESEARCH'};
+const VIEWS=['chat','system','node','stories','ezines','code','search','memory','samples','settings','models'];
+
+function $(id){return document.getElementById(id);}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// ---- Models (Hugging Face) ----
+function hfHeaders(){
+  const t = ($('hfToken')||{}).value || '';
+  return t ? {'X-HF-Token': t} : {};
+}
+function fmtBytes(n){
+  if(n===null || n===undefined) return '—';
+  const u=['B','KB','MB','GB','TB']; let i=0;
+  while(n>=1024 && i<u.length-1){ n/=1024; i++; }
+  return (i===0 ? n + ' ' : n.toFixed(1) + ' ') + u[i];
+}
+function hfFileRow(repo, f){
+  const quant = f.quant || '—';
+  const size = fmtBytes(f.size);
+  const gpu = (f.gpu_gb_est!==null && f.gpu_gb_est!==undefined) ? f.gpu_gb_est.toFixed(2) + ' GB (est.)' : '—';
+  const dl = f.downloads!==null && f.downloads!==undefined ? f.downloads : '—';
+  return '<div class="hf-row" style="border:1px solid var(--line);padding:8px 10px;margin:6px 0">'
+    + '<div style="font-size:12.5px;word-break:break-all">' + escHtml(f.name) + '</div>'
+    + '<div class="small">QUANT <b>' + escHtml(quant) + '</b> · SIZE <b>' + size + '</b> · GPU MEMORY REQUIRED <b>' + gpu + '</b></div>'
+    + '<div style="margin-top:6px"><button type="button" onclick="hfDownload(' + JSON.stringify(repo).replace(/"/g,'&quot;') + ',' + JSON.stringify(f.name).replace(/"/g,'&quot;') + ',' + (f.size||0) + ',' + JSON.stringify(f.sha256||'').replace(/"/g,'&quot;') + ')">Download</button> <span class="small" id="hf-dl-' + escHtml(f.name).replace(/[^A-Za-z0-9]/g,'') + '"></span></div></div>';
+}
+function hfRepoBlock(m){
+  let html = '<div class="hf-repo" style="margin:12px 0"><h3 style="margin:0 0 4px;word-break:break-all">' + escHtml(m.repo) + '</h3>';
+  html += '<div class="small">DOWNLOADS <b>' + (m.downloads!==null && m.downloads!==undefined ? m.downloads : '—') + '</b> · LAST MODIFIED <b>' + (m.last_modified ? escHtml(m.last_modified) : '—') + '</b></div>';
+  if(!m.files || !m.files.length){ html += '<p class="small">No GGUF files listed for this repo.</p>'; }
+  else m.files.forEach(function(f){ html += hfFileRow(m.repo, f); });
+  return html + '</div>';
+}
+async function loadHfModels(){
+  const slug = ($('hfCollection')||{}).value.trim();
+  const repo = ($('hfRepo')||{}).value.trim();
+  $('hfStatus').textContent = 'Loading…';
+  try{
+    let data;
+    if(repo){
+      const r = await fetch('/api/hf/model?repo=' + encodeURIComponent(repo), {headers: hfHeaders()});
+      data = await r.json();
+      if(data.error) throw new Error(data.error);
+      $('hfResults').innerHTML = hfRepoBlock(data);
+    } else {
+      if(!slug || slug.indexOf('/') < 0) throw new Error('Enter a collection slug like owner/name, or a repo id.');
+      const r = await fetch('/api/hf/collection?slug=' + encodeURIComponent(slug), {headers: hfHeaders()});
+      data = await r.json();
+      if(data.error) throw new Error(data.error);
+      $('hfResults').innerHTML = (data.models||[]).map(hfRepoBlock).join('') || '<p class="small">No models in this collection.</p>';
+    }
+    $('hfStatus').textContent = 'Loaded.';
+  } catch(e){ $('hfStatus').textContent = 'Failed: ' + e.message; }
+}
+async function loadHfLocal(){
+  try{
+    const r = await fetch('/api/hf/local');
+    const data = await r.json();
+    $('hfLocal').innerHTML = (data.models||[]).map(function(m){
+      return '<div class="small" style="padding:2px 0">' + escHtml(m.name) + ' · ' + fmtBytes(m.size) + ' · ' + escHtml(m.quant||'—') + '</div>';
+    }).join('') || '<p class="small">No GGUF files in models/ yet.</p>';
+  } catch(e){ $('hfLocal').textContent = 'Failed: ' + e.message; }
+}
+async function hfDownload(repo, name, size, sha256){
+  const spanId = 'hf-dl-' + name.replace(/[^A-Za-z0-9]/g,'');
+  const span = document.getElementById(spanId);
+  if(span) span.textContent = 'Starting…';
+  try{
+    const r = await fetch('/api/hf/download', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({repo: repo, filename: name, size: size||undefined, sha256: sha256||undefined, token: ($('hfToken')||{}).value || undefined})});
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const job = data.job;
+    const poll = setInterval(async function(){
+      try{
+        const rr = await fetch('/api/hf/download/' + encodeURIComponent(job));
+        const st = await rr.json();
+        if(span) span.textContent = st.state === 'running' ? ('Downloading… ' + fmtBytes(st.downloaded||0) + (st.size ? ' / ' + fmtBytes(st.size) : '')) : (st.state === 'done' ? ('Done via ' + (st.method||'') + ' — ' + fmtBytes(st.downloaded||0)) : ('Failed: ' + (st.error||'')));
+        if(st.state !== 'running'){ clearInterval(poll); loadHfLocal(); }
+      } catch(e){ clearInterval(poll); if(span) span.textContent = 'Status failed: ' + e.message; }
+    }, 2000);
+  } catch(e){ if(span) span.textContent = 'Failed: ' + e.message; }
+}
+
+function showTab(name){
+  closeDrawer();
+  VIEWS.forEach(function(v){
+    const el = v==='chat' ? $('view-chat') : $('view-'+v);
+    if(el) el.hidden = (v!==name);
+  });
+  document.querySelectorAll('.view-tab').forEach(function(b){
+    b.setAttribute('aria-pressed', String(b.dataset.tab===name));
+  });
+  document.querySelectorAll('.drawer-navbtn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.tab===name);
+  });
+  if(name==='stories') loadStories();
+  if(name==='system'){ loadSystem(); loadServers(); }
+  if(name==='node'){ loadNode(); startNodeAutoRefresh(); } else { stopNodeAutoRefresh(); }
+  if(name==='samples') loadSamples();
+  if(name==='ezines') loadEzines();
+  if(name==='chat'){ const inp=$('chatInput'); if(inp) inp.focus(); }
+}
+// Node tab sub-pages (left menu) + IRC-style auto-refresh while the
+// Node tab is open: lobby messages every 5s, presence every 60s,
+// private chat every 5s while its page is open — reads, not job polls,
+// so the 60s mailbox write budget is untouched.
+var nodeTimer = null;
+var presenceTimer = null;
+var chatTimer = null;
+var transferTimer = null;
+function showNodePage(page){
+  document.querySelectorAll('.node-page').forEach(function(el){ el.hidden = true; });
+  const pg = $('nodePage-' + page);
+  if(pg) pg.hidden = false;
+  document.querySelectorAll('.node-menu-btn').forEach(function(b){
+    const on = b.dataset.nodepage === page;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  window._nodePage = page;
+  if(page === 'lobby'){ pollNodeLobby(); refreshPresence(); }
+  if(page === 'chat'){ pollNodeChat(); startChatAutoRefresh(); } else { stopChatAutoRefresh(); }
+  if(page === 'transfers'){ refreshTransfers(); startTransferAutoRefresh(); } else { stopTransferAutoRefresh(); }
+  if(page === 'serving'){ loadServing(); }
+}
+function startNodeAutoRefresh(){
+  stopNodeAutoRefresh();
+  nodeTimer = setInterval(function(){ pollNodeLobby(); }, 5000);
+  presenceTimer = setInterval(function(){ refreshPresence(); }, 60000);
+  refreshPresence();
+}
+function stopNodeAutoRefresh(){
+  if(nodeTimer){ clearInterval(nodeTimer); nodeTimer = null; }
+  if(presenceTimer){ clearInterval(presenceTimer); presenceTimer = null; }
+  stopChatAutoRefresh();
+  stopTransferAutoRefresh();
+}
+function startChatAutoRefresh(){
+  stopChatAutoRefresh();
+  chatTimer = setInterval(function(){ pollNodeChat(); }, 5000);
+}
+function stopChatAutoRefresh(){
+  if(chatTimer){ clearInterval(chatTimer); chatTimer = null; }
+}
+// Switches (Draft 4 button style): aria-pressed + On/Off state text.
+function switchOn(id){ const b=$(id); return b && b.getAttribute('aria-pressed')==='true'; }
+function thinkOn(){ return switchOn('sw-think'); }
+function memOn(){ return switchOn('sw-mem'); }
+function sampOn(){ return switchOn('sw-samp'); }
+function wireSwitch(id, stateId, after){
+  const btn=$(id), st=$(stateId);
+  btn.addEventListener('click', function(){
+    const onNow = btn.getAttribute('aria-pressed')==='true';
+    btn.setAttribute('aria-pressed', String(!onNow));
+    st.textContent = !onNow ? 'On' : 'Off';
+    if(after) after(!onNow);
+  });
+}
+wireSwitch('sw-think','sw-think-state');
+wireSwitch('sw-mem','sw-mem-state', function(on){
+  const mb=$('memory-block');
+  if(mb) mb.classList.toggle('mem-off', !on);
+  if(!on) showMemoryDetail('MEMORY OFF','Use memory is off for this session — the constellation stays mounted, but nothing is pulled into context.');
+});
+wireSwitch('sw-samp','sw-samp-state');
+// Telemetry window: floating button in the chat area opens it.
+function openTele(){
+  const w=$('teleWindow'), s=$('tele-scrim');
+  if(!w) return;
+  w.classList.add('open'); w.setAttribute('aria-hidden','false');
+  if(s){ s.hidden=false; requestAnimationFrame(function(){ s.classList.add('show'); }); }
+}
+function closeTele(){
+  const w=$('teleWindow'), s=$('tele-scrim');
+  if(!w) return;
+  w.classList.remove('open'); w.setAttribute('aria-hidden','true');
+  if(s){ s.classList.remove('show'); s.hidden=true; }
+}
+$('tele-btn').addEventListener('click', openTele);
+$('tele-close').addEventListener('click', closeTele);
+$('tele-scrim').addEventListener('click', closeTele);
+// Reasoning panels: delegated toggle (Draft 4 think-head pattern).
+document.addEventListener('click', function(e){
+  const h = e.target && e.target.closest ? e.target.closest('.think-head') : null;
+  if(!h) return;
+  const body = h.parentNode.querySelector('.think-body');
+  const open = h.getAttribute('aria-expanded')==='true';
+  h.setAttribute('aria-expanded', String(!open));
+  if(body) body.hidden = open;
+  const lbl = h.querySelector('.think-label');
+  if(lbl && lbl.textContent.indexOf('done')!==-1){
+    lbl.textContent = open ? 'Reasoning — done · click to expand' : 'Reasoning — done · click to collapse';
+  }
+});
+
+// ---------- Messages (Draft 4 article chrome) ----------
+function updateCount(){
+  // Transcript length, not article count: the welcome sys article is not a message.
+  $('msg-count').textContent = messages.length + ' MESSAGES';
+}
+function addMsg(role, text, model, extra){
+  const cls = role==='user' ? 'you' : (role==='system' ? 'sys' : 'hub');
+  const who = role==='user' ? 'You' : (role==='system' ? 'System' : (model || 'Hub'));
+  const art = document.createElement('article');
+  art.className = 'msg ' + cls;
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const w = document.createElement('span'); w.className='who'; w.textContent=who;
+  const t = document.createElement('span'); t.textContent = (extra && extra.ts) ? new Date(extra.ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+  meta.append(w, t);
+  const body = document.createElement('div');
+  body.className = 'body';
+  const p = document.createElement('p'); p.textContent = text;
+  body.appendChild(p);
+  art.append(meta, body);
+  if(role !== 'system'){
+    const foot = document.createElement('div');
+    foot.className = 'foot';
+    const cp = document.createElement('button'); cp.type='button'; cp.textContent='Copy';
+    cp.onclick = function(){ navigator.clipboard.writeText(text).then(function(){ cp.textContent='Copied'; setTimeout(function(){ cp.textContent='Copy'; }, 1200); }); };
+    const del = document.createElement('button'); del.type='button'; del.textContent='Delete';
+    del.onclick = function(){ art.remove(); messages = messages.filter(function(m){ return !(m.role===role && m.content===text); }); updateCount(); saveSession(); };
+    foot.append(cp, del);
+    if(role === 'assistant'){
+      const regen = document.createElement('button'); regen.type='button'; regen.textContent='Regenerate';
+      regen.onclick = function(){ regenerate(art); };
+      foot.appendChild(regen);
+      const vb = document.createElement('button'); vb.type='button'; vb.textContent='Generate voice';
+      vb.onclick = function(){ voiceForText(encodeURIComponent(text).replace(/'/g, '%27'), vb); };
+      foot.appendChild(vb);
+    }
+    art.appendChild(foot);
+    // Persisted telemetry: reloaded messages render the same footer
+    // the live done handler built (tokens + tok/s + memory trace).
+    // A saved chat image renders from its stored file, not base64.
+    if(extra){
+      if(extra.image){
+        const im = document.createElement('img');
+        im.src = '/api/chat-images/' + encodeURIComponent(extra.image);
+        im.style.maxWidth = '100%';
+        body.appendChild(im);
+      }
+      if(role === 'assistant' && extra.tokens){
+        const tps = document.createElement('span'); tps.className='tps';
+        tps.textContent = extra.tokens + ' tokens' + (extra.tok_s ? ' · ' + extra.tok_s + ' tok/s' : '');
+        foot.insertBefore(tps, foot.firstChild);
+      }
+      if(role === 'assistant' && extra.memories && extra.memories.length){
+        const det = document.createElement('details');
+        det.className = 'memtrace';
+        const sum = document.createElement('summary');
+        sum.textContent = 'trace: ' + extra.memories.length + (extra.memories.length===1 ? ' memory' : ' memories') + ' used';
+        det.appendChild(sum);
+        extra.memories.forEach(function(m){
+          const line = document.createElement('div');
+          line.textContent = '#' + m.id + ' (' + (m.model || m.source || 'unknown') + ', score ' + m.score + ') ' + (m.text || '');
+          det.appendChild(line);
+        });
+        foot.appendChild(det);
+      }
+    }
+  }
+  $('msgs').appendChild(art);
+  art.scrollIntoView();
+  updateCount();
+  return {art: art, body: body, p: p};
+}
+function welcomeArticle(){
+  const art = document.createElement('article');
+  art.className = 'msg sys';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const w = document.createElement('span'); w.className='who'; w.textContent='System';
+  const t = document.createElement('span'); t.textContent='session opened · local model · nothing leaves this machine';
+  meta.append(w, t);
+  const body = document.createElement('div');
+  body.className = 'body';
+  const p = document.createElement('p');
+  p.textContent = 'New chat. Local model is private — nothing leaves this machine. Cloud models need a key in Settings. Embed memory is on by default.';
+  body.appendChild(p);
+  art.append(meta, body);
+  return art;
+}
+function showWelcome(){
+  messages=[]; currentSid=null; currentType='CHAT';
+  $('msgs').innerHTML='';
+  $('msgs').appendChild(welcomeArticle());
+  $('chat-title').textContent='NEW CHAT';
+  $('msg-count').textContent='0 MESSAGES';
+  updateRailSession(null);
+  loadConstellation(null);
+}
+function dispNum(idx){ return 'S·' + String(idx+1).padStart(2,'0'); }
+function sessById(id){ return allSessions.find(function(s){ return s.id===id; }); }
+function sessIndex(id){
+  for(let i=0;i<allSessions.length;i++) if(allSessions[i].id===id) return i;
+  return -1;
+}
+function updateRailSession(s){
+  $('sess-type').textContent = s ? (s.type || 'CHAT') : currentType;
+  $('sess-id-val').textContent = s ? dispNum(Math.max(0, sessIndex(s.id))) : '—';
+  $('teleMsgs').textContent = s ? (s.messages||[]).length : 0;
+  const exch = s ? (s.messages||[]).filter(function(m){ return m.role==='assistant'; }).length : 0;
+  $('sess-exch').textContent = exch;
+  $('sess-tok').textContent = '--';
+  $('sess-avg').textContent = '—';
+  $('tps-num').textContent = '--';
+  $('tps-note').textContent = 'no answers yet this session';
+  $('teleToks').textContent = '--';
+  $('teleCap').textContent = '--';
+  $('teleCtx').textContent = '--%';
+  $('teleCtxPct').textContent = '--%';
+  $('tele-ctx').textContent = '--%';
+  sessToksAcc = 0; sessSecsAcc = 0;
+  document.querySelectorAll('#out-bar i').forEach(function(seg){ seg.className=''; });
+  updateCount();
+}
+let sessToksAcc = 0, sessSecsAcc = 0;
+function updateRailDone(toks, secs, mem, cap){
+  const rate = (toks>0 && secs) ? (toks/secs) : null;
+  if(rate){
+    $('tps-num').textContent = rate.toFixed(1);
+    $('tele-tps').textContent = rate.toFixed(1);
+    const note = $('tps-note');
+    if(note) note.textContent = 'last answer · ' + toks + ' tokens in ' + secs.toFixed(1) + 's';
+    sessToksAcc += toks; sessSecsAcc += secs;
+    $('sess-tok').textContent = sessToksAcc.toLocaleString('en-US');
+    $('sess-avg').textContent = (sessToksAcc/sessSecsAcc).toFixed(1) + ' TOK/S';
+  }
+  $('teleToks').textContent = toks>0 ? toks : '--';
+  $('teleMem').textContent = (mem || mem===0) ? (mem + ' IN PLAY') : '--';
+  $('teleCap').textContent = cap || '--';
+  const pct = (toks>0 && cap) ? Math.min(100, Math.round(toks/cap*100)) : 0;
+  $('teleCtx').textContent = pct + '%';
+  $('teleCtxPct').textContent = pct + '%';
+  $('tele-ctx').textContent = pct + '%';
+  const segs = document.querySelectorAll('#out-bar i');
+  const on = Math.round(pct/100*segs.length);
+  segs.forEach(function(s,i){
+    s.className = i < on ? (pct > 80 ? 'warn' : 'on') : '';
+  });
+  $('sess-exch').textContent = messages.filter(function(m){ return m.role==='assistant'; }).length;
+  $('teleMsgs').textContent = messages.length;
+}
+async function saveSession(){
+  if(!messages.length) return;
+  if(!currentSid) currentSid='chat-'+new Date().toISOString().replace(/[:.]/g,'-');
+  const title=(messages.find(function(m){ return m.role==='user'; })||{content:'New chat'}).content.slice(0,60);
+  await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:currentSid,title:title,messages:messages,type:currentType})});
+  loadSessions();
+}
+function switchToSession(s){
+  messages=s.messages||[]; currentSid=s.id; currentType=s.type||'CHAT';
+  $('msgs').innerHTML='';
+  messages.forEach(function(m){ addMsg(m.role, m.content, m.model || m.via, {ts: m.ts, tokens: m.tokens, tok_s: m.tok_s, memories: m.memories, memories_used: m.memories_used, image: m.image}); });
+  $('chat-title').textContent = dispNum(Math.max(0, sessIndex(s.id))) + ' — ' + (s.title||s.id).toUpperCase();
+  document.querySelectorAll('#chan-list .chan[data-sid]').forEach(function(x){
+    x.classList.toggle('active', x.dataset.sid===s.id);
+  });
+  updateRailSession(s);
+  closeDrawer();
+  loadConstellation(s.id);
+}
+async function deleteSession(id){
+  await fetch('/api/sessions/'+encodeURIComponent(id),{method:'DELETE'});
+  if(id===currentSid) showWelcome();
+  loadSessions();
+}
+function vuHtml(active, idle){
+  if(idle) return '<span class="vu" aria-hidden="true"><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i></span>';
+  if(active) return '<span class="vu" aria-hidden="true"><i style="height:5px"></i><i class="hot" style="height:11px"></i><i class="hot" style="height:15px"></i><i class="peak" style="height:16px"></i></span>';
+  return '<span class="vu" aria-hidden="true"><i style="height:4px"></i><i class="hot" style="height:8px"></i><i style="height:6px"></i><i style="height:3px"></i></span>';
+}
+function chanRow(s, idx){
+  const d = document.createElement('div');
+  const n = (s.messages||[]).length;
+  d.className = 'chan' + (s.id===currentSid ? ' active' : '') + (n===0 ? ' idle' : '');
+  d.dataset.sid = s.id;
+  d.setAttribute('tabindex','0');
+  d.setAttribute('role','button');
+  d.setAttribute('aria-label','Switch to session ' + dispNum(idx) + ', ' + (s.title||s.id));
+  d.innerHTML = '<span class="id">' + dispNum(idx) + '</span>' +
+    '<span class="label">' + escHtml(s.title||s.id) + '<small>' + escHtml(s.type||'CHAT') + ' · ' + n + ' messages</small></span>' +
+    vuHtml(s.id===currentSid, n===0);
+  d.addEventListener('click', function(){ switchToSession(s); });
+  d.addEventListener('keydown', function(e){
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); switchToSession(s); }
+  });
+  return d;
+}
+function renderChannels(){
+  const list = $('chan-list');
+  list.innerHTML = '';
+  const shown = allSessions.slice(0,3);
+  shown.forEach(function(s, i){ list.appendChild(chanRow(s, i)); });
+  const more = document.createElement('button');
+  more.className = 'chan'; more.type = 'button'; more.id = 'more-sessions';
+  more.setAttribute('aria-label','Show all sessions');
+  more.innerHTML = '<span class="id">»</span><span class="label">More sessions<small id="more-small">see all ' + allSessions.length + ' sessions</small></span><span></span>';
+  more.addEventListener('click', openDrawer);
+  list.appendChild(more);
+  const nw = document.createElement('button');
+  nw.className = 'chan'; nw.type = 'button'; nw.id = 'new-session';
+  nw.setAttribute('aria-label','Start a new workspace');
+  nw.innerHTML = '<span class="id">+</span><span class="label">New workspace<small>pick a type first</small></span><span></span>';
+  nw.addEventListener('click', openPicker);
+  list.appendChild(nw);
+  $('sess-count').textContent = String(allSessions.length).padStart(2,'0');
+}
+async function loadSessions(){
+  const r = await fetch('/api/sessions');
+  const j = await r.json();
+  allSessions = j.sessions || [];
+  renderChannels();
+}
+
+// ---------- Drawer: all sessions (opens ONLY via More sessions) ----------
+const drawer = $('session-drawer'), drawerScrim = $('drawer-scrim');
+function buildDrawer(){
+  const list = $('drawer-list');
+  list.innerHTML = '';
+  $('drawer-count').textContent = allSessions.length + ' TOTAL';
+  allSessions.forEach(function(s, i){
+    const row = document.createElement('button');
+    row.className = 'drawer-item' + (s.id===currentSid ? ' active' : '');
+    row.type = 'button';
+    const idEl = document.createElement('span'); idEl.className='d-id'; idEl.textContent = dispNum(i);
+    const main = document.createElement('span'); main.className='d-main';
+    const lab = document.createElement('span'); lab.className='d-label'; lab.textContent = s.title||s.id;
+    const sub = document.createElement('span'); sub.className='d-sub';
+    sub.textContent = (s.type||'CHAT') + ' · ' + (s.messages||[]).length + ' messages';
+    main.append(lab, sub);
+    const tag = document.createElement('span'); tag.className='d-tag'; tag.textContent = s.type||'CHAT';
+    row.append(idEl, main, tag);
+    if(s.id===currentSid){
+      const live = document.createElement('span'); live.className='d-live'; live.textContent='OPEN';
+      row.appendChild(live);
+    }
+    const del = document.createElement('button');
+    del.className='d-del'; del.type='button'; del.textContent='×';
+    del.setAttribute('aria-label','Delete session');
+    del.addEventListener('click', function(e){ e.stopPropagation(); deleteSession(s.id); });
+    row.appendChild(del);
+    const shr = document.createElement('button');
+    shr.className='d-del'; shr.type='button'; shr.textContent='📦';
+    shr.setAttribute('aria-label','Package and share session');
+    shr.addEventListener('click', function(e){ e.stopPropagation(); shareSession(s.id); });
+    row.appendChild(shr);
+    row.addEventListener('click', function(){ const cur = sessById(s.id); if(cur){ switchToSession(cur); } closeDrawer(); });
+    list.appendChild(row);
+  });
+}
+async function shareSession(sid){
+  const r = await fetch('/api/sessions/' + encodeURIComponent(sid) + '/share', {method:'POST'});
+  const j = await r.json();
+  if(j.error){ alert('Share failed: ' + j.error); return; }
+  alert('Shared: ' + j.filename + (j.publish_warning ? ' (publish warning: ' + j.publish_warning + ')' : ' — listed as a public file offer.'));
+}
+function openDrawer(){
+  buildDrawer();
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden','false');
+  drawerScrim.hidden = false;
+  requestAnimationFrame(function(){ drawerScrim.classList.add('show'); });
+}
+function closeDrawer(){
+  if(!drawer.classList.contains('open')) return;
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden','true');
+  drawerScrim.classList.remove('show');
+  drawerScrim.hidden = true;
+}
+$('drawer-close').addEventListener('click', closeDrawer);
+drawerScrim.addEventListener('click', closeDrawer);
+$('drawer-new').addEventListener('click', function(){ closeDrawer(); openPicker(); });
+
+// ---------- New workspace picker ----------
+const picker = $('picker');
+function openPicker(){ if(!streaming) picker.hidden = false; }
+function closePicker(){ picker.hidden = true; }
+$('picker-cancel').addEventListener('click', closePicker);
+picker.addEventListener('click', function(e){ if(e.target===picker) closePicker(); });
+document.addEventListener('keydown', function(e){
+  if(e.key!=='Escape') return;
+  closePicker();
+  closeDrawer();
+  closeTele();
+});
+document.querySelectorAll('.pick').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const t = btn.getAttribute('data-type');
+    closePicker();
+    createWorkspace(t);
+  });
+});
+async function createWorkspace(typeKey){
+  if(streaming) return;
+  const tag = TYPE_TAGS[typeKey] || 'CHAT';
+  const r = await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({title:'Untitled workspace',messages:[],type:tag})});
+  const j = await r.json();
+  if(j.error){ alert(j.error); return; }
+  currentSid = j.id; currentType = tag;
+  messages = [];
+  $('msgs').innerHTML='';
+  $('msgs').appendChild(welcomeArticle());
+  await loadSessions();
+  const created = sessById(j.id);
+  $('chat-title').textContent = (created ? dispNum(Math.max(0, sessIndex(j.id))) + ' — ' : '') + 'UNTITLED WORKSPACE';
+  updateRailSession(created || null);
+  showTab('chat');
+  const inp = $('chatInput'); if(inp) inp.focus();
+  loadConstellation(j.id);
+}
+
+// ---------- Streaming chat ----------
+let streaming = false;
+async function regenerate(wrap){
+  const lastUser = [...messages].reverse().find(function(m){ return m.role==='user'; });
+  if(!lastUser) return;
+  wrap.remove();
+  if(messages.length && messages[messages.length-1].role==='assistant') messages.pop();
+  await doSend(lastUser.content, true);
+}
+function onProvider(){
+  provider = $('provider').value;
+  const cm = $('cloudModel'), rb = $('refreshModelsBtn');
+  cm.style.display = provider==='local' ? 'none' : 'block';
+  rb.style.display = provider==='local' ? 'none' : 'block';
+  if(provider!=='local') refreshCloudModels();
+  $('teleEngine').textContent = provider;
+}
+async function refreshCloudModels(){
+  const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : localStorage.getItem('nv_key')||'';
+  const r = await fetch('/api/cloud/models?provider='+provider,{headers:{'X-API-Key':key}});
+  const j = await r.json();
+  const sel = $('cloudModel'); sel.innerHTML='';
+  (j.models||[]).slice(0,100).forEach(function(m){
+    const o = document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
+  });
+}
+function buildThink(){
+  const think = document.createElement('div');
+  think.className = 'think';
+  const head = document.createElement('button');
+  head.className = 'think-head'; head.type = 'button';
+  head.setAttribute('aria-expanded','false');
+  const lbl = document.createElement('span'); lbl.className='think-label';
+  lbl.textContent = 'Reasoning — hidden, click to expand';
+  const tm = document.createElement('span'); tm.className='thinkTime'; tm.textContent='0s';
+  head.append(lbl, tm);
+  const body = document.createElement('div');
+  body.className = 'think-body'; body.hidden = true;
+  const tt = document.createElement('div'); tt.className='thinkText';
+  body.appendChild(tt);
+  think.append(head, body);
+  return think;
+}
+async function doSend(text, isRegen){
+  const model = provider==='local' ? 'local uncensored' : $('cloudModel').value;
+  if(!isRegen){ messages.push({role:'user',content:text,ts:Date.now()}); addMsg('user',text,undefined,{ts:Date.now()}); }
+  // Peer endpoint: a selected peer backend routes this message as a
+  // mailbox text job instead of a local/cloud generation.
+  const peerTo = $('peerBackend') ? $('peerBackend').value : '';
+  if(peerTo){ await peerSendChat(text, peerTo); return; }
+  const showThinking = thinkOn();
+  const think = buildThink();
+  if(showThinking){ $('msgs').appendChild(think); think.scrollIntoView(); }
+  const t0 = Date.now();
+  const timer = setInterval(function(){
+    const s = think.querySelector('.thinkTime');
+    if(s) s.textContent = Math.floor((Date.now()-t0)/1000)+'s';
+  }, 1000);
+  const boxObj = addMsg('assistant','',model);
+  const box = boxObj.body; const pEl = boxObj.p;
+  const metaEl = boxObj.art.querySelector('.meta');
+  const timeSpan = metaEl.querySelectorAll('span')[1];
+  let full='', thinkText='', gotText=false, gotThinking=false, textChunks=0, usageTokens=0, firstTextAt=0, lastSpeedAt=0;
+  let doneAt=0, effToks=0, effSecs=0, doneMemories=[], doneMemoriesUsed=0;
+  const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='nvidia' ? localStorage.getItem('nv_key')||'' : '';
+  const useMemory = memOn();
+  const sampleSources = sampOn() ? selectedSamples : null;
+  const temp = parseFloat($('tempInput').value||'0.7');
+  const baseTok = parseInt($('maxTokInput').value||'2048');
+  const mult = parseInt(($('outMult')||{value:'1'}).value||'1');
+  const maxTok = Math.min(baseTok*mult, 28000); // configured context minus ~4-5k for prompt + reasoning; 16x of 2048 is capped here
+  const on = $('outNote');
+  if(on) on.textContent = 'output '+baseTok+' × '+mult+' = '+maxTok+' tokens'+(baseTok*mult>maxTok?' (capped for the configured context)':'')+' — long outputs take minutes, keep the conversation short for 8×/16×';
+  const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:messages,provider:provider,model:provider==='local'?'':model,api_key:key,max_tokens:maxTok,temperature:temp,use_memory:useMemory,sample_sources:sampleSources})});
+  if(!r.ok){
+    clearInterval(timer); think.remove();
+    const j = await r.json().catch(function(){ return {}; });
+    pEl.textContent = '[error] ' + (j.error||r.status);
+    return;
+  }
+  const reader = r.body.getReader(); const dec = new TextDecoder(); let buf='';
+  const cur = document.createElement('span'); cur.className='cursor';
+  pEl.appendChild(cur);
+  const streamLine = document.createElement('div');
+  streamLine.className='stream-line'; streamLine.textContent='streaming… ≈ 0.0 tok/s';
+  boxObj.art.appendChild(streamLine);
+  streaming = true;
+  $('send-btn').disabled = true;
+  $('live-status').textContent = 'GENERATING';
+  while(true){
+    const chunk = await reader.read();
+    if(chunk.done) break;
+    buf += dec.decode(chunk.value,{stream:true});
+    let idx;
+    while((idx = buf.indexOf('\n\n')) >= 0){
+      const raw = buf.slice(0,idx); buf = buf.slice(idx+2);
+      if(!raw.startsWith('data: ')) continue;
+      const d = raw.slice(6);
+      if(d === '[DONE]') break;
+      try{
+        const j = JSON.parse(d);
+        if(j.kind==='thinking'){
+          gotThinking = true;
+          if(showThinking){
+            thinkText += j.text;
+            const tt = think.querySelector('.thinkText');
+            if(tt) tt.textContent = thinkText;
+          }
+        } else if(j.kind==='text'){
+          if(!gotText){
+            gotText = true; firstTextAt = Date.now();
+            if(showThinking){
+              const lbl = think.querySelector('.think-label');
+              if(lbl) lbl.textContent = 'Reasoning — done · click to expand';
+            }
+          }
+          textChunks++;
+          const now = Date.now();
+          if(now-lastSpeedAt > 250 && firstTextAt){
+            lastSpeedAt = now;
+            const el = (now-firstTextAt)/1000;
+            if(el >= 0.5){
+              const rate = (textChunks/el).toFixed(1);
+              streamLine.textContent = 'streaming… ≈ ' + rate + ' tok/s';
+              $('live-tps').textContent = '≈ ' + rate + ' TOK/S';
+              $('tps-num').textContent = rate;
+              $('tele-tps').textContent = rate;
+            }
+          }
+          full += j.text.replace(/<think>[\s\S]*?<\/think>/gi,'').replace(/<think>[\s\S]*$/gi,'');
+          pEl.textContent = full;
+          pEl.appendChild(cur);
+          boxObj.art.scrollIntoView({block:'nearest'});
+        } else if(j.kind==='usage'){
+          usageTokens = j.tokens||0;
+        } else if(j.kind==='done'){
+          doneAt = Date.now();
+          let tokTxt=''; effToks=usageTokens; effSecs=j.gen_seconds;
+          doneMemories = j.memories||[]; doneMemoriesUsed = j.memories_used||0;
+          if(usageTokens>0 && j.gen_seconds){
+            tokTxt = ' · ' + usageTokens + ' tokens generated · ' + (usageTokens/j.gen_seconds).toFixed(1) + ' tok/s';
+          } else if(textChunks>0 && firstTextAt){
+            const el = Math.max((doneAt-firstTextAt)/1000, 0.1);
+            const est = textChunks>1 ? textChunks : Math.round(full.length/4);
+            effToks = est; effSecs = el;
+            tokTxt = ' · ~' + est + ' tokens · ' + (est/el).toFixed(1) + ' tok/s';
+          }
+          if(timeSpan) timeSpan.textContent = (j.memories_used ? ('used '+j.memories_used+' memories · ') : '') + tokTxt.replace(/^ · /,'') + ' · ' + new Date().toLocaleTimeString();
+          try{ updateRailDone(effToks, effSecs, j.memories_used, maxTok); }catch(e){}
+          const foot = boxObj.art.querySelector('.foot');
+          if(foot){
+            const tps = document.createElement('span'); tps.className='tps';
+            tps.textContent = (usageTokens>0 ? usageTokens : Math.round(full.length/4)) + ' tokens · ' + (effSecs ? (effToks/effSecs).toFixed(1) : '--') + ' tok/s';
+            foot.insertBefore(tps, foot.firstChild);
+            if(j.memories_used){
+              const mm = document.createElement('span');
+              mm.textContent = j.memories_used + (j.memories_used===1 ? ' memory' : ' memories') + ' used';
+              foot.insertBefore(mm, foot.children[1] || null);
+            }
+            if(j.memories && j.memories.length){
+              const det = document.createElement('details');
+              det.className = 'memtrace';
+              const sum = document.createElement('summary');
+              sum.textContent = 'trace: ' + j.memories.length + (j.memories.length===1 ? ' memory' : ' memories') + ' used';
+              det.appendChild(sum);
+              j.memories.forEach(function(m){
+                const line = document.createElement('div');
+                line.textContent = '#' + m.id + ' (' + (m.model || m.source || 'unknown') + ', score ' + m.score + ') ' + (m.text || '');
+                det.appendChild(line);
+              });
+              foot.appendChild(det);
+            }
+            const ol = document.createElement('span');
+            ol.textContent = 'output: ' + (mult===1 ? 'normal' : mult + '× length');
+            foot.insertBefore(ol, foot.children[2] || null);
+          }
+        } else if(j.kind==='error'){
+          full += j.text; pEl.textContent = full; pEl.appendChild(cur);
+        }
+      }catch(e){}
+    }
+  }
+  clearInterval(timer);
+  if(cur.parentNode) cur.parentNode.removeChild(cur);
+  streamLine.remove();
+  streaming = false;
+  $('send-btn').disabled = false;
+  $('live-status').textContent = 'IDLE';
+  $('live-tps').textContent = '— TOK/S';
+  if(!showThinking || !gotThinking){ think.remove(); }
+  messages.push({role:'assistant',content:full,ts:doneAt||Date.now(),tokens:effToks,tok_s:effSecs?+(effToks/effSecs).toFixed(1):null,model:model,memories_used:doneMemoriesUsed,memories:doneMemories});
+  saveSession();
+}
+// ---------- Peer endpoints: chat + image via mailbox jobs ----------
+// One poller serves voice jobs AND chat jobs: the mailbox is
+// fetch-and-clear, so two pollers would steal each other's replies.
+// tickVoicePoll below handles pendingVoices, pendingChatJobs, and
+// buffers anything else into voiceReplyBuffer for the Node tab.
+var pendingChatJobs = {};
+async function peerSendChat(text, to){
+  const name = peerNameFor(to);
+  const boxObj = addMsg('assistant','',name);
+  const statusEl = document.createElement('div');
+  statusEl.className = 'voice-status';
+  statusEl.textContent = 'Sending job to ' + name + '…';
+  boxObj.art.appendChild(statusEl);
+  try{
+    const r = await fetch('/api/node/job/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to_pubkey: to, capability: 'text', text: text})});
+    const j = await r.json();
+    if(j.error){ statusEl.textContent = 'Peer job error: ' + j.error; return; }
+    const jid = j.job_id || '';
+    statusEl.textContent = 'Job ' + jid + ' — waiting for ' + name + ' (auto-checking every 15s)…';
+    pendingChatJobs[jid] = {art: boxObj.art, body: boxObj.body, pEl: boxObj.p, name: name, kind: 'text', statusEl: statusEl, started: Date.now()};
+    startVoicePoll();
+  }catch(e){
+    statusEl.textContent = 'Peer job failed to send: ' + e;
+  }
+}
+async function sendPeerImage(){
+  const out = $('peerImageOut');
+  const prompt = $('chatInput') ? $('chatInput').value.trim() : '';
+  const to = $('peerImageBackend') ? $('peerImageBackend').value : '';
+  if(!prompt){ if(out) out.textContent = 'Type a prompt in the chat input first.'; return; }
+  if(!to){ if(out) out.textContent = 'Pick an image peer first (Node tab lists peers).'; return; }
+  const name = peerNameFor(to);
+  const boxObj = addMsg('assistant','',name);
+  const statusEl = document.createElement('div');
+  statusEl.className = 'voice-status';
+  statusEl.textContent = 'Sending image job to ' + name + '…';
+  boxObj.art.appendChild(statusEl);
+  if(out) out.textContent = 'Image job sent to ' + name + '…';
+  try{
+    const r = await fetch('/api/node/job/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to_pubkey: to, capability: 'image', prompt: prompt})});
+    const j = await r.json();
+    if(j.error){ statusEl.textContent = 'Peer image error: ' + j.error; if(out) out.textContent = 'Peer image error: ' + j.error; return; }
+    const jid = j.job_id || '';
+    statusEl.textContent = 'Image job ' + jid + ' — waiting for ' + name + ' (auto-checking every 15s)…';
+    pendingChatJobs[jid] = {art: boxObj.art, body: boxObj.body, pEl: boxObj.p, name: name, kind: 'image', prompt: prompt, statusEl: statusEl, started: Date.now()};
+    startVoicePoll();
+  }catch(e){
+    statusEl.textContent = 'Peer image failed to send: ' + e;
+  }
+}
+function saveDefaultVoicePeer(){
+  const out = $('defaultVoicePeerOut');
+  const v = $('nodeJobTo') ? $('nodeJobTo').value.trim() : '';
+  if(!v){ if(out) out.textContent = 'Type or pick a peer pubkey first.'; return; }
+  localStorage.setItem('defaultVoicePeer', v);
+  if(out) out.textContent = 'Default voice peer saved: ' + peerNameFor(v) + ' — chat Generate voice will use it.';
+}
+async function sendChat(){
+  const inp = $('chatInput');
+  const text = inp.value.trim();
+  if(!text) return;
+  inp.value = '';
+  await doSend(text, false);
+}
+$('prompt-form').addEventListener('submit', function(e){ e.preventDefault(); sendChat(); });
+$('chatInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
+});
+
+// ---------- Status / system / servers ----------
+async function loadStatus(){
+  const r = await fetch('/api/status');
+  const j = await r.json();
+  $('topStatus').textContent = 'chat '+(j.chat_up?'up':'down')+' · embed '+(j.embed_up?'up':'down')+' · '+j.identity;
+  $('tbNode').textContent = j.identity;
+  $('sys-node-val').textContent = j.identity;
+  $('bottomStatus').textContent = 'chat '+(j.chat_up?'up':'down')+' · embed '+(j.embed_up?'up':'down')+' · '+j.identity+' · '+j.memories+' memories';
+  $('teleChat').textContent = j.chat_up ? 'UP' : 'DOWN';
+  $('teleEmbed').textContent = j.embed_up ? 'UP' : 'DOWN';
+  $('teleMem').textContent = j.memories + ' IN PLAY';
+}
+async function loadSystem(){
+  const r = await fetch('/api/system');
+  const j = await r.json();
+  const pct = function(u,t){ return t ? Math.round(u/t*100) : 0; };
+  if(j.gpu.present){
+    $('gpu-val').textContent = j.gpu.util_pct;
+    $('gpu-note').textContent = j.gpu.name + ' · ' + j.gpu.used_mb + ' / ' + j.gpu.total_mb + ' MiB (' + pct(j.gpu.used_mb,j.gpu.total_mb) + '%) · CHAT ON GPU';
+  } else {
+    $('gpu-val').textContent = '—';
+    $('gpu-note').textContent = 'no GPU detected — RAM/CPU mode';
+  }
+  $('ram-val').textContent = pct(j.ram.used_mb, j.ram.total_mb);
+  $('ram-label').textContent = pct(j.ram.used_mb, j.ram.total_mb) + '%';
+  document.querySelectorAll('#ram-bar i').forEach(function(s,i){
+    s.className = i < Math.round(pct(j.ram.used_mb, j.ram.total_mb)/100*24) ? 'on' : '';
+  });
+  $('systemOut').innerHTML =
+    '<div class="kv">' +
+    '<div class="row"><span>CPU</span><b>' + j.cpu_pct + '%</b></div>' +
+    '<div class="row"><span>DISK FREE</span><b>' + j.disk_free_gb + ' GB</b></div>' +
+    '<div class="row"><span>EMBED MODEL</span><b>' + (j.embed_up ? 'UP' : 'DOWN') + '</b></div>' +
+    '<div class="row"><span>CHAT MODEL</span><b>' + (j.chat_up ? 'UP' : 'DOWN') + '</b></div>' +
+    '<div class="row"><span>VECTOR MEMORY</span><b>' + j.vector_memories + ' entries</b></div>' +
+    '<div class="row"><span>SAMPLES IN USE</span><b>' + (Object.entries(j.samples||{}).map(function(kv){ return kv[0] + ' (' + kv[1] + ' chunks)'; }).join(', ') || 'none ingested yet') + '</b></div>' +
+    '</div>';
+  // Live ledger + regula panels (replacing the old mockup panels):
+  // every value comes from this node's own ledger.json + identity.dat.
+  const led = j.ledger || {}, reg = j.regula || {};
+  const lv = $('sys-ledger-val'); if(lv) lv.textContent = led.ok ? ('OK · height ' + led.height) : ('FAIL — ' + (led.error || 'unknown'));
+  const lt = $('sys-ledger-table');
+  if(lt){
+    const rows = (led.events||[]).map(function(e){
+      const h = String(e.sha256||'');
+      const t = e.created_at ? new Date(e.created_at*1000).toISOString().replace('T',' ').slice(0,16) + ' UTC' : '';
+      return '<tr><td>' + e.index + '</td><td class="hash">' + escHtml(h.slice(0,4) + '…' + h.slice(-4)) + '</td><td>' + escHtml(t) + '</td><td class="ok">SEALED</td></tr>';
+    }).join('');
+    lt.innerHTML = '<table class="ledger"><tr><th>HEIGHT</th><th>HASH PREFIX</th><th>TIME (UTC)</th><th>STATUS</th></tr>' + (rows || '<tr><td colspan="4">(ledger empty — save a session or share a voice)</td></tr>') + '</table><p class="small">tip: ' + escHtml(String(led.tip||'').slice(0,16)) + ' · blocks: ' + (led.blocks||0) + '</p>';
+  }
+  const rl = $('sys-regula-lines');
+  if(rl){
+    rl.innerHTML = 'fingerprint: ' + escHtml(reg.fingerprint||'') + '<br>hub fingerprint: ' + escHtml(reg.hub_fingerprint||'') + '<br>signing: <span class="' + (reg.signing_ok ? 'ok' : '') + '">' + (reg.signing_ok ? 'OK — probe signed + verified live' : 'FAIL') + '</span><br>verification: <span class="' + (led.ok ? 'ok' : '') + '">' + (led.ok ? ('chain verified, height ' + led.height) : ('FAIL — ' + escHtml(led.error||''))) + '</span><br>key type: ' + escHtml(reg.key_type||'secp256k1') + '<br><span style="word-break:break-all">pubkey: ' + escHtml(reg.pubkey||'') + '</span>';
+  }
+  const rc = $('sys-regula-core'); if(rc) rc.textContent = reg.signing_ok ? 'OK' : 'FAIL';
+  const bl = $('sys-block-ledger'); if(bl) bl.textContent = led.ok ? 'OK' : 'FAIL';
+}
+setInterval(function(){ if(!$('view-system').hidden) loadSystem(); }, 5000);
+async function loadServers(){
+  const r = await fetch('/api/servers/status');
+  const j = await r.json();
+  const el = $('serverOut');
+  if(el) el.innerHTML = '<b>Chat:</b> '+(j.chat_up?'🟢 up':'🔴 down')+' (model file '+(j.chat_model_exists?'present':'MISSING — run autorun.py')+')<br>' +
+    '<b>Embedding:</b> '+(j.embed_up?'🟢 up':'🔴 down')+' (model file '+(j.embed_model_exists?'present':'MISSING — run autorun.py')+')<br>' +
+    '<b>llama-server:</b> '+(j.llama_server_found?'found':'NOT FOUND — run: python -m hub doctor --install');
+  const sc = $('srv-chat-status');
+  if(sc){ sc.textContent = j.chat_up ? 'RUNNING' : 'DOWN'; sc.classList.toggle('busy', !j.chat_up); }
+  const se = $('srv-embed-status');
+  if(se){ se.textContent = j.embed_up ? 'RUNNING' : 'DOWN'; se.classList.toggle('busy', !j.embed_up); }
+  try{
+    const r2 = await fetch('/api/node/poller'); const j2 = await r2.json();
+    const sp = $('srv-poller-status');
+    if(sp){ sp.textContent = j2.running ? 'RUNNING' : 'DOWN'; sp.classList.toggle('busy', !j2.running); }
+  }catch(e){}
+  const log = $('sys-log');
+  if(log){
+    const lines = [];
+    (j.embed_log||'').split('\n').filter(Boolean).slice(-20).forEach(function(l){ lines.push('embed: ' + l); });
+    (j.chat_log||'').split('\n').filter(Boolean).slice(-20).forEach(function(l){ lines.push('chat: ' + l); });
+    log.innerHTML = lines.slice(-40).map(function(l){ return '<div>' + escHtml(l) + '</div>'; }).join('');
+    $('log-count').textContent = log.children.length;
+    log.scrollTop = log.scrollHeight;
+  }
+}
+async function restartServer(target){
+  const el = $('serverOut');
+  if(el) el.textContent = 'Restarting ' + target + '… (30–90s, polling status)';
+  await fetch('/api/servers/restart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:target})});
+  for(let i=0;i<20;i++){
+    await new Promise(function(res){ setTimeout(res, 5000); });
+    await loadServers(); await loadSystem();
+    const r = await fetch('/api/servers/status');
+    const j = await r.json();
+    if((target==='embed' && j.embed_up) || (target==='chat' && j.chat_up) || (target==='both' && j.embed_up && j.chat_up)) break;
+  }
+}
+
+// ---------- Node ----------
+function updateNodeNameGate(){
+  const hasName = !!window._nodeName;
+  const gate = $('nodeNameGate'), lgate = $('nodeLobbyGate');
+  if(gate) gate.hidden = hasName;
+  if(lgate) lgate.hidden = hasName;
+  const inp = $('nodeLobbyText'), btn = $('nodeLobbySendBtn');
+  if(inp) inp.disabled = !hasName;
+  if(btn) btn.disabled = !hasName;
+  if(inp && !hasName) inp.placeholder = 'Set a name first…';
+  else if(inp) inp.placeholder = 'public message…';
+}
+// Local lobby block: hides a node's messages for you only, on this
+// browser. It does not remove them for anyone else — global lobby
+// moderation (admin delete/block) needs a Worker change, not just UI.
+function getBlockedNodes(){ try{ return JSON.parse(localStorage.getItem('nodeBlockedV1')||'{}'); }catch(e){ return {}; } }
+function toggleNodeBlock(pk){
+  const b = getBlockedNodes();
+  if(b[pk]) delete b[pk]; else b[pk] = 1;
+  localStorage.setItem('nodeBlockedV1', JSON.stringify(b));
+  pollNodeLobby(); showNodeCard(pk);
+}
+function renderLobby(messages){
+  const lel = $('nodeLobby');
+  if(!lel) return;
+  const pinned = lel.scrollHeight - lel.scrollTop - lel.clientHeight < 40;
+  const prevTop = lel.scrollTop;
+  const blocked = getBlockedNodes();
+  lel.innerHTML = (messages||[]).filter(function(m){ return !(m.pubkey && blocked[m.pubkey]); }).map(function(m){
+    const name = m.name || '(unnamed node)';
+    const nid = m.node_id || (m.pubkey ? ('key ' + String(m.pubkey).slice(0, 16) + '…') : '?');
+    const mine = window._ownPubkey && m.pubkey === window._ownPubkey;
+    const pk = String(m.pubkey||'').replace(/[^0-9a-f]/gi, '');
+    const nameCell = pk ? '<button type="button" class="lobby-name-btn" onclick="showNodeCard(\'' + pk + '\')">' + escHtml(name) + '</button>' : '<span class="lobby-name">' + escHtml(name) + '</span>';
+    return '<div class="lobby-msg' + (mine ? ' mine' : '') + '"><div>' + nameCell + '<span class="lobby-ts">' + escHtml(m.ts || '') + '</span></div><span class="lobby-nodeid">' + escHtml(nid) + '</span><div>' + escHtml(m.text || '') + '</div></div>';
+  }).join('') || '(lobby empty — be the first to say something, once you have a name)';
+  if(pinned) lel.scrollTop = lel.scrollHeight; else lel.scrollTop = prevTop;
+}
+// Node card: click a lobby (or peer) name and this pulls up their
+// node — announced caps, shared endpoint if any, and a private-chat
+// button. Endpoint comes from the /nodes record (announce carries
+// it); a node that announced without one shows 'no endpoint shared'.
+function showNodeCard(pk){
+  const card = $('nodeCard'); if(!card) return;
+  showNodePage('lobby'); // The card lives above the lobby list, so a peer-name click lands here with the card open.
+  const list = window._nodesList || [];
+  const n = list.find(function(x){ return x.pubkey === pk; }) || {};
+  const blocked = !!getBlockedNodes()[pk];
+  const caps = (n.capabilities||[]).join(' ') || '—';
+  const ep = n.endpoint ? escHtml(n.endpoint) : 'no endpoint shared';
+  card.hidden = false;
+  card.innerHTML = '<div style="font-size:16px;font-weight:700">' + escHtml(n.name || '(unnamed node)') + '</div>'
+    + '<span class="lobby-nodeid">' + escHtml(n.node_id || '') + '</span><br>'
+    + 'caps: ' + escHtml(caps) + '<br>'
+    + 'endpoint: ' + ep + '<br>'
+    + '<span style="word-break:break-all">pubkey: ' + escHtml(pk) + '</span><br>'
+    + '<button type="button" onclick="fillChatTo(\'' + pk + '\')">Private chat →</button> '
+    + '<button type="button" onclick="fillJobTo(\'' + pk + '\')">Job →</button> '
+    + '<button type="button" onclick="toggleNodeBlock(\'' + pk + '\')">' + (blocked ? 'Unblock' : 'Block') + '</button> '
+    + '<button type="button" onclick="toggleNodeFav(\'' + pk + '\')">' + (((window._nodeFavs||{})[pk]) ? '★ Remove peer' : '☆ Add peer') + '</button> '
+    + '<button type="button" onclick="$(\'nodeCard\').hidden=true">Close</button>'
+    + '<p class="small">Block hides their lobby messages for you only, on this browser (local). It does not remove them for anyone else.</p>';
+}
+async function pollNodeLobby(){
+  const l = await (await fetch('/api/node/lobby')).json();
+  const lel = $('nodeLobby');
+  if(!lel) return;
+  if(l.error){ lel.textContent = 'Lobby error: ' + l.error; return; }
+  renderLobby(l.messages);
+}
+// IRC-style presence: everyone listed, from the /nodes list — not
+// from lobby messages, so a quiet node still shows as present.
+// Click a name for their card (private chat, block, add peer).
+function engineLines(caps){
+  const imgs = [], tts = [], voice = [];
+  (caps||[]).forEach(function(c){
+    if(c.indexOf('image-engine:')===0) imgs.push(c.slice(13));
+    else if(c.indexOf('tts-engine:')===0) tts.push(c.slice(11));
+    else if(c.indexOf('tts-voice:')===0) voice.push(c.slice(10));
+  });
+  const parts = [];
+  if(imgs.length) parts.push('engines: ' + imgs.join(', '));
+  if(tts.length) parts.push('tts: ' + tts.join(', ') + (voice.length ? ' (' + voice.join(', ') + ')' : ''));
+  return parts.join(' · ');
+}
+function renderPresence(nodes){
+  const el = $('nodePresence');
+  if(!el) return;
+  const rows = (nodes||[]).map(function(n){
+    const pk = n.pubkey || '';
+    return '<div class="presence-user"><button type="button" class="lobby-name-btn" onclick="showNodeCard(\''+pk+'\')">'+escHtml(n.name||'(unnamed)')+'</button><span class="presence-nodeid">'+escHtml(n.node_id||'')+'</span></div>';
+  }).join('');
+  el.innerHTML = '<h4 style="margin:10px 0 4px">Present now — ' + (nodes||[]).length + ' listed</h4>' + (rows || '(no nodes listed yet — nodes appear when they announce)');
+}
+async function refreshPresence(){
+  try{
+    const p = await (await fetch('/api/node/peers')).json();
+    window._nodesList = p.nodes||[];
+    (window._nodesList||[]).forEach(function(n){ if(n.pubkey) (window._nodePeers = window._nodePeers||{})[n.pubkey] = n.name||''; });
+    renderPresence(window._nodesList);
+  }catch(e){}
+}
+async function loadNode(){
+  const s = await (await fetch('/api/node/status')).json();
+  const ident = $('nodeIdent');
+  if(ident){
+    if(s.error){ ident.textContent = 'Node status error: ' + s.error; }
+    else{
+      window._nodeName = s.name || '';
+      window._ownPubkey = s.pubkey || '';
+      // Don't clobber a name the user is mid-editing.
+      const inp = $('nodeName');
+      if(inp && document.activeElement !== inp) inp.value = s.name || '';
+      // Name on top, node_id small underneath it: the pair is what
+      // stops spoofing — a name alone proves nothing, the node_id
+      // ties it to one public key.
+      ident.innerHTML = '<div style="font-size:18px;font-weight:700">' + escHtml(s.name || '(no name set)') + '</div><span class="lobby-nodeid">' + escHtml(s.node_id) + '</span><br>NODE fingerprint: <b>' + escHtml(s.fingerprint) + '</b><br>HUB fingerprint: <b>' + escHtml(s.hub_fingerprint) + '</b><br>pubkey: <span style="word-break:break-all">' + escHtml(s.pubkey) + '</span><br>list: ' + escHtml(s.list_url) + ' · listed: ' + (s.listed === null ? '?' : (s.listed ? 'yes' : 'no'));
+      updateNodeNameGate();
+    }
+  }
+  const p = await (await fetch('/api/node/peers')).json();
+  const pel = $('nodePeers');
+  if(pel){
+    if(p.error){ pel.textContent = 'Peers error: ' + p.error; }
+    else{
+      const pol = await (await fetch('/api/node/policy')).json();
+      const fav = await (await fetch('/api/node/favorites')).json();
+      const policy = pol.policy || {}; const favs = fav.favorites || {};
+      window._nodeFavs = favs;
+      window._nodePeers = {};
+      window._nodesList = p.nodes||[];
+      (p.nodes||[]).forEach(function(n){ if(n.pubkey) window._nodePeers[n.pubkey] = n.name||''; });
+      renderPresence(window._nodesList);
+      refreshPeerBackends();
+      // Already announced under another client (e.g. mya-node was
+      // announced outside the Hub, so the Hub's name file is empty):
+      // point that out instead of leaving the gate unexplained.
+      const hint = $('nodeListNameHint');
+      if(hint){
+        const own = (p.nodes||[]).find(function(n){ return n.pubkey === window._ownPubkey; });
+        if(!window._nodeName && own && own.name){
+          hint.hidden = false;
+          hint.textContent = 'The list already knows you as "' + own.name + '" — type that name above and Save to chat from the Hub.';
+        } else { hint.hidden = true; }
+      }
+      pel.innerHTML = (p.nodes||[]).map(function(n){
+        const pk = n.pubkey || '';
+        const star = favs[pk] ? '★' : '☆';
+        const cur = policy[pk] || 'unlisted';
+        const eng = engineLines(n.capabilities||[]);
+        return '<div class="card"><button type="button" class="lobby-name-btn" onclick="showNodeCard(\''+pk+'\')">'+escHtml(n.name||'')+'</button> <span class="pill">'+escHtml((n.capabilities||[]).join(' '))+'</span>' + (eng ? '<br><span class="small">'+escHtml(eng)+'</span>' : '') + '<br><span style="word-break:break-all">'+escHtml(n.node_id||'')+'</span><br>policy: '+escHtml(cur)+' <button type="button" onclick="toggleNodeFav(\''+pk+'\')">'+star+'</button> <button type="button" onclick="setNodePolicy(\''+pk+'\',\'allow\')">Allow</button> <button type="button" onclick="setNodePolicy(\''+pk+'\',\'deny\')">Deny</button> <button type="button" onclick="setNodePolicy(\''+pk+'\',\'block\')">Block</button> <button type="button" onclick="setNodePolicy(\''+pk+'\',\'clear\')">Clear</button> <button type="button" onclick="requestAccess(\''+pk+'\',\'text\')">Request LLM</button> <button type="button" onclick="requestAccess(\''+pk+'\',\'image\')">Request image</button> <button type="button" onclick="requestAccess(\''+pk+'\',\'tts\')">Request TTS</button> <button type="button" onclick="fillChatTo(\''+pk+'\')">Chat →</button></div>';
+      }).join('') || '(no nodes listed yet — nodes appear when they announce)';
+    }
+  }
+  await pollNodeLobby();
+  const u = await (await fetch('/api/node/uploads')).json();
+  const uel = $('nodeUploads');
+  if(uel){ uel.innerHTML = u.error ? ('Files error: ' + escHtml(u.error)) : (u.uploads||[]).map(function(o){ return '<div>'+escHtml(o.filename||'')+' · '+escHtml(o.node_id||'')+' · '+escHtml(String(o.size||''))+' bytes</div>'; }).join('') || '(no file offers)'; }
+  const sh = await (await fetch('/api/voice/shared')).json();
+  const sel = $('nodeSharedFiles');
+  if(sel){
+    const led = sh.ledger || {};
+    const head = '<div class="small">ledger: ' + (led.ok ? ('OK · height ' + led.height) : ('FAIL — ' + escHtml(led.error || 'unknown'))) + '</div>';
+    sel.innerHTML = head + (sh.error ? ('Shared files error: ' + escHtml(sh.error)) : (sh.files||[]).map(function(f){
+      return '<div>' + escHtml(f.filename) + ' · ' + f.size + ' bytes' + (f.manifest ? ' · manifest ✓' : '') + ' <button type="button" onclick="publishSharedFile(' + JSON.stringify(f.filename) + ', this)">Publish offer</button></div>';
+    }).join('') || '(no local shared files yet — share a voice from its waveform player)');
+  }
+  const lev = await (await fetch('/api/ledger/events?limit=20')).json();
+  const lel = $('nodeLedgerEvents');
+  if(lel){
+    lel.innerHTML = (lev.error ? ('Ledger error: ' + escHtml(lev.error)) : (lev.events||[]).map(function(e){
+      return '<div>#' + e.index + ' ' + escHtml(e.kind||'') + ' ' + escHtml(e.detail || e.path || '') + ' · ' + escHtml(String(e.sha256||'').slice(0, 16)) + ' · ' + new Date(e.created_at*1000).toLocaleString() + '</div>';
+    }).join('') || '(ledger empty — save a session or share a voice)');
+  }
+  loadNodePollerLog();
+}
+async function publishSharedFile(name, btn){
+  btn.disabled = true; btn.textContent = 'Publishing…';
+  try {
+    const r = await fetch('/api/voice/publish', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename: name})});
+    const j = await r.json();
+    if (j.error) { btn.textContent = 'Publish failed'; btn.title = j.error; btn.disabled = false; }
+    else { btn.textContent = 'Published ✓'; loadNode(); }
+  } catch (e) { btn.textContent = 'Publish failed'; btn.title = String(e); btn.disabled = false; }
+}
+async function saveNodeName(){
+  const r = await fetch('/api/node/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('nodeName').value})});
+  const j = await r.json();
+  $('nodeAnnounceOut').textContent = j.error ? ('Name error: ' + j.error) : ('Name saved: ' + j.name);
+  loadNode();
+}
+async function announceNode(){
+  const r = await fetch('/api/node/announce',{method:'POST'});
+  const j = await r.json();
+  $('nodeAnnounceOut').textContent = j.error ? ('Announce error: ' + j.error) : ('Announced (status ' + j.status + ')');
+  loadNode();
+}
+async function sendLobby(){
+  if(!window._nodeName){
+    const out = $('nodeLobbyOut');
+    if(out) out.textContent = 'Set a name first — you can\'t chat in the lobby until you set a name above.';
+    return;
+  }
+  const t = $('nodeLobbyText').value;
+  if(!t.trim()) return;
+  const r = await fetch('/api/node/lobby/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+  const j = await r.json();
+  if(j.error){ const out = $('nodeLobbyOut'); if(out) out.textContent = 'Lobby error: ' + j.error; }
+  else { $('nodeLobbyText').value=''; const out = $('nodeLobbyOut'); if(out) out.textContent=''; }
+  pollNodeLobby();
+}
+async function pollNodeChat(){
+  const j = await (await fetch('/api/node/chat')).json();
+  const cel = $('nodeChat');
+  const pinned = cel.scrollHeight - cel.scrollTop - cel.clientHeight < 40;
+  const prevTop = cel.scrollTop;
+  $('nodeChat').innerHTML = j.error ? ('Chat error: ' + escHtml(j.error)) : (j.messages||[]).map(function(m){
+    const name = m.from_name || '(unnamed node)';
+    const key = m.from_pubkey ? ('key ' + String(m.from_pubkey).slice(0, 16) + '…') : '?';
+    return '<div class="lobby-msg"><div><span class="lobby-name">' + escHtml(name) + '</span><span class="lobby-ts">' + escHtml(m.ts || '') + '</span></div><span class="lobby-nodeid">' + escHtml(key) + '</span><div>' + escHtml(m.text || '') + '</div></div>';
+  }).join('') || '(no new chat messages)';
+  if(pinned) cel.scrollTop = cel.scrollHeight; else cel.scrollTop = prevTop;
+}
+async function sendNodeChat(){
+  const r = await fetch('/api/node/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to_pubkey:$('nodeChatTo').value, text:$('nodeChatText').value})});
+  const j = await r.json();
+  if(j.error) alert('Chat error: ' + j.error); else $('nodeChatText').value='';
+}
+async function setNodePolicy(pk, action){
+  await fetch('/api/node/policy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pubkey:pk, action:action})});
+  loadNode();
+}
+async function toggleNodeFav(pk){
+  const fav = await (await fetch('/api/node/favorites')).json();
+  const has = (fav.favorites||{})[pk];
+  const url = has ? '/api/node/favorite/remove' : '/api/node/favorite';
+  await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pubkey:pk, name:(window._nodePeers||{})[pk]||''})});
+  loadNode();
+}
+function fillJobTo(pk){ $('nodeJobTo').value = pk; showNodePage('jobs'); }
+function fillChatTo(pk){ $('nodeChatTo').value = pk; showNodePage('chat'); }
+function peerNameFor(pk){ return (window._nodePeers||{})[pk] || String(pk||'').slice(0,12); }
+// Peer endpoints: the chat backend + image selects list nodes from
+// the /nodes list by claimed capability. Populated whenever the Node
+// tab loads (loadNode) and once on page init.
+async function refreshPeerBackends(){
+  try{
+    const p = await (await fetch('/api/node/peers')).json();
+    const nodes = p.nodes||[];
+    window._nodesList = nodes;
+    nodes.forEach(function(n){ if(n.pubkey) (window._nodePeers = window._nodePeers||{})[n.pubkey] = n.name||''; });
+    const pb = $('peerBackend');
+    if(pb){
+      const cur = pb.value;
+      pb.innerHTML = '<option value="">Peer chat: local model</option>' + nodes.filter(function(n){ return (n.capabilities||[]).indexOf('text') !== -1; }).map(function(n){ return '<option value="'+n.pubkey+'">'+escHtml(n.name||n.node_id)+' (text)</option>'; }).join('');
+      if(cur) pb.value = cur;
+    }
+    const ib = $('peerImageBackend');
+    if(ib){
+      const cur2 = ib.value;
+      ib.innerHTML = '<option value="">no image peer selected</option>' + nodes.filter(function(n){ return (n.capabilities||[]).indexOf('image') !== -1; }).map(function(n){ return '<option value="'+n.pubkey+'">'+escHtml(n.name||n.node_id)+' (image)</option>'; }).join('');
+      if(cur2) ib.value = cur2;
+    }
+  }catch(e){}
+}
+// Request access to a peer's capability. Under the Gopher model
+// there is no grant system — asking means messaging the operator,
+// so this sends a private sysop-chat message naming the capability
+// and your pubkey. The operator allow-lists you on their node;
+// until then your jobs to them are silently skipped.
+async function requestAccess(pk, cap){
+  const out = $('nodePeersOut');
+  const me = window._nodeName || window._ownPubkey || 'this node';
+  const text = 'Access request from ' + me + ': please allow ' + cap + ' for ' + (window._ownPubkey || '');
+  try{
+    const r = await fetch('/api/node/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to_pubkey: pk, text: text})});
+    const j = await r.json();
+    if(out) out.textContent = j.error ? ('Request error: ' + j.error) : ('Access request for ' + cap + ' sent to ' + ((window._nodePeers||{})[pk] || pk.slice(0,12)) + ' — they allow-list you on their node.');
+  }catch(e){
+    if(out) out.textContent = 'Request failed: ' + e;
+  }
+}
+async function sendNodeJob(){
+  const cap = $('nodeJobCap').value;
+  const body = {to_pubkey:$('nodeJobTo').value, capability:cap};
+  if (cap === 'text' || cap === 'tts') {
+    body.text = $('nodeJobText').value;
+    if (cap === 'tts' && $('nodeJobVoice').value.trim()) body.voice = $('nodeJobVoice').value.trim();
+  } else {
+    body.prompt = $('nodeJobPrompt').value;
+    const size = $('nodeJobSize').value.trim();
+    if (size) { const parts = size.split('x'); body.width = parseInt(parts[0], 10); body.height = parseInt(parts[1], 10); }
+    if ($('nodeJobSeed').value.trim()) body.seed = parseInt($('nodeJobSeed').value.trim(), 10);
+    if ($('nodeJobEngine') && $('nodeJobEngine').value.trim()) body.engine = $('nodeJobEngine').value.trim();
+  }
+  const r = await fetch('/api/node/job/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j = await r.json();
+  $('nodeJobOut').textContent = j.error ? ('Job error: ' + j.error) : ('Job queued: ' + (j.job_id||''));
+}
+// ---------- Voice: generate + waveform player ----------
+// A text result (Jobs reply or chat message) can be voiced through
+// the node pipeline: the text goes out as a tts job to the peer in
+// the Jobs "peer pubkey" box (click a node in the peer list to fill
+// it), with the voice from the Jobs voice box (default mya-03).
+// The MP3 reply renders as a waveform player with a Save button
+// that downloads the audio to this machine.
+var waveSeq = 0;
+var waveData = {};
+// Pending voice jobs: job_id -> {el, started}. The old flow only
+// flashed "Voice job queued" on the button for 2.5s and left the
+// notice in the Node tab's nodeJobOut — invisible from Chat, wiped
+// by the first Fetch that found no reply yet, with no record of the
+// job id and nothing waiting for the MP3. So a user who fetched
+// before the peer's 60s poller + bridge synthesis had finished saw
+// "(no job replies)", re-clicked Generate, and looped forever
+// without ever seeing audio. Now the job stays attached to the chat
+// message that asked for it, and this page auto-fetches every 15s
+// until its reply lands, rendering the waveform inline in chat.
+// Replies the auto-fetch consumes that are NOT voice replies are
+// kept in voiceReplyBuffer, so pollNodeJobs() can still show them
+// in the Node tab instead of losing them to fetch-and-clear.
+var pendingVoices = {};
+var voiceReplyBuffer = [];
+var voicePollTimer = null;
+function voiceForText(enc, btn){
+  var text = decodeURIComponent(enc);
+  // Peer resolution: the Jobs peer box first, then the saved default
+  // voice peer (Jobs → "Save as default voice peer"), so chat voice
+  // works without visiting the Jobs tab once a default is set.
+  var to = ($('nodeJobTo') ? $('nodeJobTo').value.trim() : '') || localStorage.getItem('defaultVoicePeer') || '';
+  var say = function(s){ if ($('nodeJobOut')) $('nodeJobOut').textContent = s; if (btn) { btn.textContent = s; setTimeout(function(){ btn.textContent = 'Generate voice'; }, 2500); } };
+  if (!to) { say('Pick a peer first: click a node, then Job → on its card (or save a default voice peer in Jobs).'); return; }
+  // Chat messages live in <article> elements; Jobs buttons do not.
+  // In chat, pin a persistent status line to the message itself.
+  var art = (btn && btn.closest) ? btn.closest('article') : null;
+  var statusEl = null;
+  if (art) {
+    statusEl = document.createElement('div');
+    statusEl.className = 'voice-status';
+    statusEl.textContent = 'Voice job: sending…';
+    art.appendChild(statusEl);
+  }
+  var body = {to_pubkey: to, capability: 'tts', text: text};
+  if ($('nodeJobVoice') && $('nodeJobVoice').value.trim()) body.voice = $('nodeJobVoice').value.trim();
+  fetch('/api/node/job/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) {
+        if (statusEl) statusEl.textContent = 'Voice job error: ' + j.error;
+        if ($('nodeJobOut')) $('nodeJobOut').textContent = 'Voice job error: ' + j.error;
+        return;
+      }
+      var jid = j.job_id || '';
+      pendingVoices[jid] = {el: statusEl, started: Date.now()};
+      var msg = 'Voice job ' + jid + ' — waiting for the peer (auto-checking every 15s, no need to click Fetch)…';
+      if (statusEl) statusEl.textContent = msg;
+      if ($('nodeJobOut')) $('nodeJobOut').textContent = msg;
+      startVoicePoll();
+    })
+    .catch(function(e){
+      if (statusEl) statusEl.textContent = 'Voice job failed to send: ' + e;
+    });
+}
+function startVoicePoll(){
+  if (voicePollTimer) return;
+  voicePollTimer = setInterval(tickVoicePoll, 5000);
+}
+function tickVoicePoll(){
+  var ids = Object.keys(pendingVoices);
+  var cids = Object.keys(pendingChatJobs);
+  if (!ids.length && !cids.length) { clearInterval(voicePollTimer); voicePollTimer = null; return; }
+  var now = Date.now();
+  ids.forEach(function(jid){
+    if (now - pendingVoices[jid].started > 10 * 60 * 1000) {
+      var e = pendingVoices[jid];
+      if (e.el) e.el.textContent = 'No voice reply after 10 minutes — the peer may be offline, its poller down, or it may not offer tts. Job ' + jid + ' may still be in flight; check Fetch job replies in the Node tab.';
+      delete pendingVoices[jid];
+    }
+  });
+  cids.forEach(function(jid){
+    var c = pendingChatJobs[jid];
+    if (c && now - c.started > 10 * 60 * 1000) {
+      if (c.statusEl) c.statusEl.textContent = 'No reply after 10 minutes — the peer may be offline, its poller down, or it may not offer this capability.';
+      delete pendingChatJobs[jid];
+    }
+  });
+  if (!Object.keys(pendingVoices).length && !Object.keys(pendingChatJobs).length) { clearInterval(voicePollTimer); voicePollTimer = null; return; }
+  fetch('/api/node/jobs')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      (j.messages || []).forEach(function(m){
+        var e = pendingVoices[m.in_reply_to];
+        if (e) {
+          // This reply is also kept for the Node tab (see buffer note above).
+          voiceReplyBuffer.push(m);
+          delete pendingVoices[m.in_reply_to];
+          if (e.el) { e.el.innerHTML = renderJobReply(m); }
+          else if ($('nodeJobOut')) { $('nodeJobOut').innerHTML = '<div>' + renderJobReply(m) + '</div>'; }
+          initWavePlayers();
+          return;
+        }
+        var c = pendingChatJobs[m.in_reply_to];
+        if (c) {
+          voiceReplyBuffer.push(m);
+          delete pendingChatJobs[m.in_reply_to];
+          const r = m.result || {};
+          if (c.statusEl) c.statusEl.remove();
+          if (r.error) {
+            c.pEl.textContent = '[peer error] ' + r.error;
+            messages.push({role:'assistant',content:'[peer error] ' + r.error,ts:Date.now(),via:c.name});
+          } else if (c.kind === 'image' && r.image_b64) {
+            // Save the bytes server-side so the image survives reloads.
+            fetch('/api/chat-images/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data: r.image_b64, filename: 'peer-' + String(m.in_reply_to||'img').replace(/[^A-Za-z0-9]+/g,'').slice(0,12)})})
+              .then(function(rr){ return rr.json(); })
+              .then(function(sj){
+                const im = document.createElement('img');
+                im.src = sj.filename ? ('/api/chat-images/' + encodeURIComponent(sj.filename)) : ('data:image/png;base64,' + r.image_b64);
+                im.style.maxWidth = '100%';
+                c.body.appendChild(im);
+                messages.push({role:'assistant',content:'[image] ' + (c.prompt||''),image:sj.filename||null,ts:Date.now(),via:c.name});
+                saveSession();
+              })
+              .catch(function(){
+                const im = document.createElement('img');
+                im.src = 'data:image/png;base64,' + r.image_b64;
+                im.style.maxWidth = '100%';
+                c.body.appendChild(im);
+                messages.push({role:'assistant',content:'[image] ' + (c.prompt||''),ts:Date.now(),via:c.name});
+                saveSession();
+              });
+            c.pEl.textContent = '[image] ' + (c.prompt||'');
+            return;
+          } else if (r.text) {
+            c.pEl.textContent = r.text;
+            messages.push({role:'assistant',content:r.text,ts:Date.now(),via:c.name});
+          } else {
+            c.pEl.textContent = renderJobReply(m);
+            messages.push({role:'assistant',content:JSON.stringify(r),ts:Date.now(),via:c.name});
+          }
+          saveSession();
+          return;
+        }
+        voiceReplyBuffer.push(m);
+      });
+      if (!Object.keys(pendingVoices).length && !Object.keys(pendingChatJobs).length) { clearInterval(voicePollTimer); voicePollTimer = null; }
+    })
+    .catch(function(){ /* next tick retries; the job stays pending */ });
+}
+function b64ToBytes(s){
+  var bin = atob(s), out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function initWavePlayers(){
+  Object.keys(waveData).forEach(function(id){
+    var d = waveData[id]; delete waveData[id];
+    var box = document.getElementById(id); if (!box) return;
+    var bytes = b64ToBytes(d.b64);
+    var blob = new Blob([bytes], {type: d.ct});
+    var url = URL.createObjectURL(blob);
+    var audio = new Audio(url);
+    var canvas = box.querySelector('canvas');
+    var play = box.querySelector('.waveplay');
+    var prog = box.querySelector('.waveprog');
+    var save = box.querySelector('.wavesave');
+    save.href = url; save.download = 'voice-' + d.stamp + '.mp3';
+    var share = box.querySelector('.waveshare');
+    if (share) share.onclick = async function(){
+      share.disabled = true; share.textContent = 'Sharing…';
+      try {
+        const r = await fetch('/api/voice/share', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename: 'voice-' + d.stamp + '.mp3', data: d.b64})});
+        const jj = await r.json();
+        if (jj.error) { share.textContent = 'Share failed'; share.title = jj.error; share.disabled = false; }
+        else { share.textContent = 'Shared ✓'; share.title = 'Stored to shared files, ledger height ' + (jj.ledger && jj.ledger.height); }
+      } catch (e) { share.textContent = 'Share failed'; share.title = String(e); share.disabled = false; }
+    };
+    play.onclick = function(){ if (audio.paused) { audio.play(); play.textContent = 'Pause'; } else { audio.pause(); play.textContent = 'Play'; } };
+    audio.onended = function(){ play.textContent = 'Play'; };
+    audio.ontimeupdate = function(){ if (audio.duration) prog.style.width = (100 * audio.currentTime / audio.duration) + '%'; };
+    canvas.onclick = function(ev){
+      var r = canvas.getBoundingClientRect();
+      var frac = (ev.clientX - r.left) / r.width;
+      if (audio.duration) audio.currentTime = frac * audio.duration;
+    };
+    var draw = function(peaks){
+      var ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#17cfff';
+      var n = peaks.length, w = canvas.width / n;
+      for (var i = 0; i < n; i++){
+        var h = Math.max(2, peaks[i] * canvas.height);
+        ctx.fillRect(i * w + 1, (canvas.height - h) / 2, Math.max(1, w - 2), h);
+      }
+    };
+    var flat = function(){ draw(new Array(120).fill(0.25)); };
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        var actx = new AC();
+        actx.decodeAudioData(bytes.buffer.slice(0), function(buf){
+          var ch = buf.getChannelData(0), n = 120, peaks = [];
+          var step = Math.max(1, Math.floor(ch.length / n));
+          for (var i = 0; i < n; i++){
+            var m = 0;
+            for (var k = 0; k < step; k += 4){ var v = Math.abs(ch[i * step + k] || 0); if (v > m) m = v; }
+            peaks.push(m);
+          }
+          draw(peaks);
+        }, flat);
+      } else flat();
+    } catch (e) { flat(); }
+  });
+}
+function renderJobReply(m){
+  const r = m.result||{};
+  const head = 'reply to '+escHtml(m.in_reply_to||'')+': ';
+  if (r.error) return head + 'error: ' + escHtml(r.error);
+  const b64ok = function(s){ return typeof s === 'string' && /^[A-Za-z0-9+/=]+$/.test(s); };
+  if (r.audio_b64 && b64ok(r.audio_b64)) {
+    const ct = /^audio\/[a-z0-9.+-]+$/i.test(r.content_type||'') ? r.content_type : 'audio/mpeg';
+    var wid = 'wave-' + (++waveSeq);
+    waveData[wid] = {b64: r.audio_b64, ct: ct, stamp: (m.in_reply_to||'voice').replace(/[^A-Za-z0-9]+/g,'').slice(0,12) + '-' + Date.now()};
+    return head + '<div class="waveplayer" id="'+wid+'"><canvas width="600" height="64" style="width:100%;background:#02120a;cursor:pointer"></canvas><div style="height:4px;background:#123"><div class="waveprog" style="height:100%;width:0%;background:#17cfff"></div></div><div><button type="button" class="waveplay">Play</button> <a class="wavesave" href="#" title="Download voice">⬇ Save voice</a> <button type="button" class="waveshare" title="Store to shared files">Share</button> ('+escHtml(String(r.bytes||''))+' bytes)</div></div>';
+  }
+  if (r.image_b64 && b64ok(r.image_b64)) {
+    return head + '<img src="data:image/png;base64,'+r.image_b64+'" style="max-width:100%">';
+  }
+  if (r.status === 'queued') return head + 'queued as ' + escHtml(r.job||'') + ' (render pending)';
+  if (r.tc_transfer) return head + 'image too large for mailbox — TC transfer ' + escHtml(r.tc_transfer);
+  if (r.text) return head + escHtml(r.text) + ' <button type="button" onclick="voiceForText(\''+encodeURIComponent(r.text).replace(/'/g, '%27')+'\', this)">Generate voice</button>';
+  return head + escHtml(JSON.stringify(r));
+}
+async function pollNodeJobs(){
+  const j = await (await fetch('/api/node/jobs')).json();
+  if (j.error) { $('nodeJobOut').innerHTML = 'Jobs error: ' + escHtml(j.error); return; }
+  // Include replies the voice auto-fetch already consumed (buffered
+  // there so fetch-and-clear does not lose them), and deliver any
+  // fresh reply that answers a pending voice job into its chat
+  // message as well as here.
+  const fresh = j.messages || [];
+  const all = voiceReplyBuffer.concat(fresh);
+  voiceReplyBuffer = [];
+  fresh.forEach(function(m){
+    const e = pendingVoices[m.in_reply_to];
+    if (e) { if (e.el) e.el.innerHTML = renderJobReply(m); delete pendingVoices[m.in_reply_to]; }
+  });
+  const pendingNote = Object.keys(pendingVoices).length ? ' (voice job(s) still pending: ' + Object.keys(pendingVoices).join(', ') + ' — auto-checking, or Fetch again in a minute)' : '';
+  $('nodeJobOut').innerHTML = all.map(function(m){ return '<div>'+renderJobReply(m)+'</div>'; }).join('') || ('(no job replies yet)' + pendingNote);
+  initWavePlayers();
+}
+function transferAge(ts){
+  if(!ts) return '';
+  var s = Math.max(0, Math.round(Date.now()/1000 - ts));
+  if(s < 60) return s + 's ago';
+  if(s < 3600) return Math.floor(s/60) + 'm ago';
+  return Math.floor(s/3600) + 'h ago';
+}
+function renderTransfers(list){
+  const el = $('nodeTransfers');
+  if(!el) return;
+  el.innerHTML = (list||[]).map(function(t){
+    const peer = peerNameFor(t.to_pubkey) || String(t.to_pubkey||'').slice(0,12);
+    const st = t.status || 'sent';
+    const reply = t.error ? ('error: ' + escHtml(t.error))
+      : t.reply_kind === 'text' && t.reply_text ? escHtml(t.reply_text)
+      : t.reply_kind ? ('reply: ' + escHtml(t.reply_kind)) : 'awaiting reply';
+    return '<div class="card"><span class="pill">' + escHtml(st) + '</span> <span class="pill">' + escHtml(t.capability || '') + '</span> '
+      + escHtml(peer) + ' · ' + transferAge(t.sent_at) + '<br><span class="small">' + escHtml(t.snippet || '') + '</span><br>'
+      + '<span class="small">' + reply + '</span> '
+      + '<button type="button" onclick="resendTransfer(\'' + escHtml(t.job_id) + '\')">Resend</button></div>';
+  }).join('') || '(no transfers yet — send a job from Jobs or chat Generate voice)';
+}
+async function refreshTransfers(){
+  try{
+    const j = await (await fetch('/api/node/jobs')).json();
+    // Deliver fresh replies to pending chat voice jobs first, exactly
+    // like the Jobs fetch does, so this refresh never steals a
+    // waveform from the chat message waiting on it.
+    const fresh = j.messages || [];
+    const all = voiceReplyBuffer.concat(fresh);
+    voiceReplyBuffer = [];
+    fresh.forEach(function(m){
+      const e = pendingVoices[m.in_reply_to];
+      if(e){ if(e.el) e.el.innerHTML = renderJobReply(m); delete pendingVoices[m.in_reply_to]; }
+    });
+    if(all.length){
+      $('nodeTransfersReplies').innerHTML = all.map(function(m){ return '<div>' + renderJobReply(m) + '</div>'; }).join('');
+      initWavePlayers();
+    }
+    const t = await (await fetch('/api/node/transfers')).json();
+    renderTransfers(t.transfers || []);
+  }catch(e){
+    const out = $('nodeTransfersOut');
+    if(out) out.textContent = 'Transfers refresh failed: ' + e;
+  }
+}
+async function resendTransfer(jobId){
+  const r = await fetch('/api/node/transfers/resend', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({job_id: jobId})});
+  const j = await r.json();
+  const out = $('nodeTransfersOut');
+  if(out) out.textContent = j.error ? ('Resend failed: ' + j.error) : ('Resent as job ' + j.job_id);
+  refreshTransfers();
+}
+function startTransferAutoRefresh(){
+  stopTransferAutoRefresh();
+  transferTimer = setInterval(function(){ refreshTransfers(); }, 5000);
+}
+function stopTransferAutoRefresh(){
+  if(transferTimer){ clearInterval(transferTimer); transferTimer = null; }
+}
+async function loadServing(){
+  const j = await (await fetch('/api/node/serving')).json();
+  if(j.error) return;
+  if($('nodeServeBackend')) $('nodeServeBackend').value = j.text_backend || '';
+  if($('nodeServeModel')) $('nodeServeModel').value = j.text_model || '';
+  if($('nodeServeVoice')) $('nodeServeVoice').value = j.tts_voice || '';
+  if($('nodeServeEndpoint')) $('nodeServeEndpoint').value = j.public_endpoint || '';
+  const out = $('nodeServeOut');
+  if(out) out.textContent = j.has_cloud_key ? 'A cloud key is stored (not shown).' : '';
+}
+async function saveServing(){
+  const body = {
+    text_backend: $('nodeServeBackend').value,
+    text_model: $('nodeServeModel').value.trim(),
+    cloud_key: $('nodeServeKey').value,
+    tts_voice: $('nodeServeVoice').value.trim(),
+    public_endpoint: $('nodeServeEndpoint').value.trim()
+  };
+  const r = await fetch('/api/node/serving', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  const out = $('nodeServeOut');
+  if(out) out.textContent = j.error ? ('Save failed: ' + j.error) : 'Serving defaults saved — next Announce shares them.';
+  if($('nodeServeKey')) $('nodeServeKey').value = '';
+  loadServing();
+}
+async function pollerControl(action){
+  await fetch('/api/node/poller/'+action,{method:'POST'});
+  loadServers(); loadNodePollerLog();
+}
+async function loadNodePollerLog(){
+  const j = await (await fetch('/api/node/poller')).json();
+  const el = $('nodePollerStatus');
+  if(el) el.textContent = 'Poller: ' + (j.running ? 'RUNNING' : 'DOWN') + ' (text-only · mailbox poll every 60s)';
+  const log = $('nodePollerLog');
+  if(log) log.innerHTML = (j.log||'').split('\n').filter(Boolean).slice(-30).map(function(l){ return '<div>' + escHtml(l) + '</div>'; }).join('');
+}
+
+// ---------- Stories / ezines / code / search / memory / samples ----------
+async function loadStories(){
+  const r = await fetch('/api/stories');
+  const j = await r.json();
+  const el = $('storyList'); el.innerHTML = '';
+  (j.stories||[]).forEach(function(s){
+    const d = document.createElement('div'); d.className='card';
+    d.innerHTML = '<b>'+escHtml(s.id)+'</b><br>'+s.blocks+' blocks · '+s.words+' words · ~'+s.est_tokens+' tokens ('+s.pct_of_256k+'% of 256k)<br><span class="pill">'+(s.meta.genre||'')+'</span> <span class="pill">'+(s.meta.perspective||'')+'</span> <span class="pill">'+(s.meta.rating||'')+'</span><div class="bar" style="margin-top:8px"><div style="width:'+Math.min(100,s.pct_of_256k)+'%"></div></div>';
+    const w = document.createElement('button'); w.textContent='Write 1 block (3 pages)'; w.onclick=function(){ writeStory(s.id,3,1); }; d.appendChild(w);
+    const sb = document.createElement('button'); sb.textContent='Storyboard'; sb.onclick=function(){ showStoryboard(s.id); }; d.appendChild(sb);
+    const c = document.createElement('button'); c.textContent='Compile'; c.onclick=async function(){ await fetch('/api/stories/'+encodeURIComponent(s.id)+'/compile',{method:'POST'}); alert('compiled'); }; d.appendChild(c);
+    const dl = document.createElement('a'); dl.href='/api/stories/'+encodeURIComponent(s.id)+'/download'; dl.textContent=' Download .md'; dl.style.marginLeft='8px'; d.appendChild(dl);
+    el.appendChild(d);
+  });
+  const sc = $('storySamples');
+  if(sc && !sc.dataset.loaded){ loadSampleChecks('storySamples'); sc.dataset.loaded='1'; }
+}
+async function showStoryboard(id){
+  const r = await fetch('/api/stories/'+encodeURIComponent(id)+'/beats');
+  const j = await r.json();
+  const el = $('storyboard');
+  if(j.error){ el.textContent = j.error; return; }
+  el.innerHTML = '<h3>Storyboard — '+escHtml(id)+'</h3><p>'+j.blocks_written+' blocks written · '+j.words+' words · ~'+j.est_tokens+' tokens ('+j.pct_of_256k+'% of 256k)</p>' +
+    '<div class="bar"><div style="width:'+Math.min(100,j.pct_of_256k)+'%"></div></div>' +
+    j.beats.map(function(b,i){ return '<div class="beat '+(i<j.blocks_written?'done':'')+'"><b>Chapter '+(i+1)+'</b> '+(i<j.blocks_written?'✅ written':'⏳ not yet')+'<br>'+escHtml(b)+'</div>'; }).join('');
+  el.scrollIntoView();
+}
+async function newStory(){
+  const body = {premise:$('sPremise').value,genre:$('sGenre').value,perspective:$('sPersp').value,rating:$('sRating').value,plot:$('sPlot').value,outline:$('sOutline').value};
+  const r = await fetch('/api/stories/new',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j = await r.json();
+  if(j.error){ alert(j.error); return; }
+  alert('created: '+j.story_id); loadStories();
+}
+async function writeStory(id,pages,count){
+  $('storyText').textContent = 'Writing… (streams block by block)';
+  const sampleSources = sampOn() ? selectedSamples : null;
+  const r = await fetch('/api/stories/write',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_id:id,pages:pages,count:count,sample_sources:sampleSources})});
+  const reader = r.body.getReader(); const dec = new TextDecoder(); let buf='', full='';
+  while(true){
+    const chunk = await reader.read();
+    if(chunk.done) break;
+    buf += dec.decode(chunk.value,{stream:true});
+    let idx;
+    while((idx = buf.indexOf('\n\n')) >= 0){
+      const raw = buf.slice(0,idx); buf = buf.slice(idx+2);
+      if(raw.startsWith('data: ')){
+        const d = raw.slice(6);
+        if(d==='[DONE]') break;
+        try{ const j = JSON.parse(d); full += j.text; $('storyText').textContent = full; }catch(e){}
+      }
+    }
+  }
+  loadStories();
+}
+async function remember(){
+  const t = $('memText').value;
+  const r = await fetch('/api/memory/remember',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+  $('memOut').textContent = JSON.stringify(await r.json());
+}
+async function recall(){
+  const q = $('recallQ').value;
+  const r = await fetch('/api/memory/recall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+  const j = await r.json();
+  $('memOut').innerHTML = (j.hits||[]).map(function(h){ return '['+h.score+'] ('+escHtml(h.source)+') '+escHtml(h.text); }).join('<br><br>');
+}
+async function ingestSamples(){
+  const r = await fetch('/api/samples/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+  $('samplesOut').textContent = JSON.stringify(await r.json()); loadSamples();
+}
+async function loadSamples(){
+  const r = await fetch('/api/samples');
+  const j = await r.json();
+  $('samplesOut').textContent = 'Folder: '+j.folder+'\n'+JSON.stringify(j.samples,null,2);
+  loadSampleChecks('sampleChecks');
+}
+async function loadSampleChecks(elId){
+  const r = await fetch('/api/samples');
+  const j = await r.json();
+  const el = $(elId);
+  if(!el) return;
+  el.innerHTML = '<p class="small">Tick samples to use as reference in chat/stories:</p>';
+  Object.keys(j.samples||{}).forEach(function(src){
+    const lab = document.createElement('label');
+    lab.style.display='block'; lab.style.fontWeight='normal';
+    const cb = document.createElement('input');
+    cb.type='checkbox'; cb.style.width='auto'; cb.checked = selectedSamples.includes(src);
+    cb.onchange = function(){
+      if(cb.checked && !selectedSamples.includes(src)) selectedSamples.push(src);
+      if(!cb.checked) selectedSamples = selectedSamples.filter(function(s){ return s!==src; });
+      $('teleSamples').textContent = selectedSamples.length + ' SELECTED';
+    };
+    lab.append(cb, ' '+src+' ('+j.samples[src]+' chunks)');
+    el.appendChild(lab);
+  });
+  if(!Object.keys(j.samples||{}).length) el.innerHTML += '<p class="small">No samples ingested yet.</p>';
+  $('teleSamples').textContent = selectedSamples.length + ' SELECTED';
+}
+async function uploadPdf(){
+  const f = $('pdfFile').files[0];
+  if(!f){ alert('Choose a PDF / txt / md file first'); return; }
+  const buf = await f.arrayBuffer();
+  let binary=''; const bytes = new Uint8Array(buf);
+  for(let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+  const b64 = btoa(binary);
+  const r = await fetch('/api/samples/upload-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,b64:b64})});
+  const j = await r.json();
+  $('samplesOut').textContent = JSON.stringify(j,null,2); loadSamples();
+}
+async function testApi(providerName){
+  const key = providerName==='openrouter' ? $('keyOR').value : $('keyNV').value;
+  const model = providerName==='openrouter' ? $('testModelOR').value : $('testModelNV').value;
+  $('apiTestOut').textContent = 'Testing ' + providerName + '…';
+  const r = await fetch('/api/cloud/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:providerName,api_key:key,model:model})});
+  const j = await r.json();
+  $('apiTestOut').textContent = JSON.stringify(j,null,2);
+}
+async function testLocal(){
+  $('apiTestOut').textContent = 'Testing local…';
+  const r = await fetch('/api/system');
+  const j = await r.json();
+  $('apiTestOut').textContent = 'chat '+(j.chat_up?'up':'down')+' · embed '+(j.embed_up?'up':'down')+' · vector memories '+j.vector_memories+' · GPU '+(j.gpu.present?j.gpu.name:'none');
+}
+function saveKeys(){
+  localStorage.setItem('or_key',$('keyOR').value);
+  localStorage.setItem('nv_key',$('keyNV').value);
+  $('keyNote').textContent = 'Saved in this browser only.';
+}
+function clearKeys(){
+  localStorage.removeItem('or_key'); localStorage.removeItem('nv_key');
+  $('keyOR').value=''; $('keyNV').value='';
+  $('keyNote').textContent = 'Cleared.';
+}
+async function loadEzines(){
+  const r = await fetch('/api/ezines');
+  const j = await r.json();
+  const el = $('ezineList'); el.innerHTML = '';
+  (j.ezines||[]).forEach(function(e){
+    const d = document.createElement('div'); d.className='card';
+    d.innerHTML = '<b>'+escHtml(e.title)+'</b> (issue '+e.issue+')<br>'+e.pieces+' pieces · '+e.words+' words · '+e.pages+' pages · ~'+e.est_tokens+' tokens';
+    const c = document.createElement('button'); c.textContent='Compile to HTML';
+    c.onclick = async function(){ await fetch('/api/ezines/compile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ezine_id:e.ezine_id})}); alert('compiled'); };
+    d.appendChild(c);
+    const dl = document.createElement('a'); dl.href='/api/ezines/'+encodeURIComponent(e.ezine_id)+'/download'; dl.textContent=' Download HTML'; dl.style.marginLeft='8px'; d.appendChild(dl);
+    el.appendChild(d);
+  });
+}
+async function newEzine(){
+  const r = await fetch('/api/ezines/new',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('ezTitle').value,issue:$('ezIssue').value,tagline:$('ezTagline').value})});
+  const j = await r.json();
+  if(j.error){ alert(j.error); return; }
+  alert('created: '+j.ezine_id); loadEzines();
+}
+async function askCode(){
+  $('codeOut').textContent = 'Generating…';
+  const r = await fetch('/api/code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:$('codePrompt').value,file:$('codeFile').value})});
+  const j = await r.json();
+  $('codeOut').textContent = (j.code||j.error||'') + (j.saved ? ('\n\nSaved: '+j.saved) : '');
+}
+async function doSearch(){
+  const q = $('searchQ').value;
+  const r = await fetch('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,top:10})});
+  const j = await r.json();
+  $('searchOut').innerHTML = (j.hits||[]).map(function(h){ return '['+h.score+'] ('+escHtml(h.source)+') '+escHtml(h.text.slice(0,400)); }).join('<br><br>') || (j.error||'no hits');
+}
+
+// ---------- Signed chat packages ----------
+async function packageCurrent(){
+  if(!messages.length){ alert('Nothing to package yet — send a message first.'); return; }
+  await saveSession();
+  if(!currentSid){ alert('Could not save this chat yet.'); return; }
+  const a = document.createElement('a');
+  a.href = '/api/sessions/'+encodeURIComponent(currentSid)+'/package';
+  a.download = '';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function verifyPackageFile(){
+  const f = $('pkgFile').files[0];
+  const out = $('pkgVerifyOut');
+  if(!f){ alert('Choose a package file first'); return; }
+  let pkg;
+  try{ pkg = JSON.parse(await f.text()); }catch(e){ out.textContent = 'Invalid: not JSON.'; return; }
+  const r = await fetch('/api/packages/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pkg)});
+  const j = await r.json();
+  out.textContent = j.valid ? ('✅ Valid — signed by '+j.fingerprint+(j.node_id?' ('+j.node_id+')':'')) : ('❌ Invalid — '+(j.reason||'verification failed'));
+}
+
+// ---------- Memory constellation + vector inspector ----------
+let constData=null, constFocus='core', constSessionTitle='', vecCache={}, vecOpenId=null, vecAllShown=false;
+function constNeighbors(id){
+  const out = new Set();
+  (constData.edges||[]).forEach(function(e){
+    if(e.a===id) out.add(e.b);
+    if(e.b===id) out.add(e.a);
+  });
+  return out;
+}
+function constFocusSets(){
+  const inctx = new Set(), hop = new Set();
+  if(!constData) return {inctx:inctx, hop:hop};
+  if(constFocus==='core'){
+    (constData.core_links||[]).forEach(function(id){ inctx.add(id); });
+  } else {
+    constNeighbors(constFocus).forEach(function(id){ inctx.add(id); });
+  }
+  inctx.forEach(function(id){
+    constNeighbors(id).forEach(function(n){
+      if(n!==constFocus && !inctx.has(n)) hop.add(n);
+    });
+  });
+  return {inctx:inctx, hop:hop};
+}
+function constLayout(n){
+  // Golden-angle spiral, deterministic, core at centre (150,150).
+  const pts = [];
+  for(let i=0;i<n;i++){
+    const a = i*2.399963, r = 40 + Math.min(i,23)*3.2;
+    let x = 150 + Math.cos(a)*r, y = 150 + Math.sin(a)*r*0.92;
+    pts.push([Math.max(22, Math.min(278, x)), Math.max(22, Math.min(278, y))]);
+  }
+  return pts;
+}
+function showMemoryDetail(title, body){
+  const d = $('memory-detail');
+  if(!d) return;
+  d.innerHTML = '';
+  const t = document.createElement('div'); t.className='md-title'; t.textContent = title;
+  const b = document.createElement('div'); b.textContent = body;
+  d.append(t, b);
+}
+function renderConstellation(){
+  const svg = $('constellation');
+  if(!svg || !constData) return;
+  const nodes = constData.nodes||[];
+  const sets = constFocusSets();
+  const pts = constLayout(nodes.length);
+  const pos = {};
+  nodes.forEach(function(n,i){ pos[n.id] = pts[i]; });
+  const NS = 'http://www.w3.org/2000/svg';
+  let h = '';
+  (constData.edges||[]).forEach(function(e){
+    const p1 = pos[e.a], p2 = pos[e.b];
+    if(!p1 || !p2) return;
+    let cls = 'edge';
+    if(sets.inctx.has(e.a) && sets.inctx.has(e.b)) cls = 'edge hot';
+    else if(sets.inctx.has(e.a) || sets.inctx.has(e.b) || sets.hop.has(e.a) || sets.hop.has(e.b)) cls = 'edge hot';
+    h += '<line class="'+cls+'" x1="'+p1[0].toFixed(1)+'" y1="'+p1[1].toFixed(1)+'" x2="'+p2[0].toFixed(1)+'" y2="'+p2[1].toFixed(1)+'"/>';
+  });
+  nodes.forEach(function(n,i){
+    const p = pts[i];
+    let cls = 'node-group';
+    if(String(constFocus)===String(n.id)) cls += ' active';
+    else if(sets.inctx.has(n.id)) cls += ' inctx';
+    const focused = String(constFocus)===String(n.id);
+    h += '<g class="'+cls+'" data-node="'+n.id+'" tabindex="0"><title>#'+n.id+' · '+escHtml(n.source)+' — '+escHtml(n.text_preview.slice(0,60))+'</title>';
+    if(focused){
+      h += '<circle class="glow-dot" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="11"/>';
+      h += '<circle class="pulse" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="10"/>';
+    }
+    h += '<circle class="node-ring" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="9"/>';
+    h += '<circle class="node-dot" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="4"/>';
+    h += '<text x="'+p[0].toFixed(1)+'" y="'+(p[1]-14).toFixed(1)+'" text-anchor="middle">#'+n.id+'</text></g>';
+  });
+  const coreFocused = constFocus==='core';
+  h += '<g class="node-group core'+(coreFocused?' active':'')+'" data-node="core" tabindex="0"><title>SESSION CORE</title>';
+  if(coreFocused){
+    h += '<circle class="glow-dot" cx="150" cy="150" r="13"/>';
+    h += '<circle class="pulse" cx="150" cy="150" r="12"/>';
+  }
+  h += '<circle class="node-ring" cx="150" cy="150" r="13" style="stroke:rgba(23,207,255,.5)"/>';
+  h += '<circle class="node-dot" cx="150" cy="150" r="6" fill="#17cfff"/>';
+  h += '<text x="150" y="178" text-anchor="middle">SESSION CORE</text></g>';
+  svg.innerHTML = h;
+  $('mem-node-count').textContent = nodes.length + (nodes.length===1 ? ' NODE' : ' NODES');
+  renderConstDetail();
+}
+function renderConstDetail(){
+  const sets = constFocusSets();
+  if(constFocus==='core'){
+    showMemoryDetail('SESSION CORE — ' + (constSessionTitle||'no session'),
+      (constData.nodes.length) + ' nodes · ' + (constData.edges||[]).length + ' edges · ' + sets.inctx.size + ' in context. Click a node to inspect its memory and vector.');
+  } else {
+    const n = (constData.nodes||[]).find(function(x){ return String(x.id)===String(constFocus); });
+    if(!n){ showMemoryDetail('Node not found',''); return; }
+    const dt = n.created_at ? new Date(n.created_at*1000).toLocaleString() : '';
+    const d = $('memory-detail');
+    d.innerHTML = '';
+    const t = document.createElement('div'); t.className='md-title'; t.textContent = '#'+n.id+' · '+n.source+' · '+dt;
+    const b = document.createElement('div'); b.textContent = n.text_preview;
+    const btn = document.createElement('button');
+    btn.type='button'; btn.textContent='Expand vector ▾'; btn.style.marginTop='6px';
+    btn.onclick = function(){ expandVector(n.id); };
+    d.append(t, b, btn);
+  }
+}
+async function loadNodeView(){
+  const el = $('nodeView'); if(!el) return;
+  el.textContent = 'Loading full node view…';
+  try {
+    const j = await (await fetch('/api/memories/list?limit=100')).json();
+    if(j.error){ el.textContent = 'Node view error: ' + j.error; return; }
+    el.innerHTML = '<div class="small">showing ' + j.shown + ' of ' + j.total + ' memory nodes — each with the model that wrote it and the replies that used it</div>' + (j.nodes||[]).map(function(n){
+      const used = (n.used_by||[]).map(function(u){ return '<div>↳ reply #' + u.id + ': ' + escHtml(u.text_preview||'') + '</div>'; }).join('');
+      return '<div style="margin:8px 0;border-top:1px solid #123;padding-top:6px"><b>#' + n.id + '</b> (' + escHtml(n.model || n.source || 'unknown') + ') · ' + escHtml(n.source||'') + ' · ' + new Date(n.created_at*1000).toLocaleString() + '<div>' + escHtml(n.text_preview||'') + '</div>' + (n.used_count ? ('<div class="small">used in ' + n.used_count + ' repl' + (n.used_count===1 ? 'y' : 'ies') + '</div>' + used) : '<div class="small">not used by any reply yet</div>') + '</div>';
+    }).join('') || '(no memories yet)';
+  } catch (e) { el.textContent = 'Node view failed: ' + e; }
+}
+async function loadConstellation(sessionId){
+  const d = $('memory-detail');
+  if(d) d.textContent = 'Loading memories…';
+  try{
+    const url = '/api/memories?limit=24' + (sessionId ? ('&session='+encodeURIComponent(sessionId)) : '');
+    const r = await fetch(url);
+    constData = await r.json();
+    constFocus = 'core'; vecOpenId = null;
+    const insp = $('vecInspector');
+    if(insp) insp.style.display = 'none';
+    renderConstellation();
+  }catch(e){
+    if(d) d.textContent = 'Constellation unavailable.';
+  }
+}
+$('constellation').addEventListener('click', function(ev){
+  const g = ev.target.closest ? ev.target.closest('[data-node]') : null;
+  if(!g) return;
+  const id = g.getAttribute('data-node');
+  if(id==='core'){
+    constFocus = 'core'; vecOpenId = null;
+    const insp = $('vecInspector');
+    if(insp) insp.style.display = 'none';
+    renderConstellation();
+  } else {
+    constFocus = parseInt(id,10);
+    renderConstellation();
+    expandVector(constFocus);
+  }
+});
+async function expandVector(id){
+  const insp = $('vecInspector');
+  if(!insp) return;
+  insp.style.display = 'block'; vecOpenId = id; vecAllShown = false;
+  const show = $('vecShowAll');
+  if(show) show.textContent = 'Show all values';
+  const all = $('vecAll');
+  if(all) all.style.display = 'none';
+  const meta = $('vecMeta'), prev = $('vecPreview');
+  meta.textContent = 'Loading vector #' + id + '…';
+  prev.textContent = '';
+  try{
+    let body = vecCache[id];
+    if(!body){
+      const r = await fetch('/api/memories/'+id+'/vector');
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      body = await r.json(); vecCache[id] = body;
+    }
+    const v = body.vector||[], n = v.length;
+    let sum = 0, mn = Infinity, mx = -Infinity;
+    v.forEach(function(x){ sum += x*x; if(x<mn) mn=x; if(x>mx) mx=x; });
+    const mean = v.reduce(function(a,b){ return a+b; }, 0) / Math.max(1,n);
+    meta.innerHTML = 'DIM <b>'+body.dim+'</b> · MODEL <b>'+escHtml(body.model)+'</b> · SOURCE <b>'+escHtml(body.source)+'</b><br>L2 <b>'+Math.sqrt(sum).toFixed(3)+'</b> · MIN <b>'+mn.toFixed(4)+'</b> · MAX <b>'+mx.toFixed(4)+'</b> · MEAN <b>'+mean.toFixed(4)+'</b>';
+    prev.textContent = 'v[0..'+(Math.min(16,n)-1)+']: ' + v.slice(0,16).map(function(x){ return x.toFixed(4); }).join(', ') + (n>16 ? ' …' : '');
+    drawVectorStrip(v);
+  }catch(e){
+    meta.textContent = 'Vector unavailable for #' + id + '.';
+  }
+}
+function drawVectorStrip(v){
+  const cv = $('vecStrip');
+  if(!cv || !v.length) return;
+  const w = cv.clientWidth || 218;
+  cv.width = w;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,w,48);
+  let mx = 0;
+  v.forEach(function(x){ if(Math.abs(x)>mx) mx = Math.abs(x); });
+  mx = mx || 1;
+  const step = w / v.length;
+  for(let i=0;i<v.length;i++){
+    const x = v[i], h = Math.max(1, Math.abs(x)/mx*22), y = x>=0 ? 24-h : 24;
+    ctx.fillStyle = x>=0 ? '#17cfff' : '#ffb340';
+    ctx.fillRect(i*step, y, Math.max(1, step), h);
+  }
+  ctx.fillStyle = '#4a5058';
+  ctx.fillRect(0, 24, w, 1);
+}
+function toggleVecAll(){
+  const all = $('vecAll');
+  if(!all || vecOpenId===null) return;
+  const body = vecCache[vecOpenId];
+  if(!body) return;
+  vecAllShown = !vecAllShown;
+  if(vecAllShown){
+    all.textContent = body.vector.map(function(x,i){ return String(i).padStart(4,'0') + '  ' + (x>=0?'+':'') + x.toFixed(4); }).join('\n');
+    all.style.display = 'block';
+    $('vecShowAll').textContent = 'Hide full vector';
+  } else {
+    all.style.display = 'none';
+    $('vecShowAll').textContent = 'Show all values';
+  }
+}
+function collapseVec(){
+  const insp = $('vecInspector');
+  if(insp) insp.style.display = 'none';
+  vecOpenId = null;
+}
+
+// ---------- Init ----------
+// Output-budget meter: 28 segments, Draft 4 style.
+(function(){
+  const bar = $('out-bar');
+  for(let i=0;i<28;i++) bar.appendChild(document.createElement('i'));
+  const rb = $('ram-bar');
+  for(let i=0;i<24;i++) rb.appendChild(document.createElement('i'));
+})();
+$('keyOR').value = localStorage.getItem('or_key')||'';
+$('keyNV').value = localStorage.getItem('nv_key')||'';
+$('teleTemp').textContent = $('tempInput').value || '0.7';
+$('tempInput').addEventListener('change', function(){ $('teleTemp').textContent = $('tempInput').value; });
+if($('nodeLobbyText')) $('nodeLobbyText').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); sendLobby(); } });
+if($('nodeChatText')) $('nodeChatText').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); sendNodeChat(); } });
+showWelcome(); loadStatus(); loadSessions(); loadStories();
+showTab('chat'); // Refresh always lands on Chat, the default page. Node is one click away.
+// Live clock + page uptime (real, local only)
+const _t0 = Date.now();
+setInterval(function(){
+  const c = $('deckClock');
+  if(c) c.textContent = new Date().toLocaleTimeString();
+  const u = $('readUptime');
+  if(u){
+    const s = Math.floor((Date.now()-_t0)/1000);
+    u.textContent = (s<60) ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s';
+  }
+}, 1000);
+</script>
+</body>
+</html>

@@ -1,2 +1,412 @@
-# ceti-node
-CETI: Uncensored Node 0.0.1. Distributed peer-to-peer AI: uncensored models and local memory on your own iron. Signed nodes, a ledger on every write, zero tokens at serve time. No accounts. No landlord. Built by AI for Humanity.
+# CETI: Uncensored Node — Sovereign AI, run on your own iron
+
+![CETI: Uncensored Node logo](docs/images/logo.svg)
+
+**Produced by [darknet.ca Labs](https://darknet.ca) — Toronto, Canada.**
+
+CETI: Uncensored Node is a local-first AI network. Every node runs on its
+operator's own hardware, holds its own keys, and keeps its own data.
+No accounts, no cloud dashboards, no one else's model shaping your
+answers. Chat, long-form stories and ezines, code, voice, and image —
+served by uncensored models you control, shared node to node.
+
+This is the project to make sovereign AI the Canadian hub: built in
+Toronto, for anyone who wants their AI to live in their own building.
+
+## What it is
+
+- **Your node, your rules.** A node is a laptop, a desktop, a phone,
+  or a box in your rack. It announces itself to the network and serves
+  what its operator allows — nothing more.
+- **Uncensored models, locally.** Chat runs on models from the
+  Hugging Face Hub, fetched through the Hub's Models tab. The token
+  is per-request only: never stored, never logged, never sent
+  anywhere but the download itself.
+- **No inbound ports, no firewall fights.** Nodes sit behind NAT and
+  firewalls like everything else. They poll a mailbox on the list
+  host, so serving works outbound-only — nothing inbound anywhere.
+- **Everything signed.** Every node has one identity key
+  (`identity.dat`, secp256k1, created on first run, never leaves the
+  box). Announces, lobby posts, private chats, file offers, and
+  ledger events are all signed and verified with that key. Nothing
+  counts until it is signed.
+- **Every write on the ledger.** Sessions, stories, ezines, code,
+  samples, model downloads, and shared files are all recorded in the
+  node's append-only regula ledger: signed, hash-chained events, so
+  any output can be traced back to the data and the model behind it.
+
+## CETI: the new version
+
+Uncensored Node is now CETI: Uncensored Node — the node network as
+the new version of CETI, the platform the new CETI is being built
+on. The goal is unchanged from CETI's founding rule
+and is now the project's headline: **zero tokens at serve time.**
+
+- **Local AI.** Uncensored models plus local memory. Chat runs on
+  models on your own iron; memory is the node's own identity-bound
+  store, filtered by identity hash in every query, so one node's
+  memories are never another's.
+- **The AIML engine is the next build.** The embedded server gains
+  CETI's local AIML retrieval tier: a question is answered from
+  local patterns and local memory first, and the model runs only
+  on a miss. Serving becomes retrieval; the model becomes a
+  background compiler that writes new memory, not a meter that
+  runs on every question.
+- **The ledger is how compute stops being wasted.** Every write
+  is already on the regula ledger, and content-addressed blocks
+  mean identical bytes are never stored twice. The same rule
+  extends to answers: work the network has already done, verified,
+  and ledgered is served from memory instead of recomputed. No
+  re-running a model for an answer the ledger already holds.
+- **Same easy setup, everything kept.** Autorun, the web UI, the
+  Node tab, Jobs, Transfers, Serving, Files, Memory — all of it
+  carries over. The rename changes the name on the top bar, not
+  the machine underneath it.
+
+Footnote — this release does not use CETI AIML technology yet,
+nor the CETI BIOS for general intelligence. CETI's technology was
+used in developing this release: the node network is the platform
+the new CETI is being built on, and the AIML engine and BIOS land
+in a later build.
+
+## The network: Gopher, not a platform
+
+There is no central sysop, no approval queue, and no verified badge.
+A valid announce lists the node immediately, with the capabilities it
+claims to offer. The list host (`node.darknet.ca`) is a dumb pipe:
+signature plus listed check, nothing more.
+
+- **List** — nodes announce a name, a public key, capabilities
+  (`text`, `tts`, `image`), and an optional endpoint. Anyone can read
+  the list; nodes populate it by announcing.
+- **Allow, deny, mute — per node, locally.** Each operator keeps a
+  local allow-list that never leaves their node. Allow means a
+  standing yes with no per-job ask; deny is an explicit error;
+  block/mute is a silent drop. Unlisted nodes fall back to the
+  allow set, otherwise they are silently skipped.
+- **Lobby** — a public, IRC-like room: signed posts from listed
+  nodes only, last 100 messages. Asking for access means talking to
+  the operator here.
+- **Private sysop chat** — a separate queue for operator-to-operator
+  messages, kept apart from the job mailbox so the poller can never
+  eat chat.
+- **Favorites** — a per-node local list of nodes you trust.
+- **Jobs** — text, voice, and image jobs travel through the mailbox:
+  send, poll, reply, with retries and bounce-back instead of silent
+  loss. At most once, fail loud, never silently empty.
+
+## Sharing models via nodes
+
+Models are files, and files are what the network moves best.
+
+1. **Download** an uncensored model from the Hugging Face Hub in the
+   Models tab. It lands in your `models/` folder, ready to run.
+2. **It is chunked automatically** into 50MB signed blocks in your
+   local block store (`data/blocks/`), content-addressed by hash —
+   identical bytes are never stored twice — with a signed Merkle
+   manifest and a ledger event closing the set.
+3. **Publish it** as a public file offer from the Files tab. The
+   offer carries the manifest: chunk list in order, whole-file
+   sha256, Merkle root, ledger tip, signature.
+4. **Peers fetch it chunk by chunk**, hash-verified at every step,
+   over the node-to-node transfer path. A model you already
+   downloaded can be shared with any node that is allowed to fetch
+   it — no re-download from the Hub, no central mirror in the way.
+
+Already-downloaded models are first-class shared files: if it is on
+your disk, your node can offer it.
+
+## Coming soon: our own hosting
+
+Today, models come from the Hugging Face Hub. The next step is
+darknet.ca's own hosting: a sovereign model registry and mirror run
+by darknet.ca Labs, so nodes can fetch uncensored models without
+depending on any third-party hub at all. The chunked block store and
+signed manifests are already built for exactly that — the hosting
+just changes where the first copy comes from.
+
+## Quickstart (laptop)
+
+1. Download `laptop-uncensored-node-0.0.1.zip` and unzip it.
+2. Run `autorun.bat` (Windows) or `autorun.sh` (Linux). The Hub
+   starts, checks its setup, and opens the web UI.
+3. Open `http://localhost:8900` in your browser.
+4. Set your node's name, announce to the list, and allow the peers
+   you want to serve. Chat, Jobs, Models, Memory, and Files are all
+   in the UI — the Node tab is the network.
+5. Phone: the Android app ships separately as
+   `android-uncensored-node-0.0.1.zip` — build it in Android
+   Studio, then announce from the app.
+
+Requirements: Python on the machine running the Hub; a model needs
+disk space and RAM/VRAM to run (chat on VRAM, embeddings on CPU/RAM
+by default so they don't steal VRAM). GPU memory figures in the
+Models tab are labelled estimates (file size × 1.2), not
+measurements.
+
+## Screenshots
+
+Chat, the default view:
+
+![CETI: Uncensored Node — Chat](docs/images/chat.png)
+
+Node tab, Lobby — the IRC room:
+
+![CETI: Uncensored Node — Node lobby](docs/images/node-lobby.png)
+
+A self-contained copy of this README, images baked in for reading
+offline or where relative links can't resolve, ships in `info/`
+(`info/ceti-readme-baked.html`).
+
+## The ledger (regula core)
+
+`hub/regula.py` is the local file system based on the ledger:
+
+- `data/ledger.json` — append-only chain of signed events, each
+  carrying `prev_hash`, with the event hash covering the event plus
+  its signature. Rejected items never enter signed history: a
+  failed publish records no event.
+- `data/blocks/` — 50MB content-addressed chunks plus one signed
+  manifest per file. `GET /api/ledger/status` re-verifies the whole
+  chain (hashes, prev-hash pointers, signatures); the Files tab
+  shows ledger OK and height.
+- The 2006 Chamber Zero header (RSA-1024, LCG nonce) is history,
+  not the scheme used here. The scheme is the network's own:
+  ECDSA secp256k1 over double-SHA256, DER.
+
+## Dev blog: getting the nodes and the poller to talk
+
+The concept is simple to say and stubborn to build: distributed
+peer-to-peer AI. Not a platform you log into, but a network of
+nodes — laptops, desktops, phones, boxes in racks — each running
+its own models, holding its own keys, keeping its own data, and
+serving the others. Knowledge, LLMs, image generation, and voice,
+all in one node, all over the same signed, ledgered protocol.
+Later: music, video, research, same rails. The network is the
+computer, and no one operates it.
+
+This is the part where the idea fought back.
+
+**Nobody can listen.** Every machine that matters sits behind NAT
+or a firewall, and none of them accept inbound connections. A node
+cannot be a server in the usual sense, so it never tries. Instead
+it polls: the poller opens an outbound connection to the list
+host and asks, "anything for me?" Jobs arrive in a mailbox, the
+node verifies the signature and its own allow-list, runs the job
+against a local model, the voice bridge, or the image queue, and
+posts a signed reply to the requester's mailbox. Serving works
+outbound-only, past any firewall. The list host itself is a dumb
+pipe — signature plus listed check, nothing more — because the
+moment it starts deciding, it becomes the platform we are trying
+not to build.
+
+**The mailbox eats messages.** The mailbox is fetch-and-clear:
+whoever polls first consumes. Early on, the serving poller ate
+replies meant for the UI, and the UI's reply fetch ate jobs meant
+for the poller. The fix is the bounce: a fetched message that is
+not yours is re-queued verbatim, and the server re-verifies the
+original signature on post, so a forged message cannot bounce
+and a genuine one lands back in exactly the mailbox it came
+from. Bounces are bounded — ten cycles, about ten minutes at the
+60-second poll rate — so an unfetched reply is dropped loudly,
+not kept forever. Private sysop chat got its own queue entirely,
+separate from the job mailbox, so the poller can never eat chat.
+
+**The voice job that vanished.** On October 30 a voice job was
+processed, synthesized, and logged as "processed" — and its reply
+never arrived. Nothing logged the failure, because the reply post
+had no failure path: the code claimed a "spare copy" would retry
+the job, but no such retry existed. The fix is unglamorous and
+total: a failed reply is now logged loudly, held, and retried
+every poll cycle until it posts, dropped only after thirty tries
+with a log line saying the sender must re-send. The lesson we
+keep: "processed" must mean delivered, or the log must say it
+didn't.
+
+**The proxy war.** The sandbox this node was built in fights
+outbound traffic: its egress proxy 403s tunnels, drops
+connections mid-read, truncates large responses, and rotates the
+credentials long-lived processes authenticate with — so a poller
+that ran fine for hours would start 403ing for no reason anyone
+could see. The poller now tries direct first and falls back to
+the proxy, and an HTTP error is never retried through the
+fallback, because a server that answered must not be sent the
+same job twice. Watchdog restarts taught their own lesson:
+processes started from background jobs get reaped within minutes,
+so a restart only sticks when it comes from the main context,
+and health is judged by the poller's last-OK marker age, not by
+whether a process exists. One limit stays honest: large voice
+replies cannot be read back whole through this sandbox, so
+end-to-end voice receipt is proven by the laptop and phone
+polling directly, never claimed from here.
+
+**The write budget.** A five-second poller that saves the mailbox
+on every poll — even an empty one — burns 17,280 writes a day by
+itself, and it exhausted the free KV tier in a single evening.
+The answer was arithmetic, not hope: the Paid tier plus a
+60-second poll interval puts a hundred clients at about 4.32
+million writes a month, roughly fourteen percent of budget, and
+a no-write-on-empty-poll fix sits ready for the day it matters.
+Quotas are design constraints. They get counted before they get
+hit.
+
+**Models that won't run.** Ollama cannot run LFM3 — its bundled
+llama.cpp predates the architecture — so the node serves text
+from a standalone llama-server build instead, and the embedding
+server needs a build new enough for EmbeddingGemma-2, enforced
+by a fail-closed gate that rejects stale binaries loudly rather
+than serving nothing. When llama.cpp changed its release model
+and "latest" became a versioned stable with no binaries in it,
+fresh installs crashed outright; the installer now scans recent
+releases for a nightly server zip, and an install failure warns
+and starts chat anyway instead of dying.
+
+**Identity is the node.** Wipe an identity and you wipe the
+node: a fresh extract generates a new key, a new fingerprint,
+and a new round of allow-listing. That is why every release
+installs over the old folder with `data/` kept intact. And it is
+why the Gopher decision matters: a valid announce lists the node
+immediately, no approval, no verified badge, no network sysop —
+because a gatekeeper would need to know who you are, and the
+whole point is that only your key says that.
+
+What is proven today: text jobs end to end, image jobs end to
+end, voice piecewise (bridge synthesis, poller processing, reply
+posts all verified; receipt proven by direct polls, not from
+this sandbox). What comes next is direct node-to-node transfer
+— the list host as tracker-style discovery, data moving peer to
+peer, the mailbox kept for signaling and fallback — and then
+music, video, and research over the same protocol. Same keys,
+same ledger, same rule: nothing counts until it is signed.
+
+## Status
+
+- **Version:** 0.0.1l, the initial 0.0.1 release. (Lettered builds
+  mark exactly which 0.0.1 is in hand; l is this one.)
+- **Tests:** 314 checks green at this build (Hub 118, node 81,
+  nodeapi 101, transfers/serving 14).
+- **New in 0.0.1l:** the initial GitHub release build. The repo
+  now ships an `info/` folder with a self-contained rendering of
+  this README (`info/ceti-readme-baked.html`, images baked in for
+  reading offline or where relative links can't resolve), and this
+  README was reviewed for release: the Quickstart no longer
+  points at an `android/` folder that isn't in this zip (the
+  Android app ships separately), the stale "GitHub release build"
+  claim moved off 0.0.1j onto this build, and the CETI section
+  now matches its footnote — no AIML/BIOS in this build yet.
+- **New in 0.0.1k:** the rename to CETI: Uncensored Node. The UI
+  top bar now reads "CETI: Uncensored Node 0.0.1 · Built by AI for
+  Humanity" on every view (same bar, same layout, new words), the
+  README carries the CETI vision — zero tokens at serve time,
+  local AIML engine plus node-style memory for the embedded
+  server, ledger-gated so answered work is never recomputed —
+  and the repo now ships a logo and real UI screenshots
+  (`docs/images/`, embedded above). The AIML retrieval tier
+  itself is the next build, not smuggled in untested here. Setup
+  is unchanged: same autorun, same everything from the node.
+- **New in 0.0.1j:** the dev blog above — README only, code
+  identical to 0.0.1i. The Quickstart now names the living
+  `laptop-uncensored-node-0.0.1.zip`
+  instead of the stale 0.0.1c snapshot.
+- **New in 0.0.1i:** the voice fix + the network as tracked
+  transfers. A reply post that fails (proxy burst) used to vanish
+  silently — the poller printed "processed" either way and the
+  reply was gone with the consumed job. Now a failed reply is
+  logged loudly and held, retried every poll cycle until it
+  posts, and only dropped after 30 tries with a log line saying
+  the sender must re-send. Every sent job is tracked in a
+  Transfers page (uTorrent-style rows: peer, kind, snippet,
+  status, age, Resend) that auto-refreshes every 5 seconds and
+  pulls fresh replies without stealing waveforms from chat; voice
+  reply polling is 5 seconds too (was 15). A Serving page sets
+  what this node serves by default: text backend (local LFM3,
+  local Ollama, or a cloud model on OpenRouter/Nvidia when the
+  operator opts in with a model + key, stored on disk 0600 and
+  deleted on switching back to local), default TTS voice, and a
+  public endpoint shared on the next Announce for direct
+  connections (peers behind NAT still use the mailbox relay).
+  Saved chats can be packaged and shared from the session list
+  (📦): a node-signed package lands in shared files with a
+  ledger event and is listed as a public file offer.
+- **New in 0.0.1h:** the Node tab is a real IRC room now — it
+  breaks out of the narrow 860px panel and fills the screen,
+  lobby and private-chat messages live in tall scroll regions
+  that keep their scroll position across refreshes (a refresh
+  no longer yanks you back to the top), and the polls run like
+  IRC: lobby messages every 5 seconds (was 15), presence every
+  60 seconds from the /nodes list (the roster used to go stale
+  until you hit Refresh by hand), private chat every 5 seconds
+  while its page is open (it was manual Fetch only). Lobby and
+  presence polls are reads, so they don't touch the 60-second
+  mailbox write budget. A browser refresh always lands on Chat,
+  the default page (general load used to land on Node). The
+  voice-peer error now names the missing step: click a node,
+  then Job → on its card.
+- **New in 0.0.1g:** a fresh install works again — llama.cpp
+  changed its release model, and the "latest" release is now a
+  versioned stable (v0.8.0) whose only asset is nightly-tag.txt,
+  so 0.0.1f's installer found no binary and autorun died with a
+  traceback before anything started. The installer now tries the
+  latest release's assets, then scans recent releases newest
+  first for a nightly server zip; the picker only accepts
+  llama-* packages (the cudart DLL bundles match a naive
+  cuda+win test but hold no server) and matches the machine's
+  architecture. And if installing still fails, autorun no longer
+  crashes: it warns loudly, starts chat + web UI anyway, and
+  leaves embedding DOWN with the manual-download remedy on
+  screen. A missing server binary is a per-server failure now,
+  not a run-killing error.
+- **New in 0.0.1f:** the Node tab is one screen per menu click —
+  the persistent identity header above the pages is gone, so the
+  lobby has nothing above it but the menu; Identity is its own
+  page (name box, Save, Announce, fingerprints, pubkey, listed
+  state) loaded on click. The lobby is a real IRC layout: messages
+  on the left, the "Present now" roster on the right, each entry a
+  username with its small node-id below; clicking a name still
+  opens that node's card (caps, endpoint, private chat, job,
+  block, add peer). Lobby default landing, name gate, 15-second
+  auto-refresh, black console, and Announce beside Refresh are
+  unchanged.
+- **New in 0.0.1e:** the embedding server works on a fresh
+  install with no workaround — the llama-server version gate is
+  now fail-closed: a binary whose build cannot be determined is
+  skipped (previously it was accepted on trust, so a stale binary
+  with an unparseable `--version` sailed through and the embed
+  server died on it with "unknown model architecture:
+  'gemma-embedding2'"). When no usable binary is found, autorun
+  installs a current build automatically; and if the embedding
+  server still comes up DOWN, autorun now prints the server path
+  and build so the cause is on screen instead of a bare DOWN.
+- **New in 0.0.1d:** the System tab's ledger and regula panels
+  are live — real height, tip, and chain verification from your
+  own ledger.json, and a real signing proof from your own
+  identity.dat (the old panels were labeled mockups and showed
+  sample data); chat telemetry (tokens, tok/s, memory trace)
+  now persists in saved sessions and renders when you come back;
+  the Node lobby shows an IRC-style presence roster with an
+  Announce button beside Refresh; peers offer Request access
+  (LLM, image, TTS) via private sysop chat instead of only Job;
+  chat gains peer endpoints — a text backend dropdown, image
+  generation from the chat input to a peer, and a default voice
+  peer for Generate voice; nodes advertise image/TTS engines
+  (announce tags) and a receiver fails loud when asked for an
+  engine it doesn't run. A clean `engines` field on list entries
+  still needs a Worker redeploy; tags work with no redeploy.
+- **Known limits, stated honestly:** the mailbox is at-most-once (a
+  job polled but unanswered is lost if the poller dies mid-job);
+  list values cap at 25MB, so long audio and big files go through
+  the chunked transfer path, not the mailbox; there is no unlist
+  API — removing a wiped identity means editing the list store
+  directly; the Android transfer client is still in progress;
+  login-gated disk encryption and credit payments are later
+  phases, not in this build.
+
+## Join the project
+
+Anyone who wants to join gets a **free darknet.ca Gmail account**.
+
+Email **admin@darknet.ca** to join, to run a node, to offer models
+or compute, or to help build. Tell us what you run and what you
+want to serve — we'll get you listed and set up.
+
+Sovereign AI, from Canada, on your own iron. Welcome to the network.
