@@ -653,6 +653,31 @@ button.chan .label{color:var(--dim)}
       <button type="button" onclick="refreshCloudModels()" id="refreshModelsBtn" style="display:none">List models</button>
       <span class="small" id="topStatus"></span>
     </div>
+    <div id="sshPane" hidden style="border-top:1px solid var(--line);padding:10px 12px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <label class="small">Saved host</label>
+        <select id="sshSaved" onchange="sshFillFromSaved()" style="min-width:220px"></select>
+        <label class="small">Name</label><input id="sshName" placeholder="chat.hf.co" style="width:140px">
+        <label class="small">Host</label><input id="sshHost" placeholder="chat.hf.co" style="width:160px">
+        <label class="small">Port</label><input id="sshPort" value="22" inputmode="numeric" style="width:70px">
+        <label class="small">User</label><input id="sshUser" placeholder="(optional)" style="width:110px">
+        <label class="small">Key</label><select id="sshKey" style="min-width:140px"><option value="">no key</option></select>
+        <button type="button" id="sshConnectBtn" onclick="sshConnect()">Connect</button>
+        <button type="button" id="sshDisconnectBtn" onclick="sshDisconnect()" disabled>Disconnect</button>
+        <button type="button" onclick="sshSaveHost()">Save host</button>
+        <button type="button" onclick="sshDeleteHost()">Delete saved host</button>
+        <span class="small" id="sshStatus"></span>
+      </div>
+      <div id="ssh-term" style="height:480px;background:#000;padding:4px"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <span class="small">Manage hosts &amp; keys:</span>
+        <input id="sshNewKey" placeholder="new key name" style="width:150px">
+        <button type="button" onclick="sshGenKey()">Generate key</button>
+        <select id="sshKeyDel" style="min-width:140px"><option value="">select key to delete</option></select>
+        <button type="button" onclick="sshDeleteKey()">Delete key</button>
+        <span class="small">Keys are ed25519, private file 0600, never shown. Terminal output is never saved into the workspace.</span>
+      </div>
+    </div>
     <div class="chat-scroll" id="msgs"></div>
     <button class="tele-btn" id="tele-btn" type="button" aria-label="Open telemetry"><span class="dot" aria-hidden="true"></span>Telemetry</button>
   </section>
@@ -1163,6 +1188,10 @@ button.chan .label{color:var(--dim)}
         <span class="pick-tag">RESEARCH</span>
         <span class="pick-main"><b>Research</b><span class="pick-desc">Look things up — sources, notes, and comparisons kept together.</span></span>
       </button>
+      <button class="pick" type="button" data-type="ssh">
+        <span class="pick-tag">SSH</span>
+        <span class="pick-main"><b>SSH terminal</b><span class="pick-desc">A terminal in the workspace — saved hosts, saved keys, default chat.hf.co. Local operator only.</span></span>
+      </button>
     </div>
     <button class="picker-cancel" id="picker-cancel" type="button">Cancel</button>
   </div>
@@ -1171,7 +1200,7 @@ button.chan .label{color:var(--dim)}
 <script>
 let messages=[], currentSid=null, currentType='CHAT', provider='local', selectedSamples=[];
 let allSessions=[];
-const TYPE_TAGS={chat:'CHAT',story:'STORY/EZINE',code:'CODE SPACES',research:'RESEARCH'};
+const TYPE_TAGS={chat:'CHAT',story:'STORY/EZINE',code:'CODE SPACES',research:'RESEARCH',ssh:'SSH'};
 const VIEWS=['chat','system','node','stories','ezines','code','search','memory','samples','settings','models'];
 
 function $(id){return document.getElementById(id);}
@@ -1461,6 +1490,8 @@ function showWelcome(){
   $('chat-title').textContent='NEW CHAT';
   $('msg-count').textContent='0 MESSAGES';
   updateRailSession(null);
+  currentType='CHAT';
+  updateSshPane();
   loadConstellation(null);
 }
 function dispNum(idx){ return 'S·' + String(idx+1).padStart(2,'0'); }
@@ -1516,6 +1547,7 @@ function updateRailDone(toks, secs, mem, cap){
   $('teleMsgs').textContent = messages.length;
 }
 async function saveSession(){
+  if(currentType==='SSH') return; // terminal bytes are never saved
   if(!messages.length) return;
   if(!currentSid) currentSid='chat-'+new Date().toISOString().replace(/[:.]/g,'-');
   const title=(messages.find(function(m){ return m.role==='user'; })||{content:'New chat'}).content.slice(0,60);
@@ -1533,6 +1565,8 @@ function switchToSession(s){
   updateRailSession(s);
   closeDrawer();
   loadConstellation(s.id);
+  if(s.type==='SSH' && s.ssh_host) sshPendingHost=s.ssh_host;
+  updateSshPane();
 }
 async function deleteSession(id){
   await fetch('/api/sessions/'+encodeURIComponent(id),{method:'DELETE'});
@@ -1580,11 +1614,18 @@ function renderChannels(){
   list.appendChild(nw);
   $('sess-count').textContent = String(allSessions.length).padStart(2,'0');
 }
-async function loadSessions(){
+async function loadSessions(opts){
   const r = await fetch('/api/sessions');
   const j = await r.json();
   allSessions = j.sessions || [];
   renderChannels();
+  // First load only: open the most recent chat so the pane shows a
+  // conversation, not just the welcome screen. Any other caller
+  // (new workspace, delete, save) leaves the current view alone.
+  if(opts && opts.openChat && !currentSid){
+    const chat = allSessions.find(function(s){ return (s.type||'CHAT')==='CHAT'; });
+    if(chat) switchToSession(chat);
+  }
 }
 
 // ---------- Drawer: all sessions (opens ONLY via More sessions) ----------
@@ -1682,8 +1723,240 @@ async function createWorkspace(typeKey){
   $('chat-title').textContent = (created ? dispNum(Math.max(0, sessIndex(j.id))) + ' — ' : '') + 'UNTITLED WORKSPACE';
   updateRailSession(created || null);
   showTab('chat');
-  const inp = $('chatInput'); if(inp) inp.focus();
+  const inp = $('chatInput'); if(inp && tag!=='SSH') inp.focus();
+  updateSshPane();
   loadConstellation(j.id);
+}
+
+// ---------- SSH terminal (local operator only) ----------
+let sshTerm=null, sshFit=null, sshEs=null, sshSid=null, sshWorkspaceSid=null;
+let sshScripts=null, sshPendingHost=null, sshResizeBound=false;
+function ensureXterm(){
+  if(sshScripts) return sshScripts;
+  sshScripts = new Promise(function(resolve, reject){
+    const css = document.createElement('link');
+    css.rel='stylesheet'; css.href='/assets/xterm.css';
+    document.head.appendChild(css);
+    function load(src){ return new Promise(function(res, rej){
+      const s=document.createElement('script'); s.src=src;
+      s.onload=res; s.onerror=function(){ rej(new Error('failed to load '+src)); };
+      document.head.appendChild(s);
+    });}
+    load('/assets/xterm.js').then(function(){ return load('/assets/addon-fit.js'); })
+      .then(resolve, reject);
+  });
+  return sshScripts;
+}
+function sshDetach(){
+  if(sshEs){ try{ sshEs.close(); }catch(e){} sshEs=null; }
+  if(sshTerm){ try{ sshTerm.dispose(); }catch(e){} sshTerm=null; sshFit=null; }
+  const cb=$('sshConnectBtn'), db=$('sshDisconnectBtn');
+  if(cb) cb.disabled=false; if(db) db.disabled=true;
+}
+function updateSshPane(){
+  const pane=$('sshPane'); if(!pane) return;
+  const isSsh = currentType==='SSH';
+  pane.hidden = !isSsh;
+  $('msgs').style.display = isSsh ? 'none' : '';
+  const comp = document.querySelector('.composer');
+  if(comp) comp.style.display = isSsh ? 'none' : '';
+  if(!isSsh){ sshDetach(); return; }
+  loadSshHosts();
+  if(sshSid && currentSid===sshWorkspaceSid && !sshTerm){
+    sshAttach(sshSid).catch(function(){ sshSid=null; });
+  }
+}
+function sshFillFromSaved(){
+  const sel=$('sshSaved'); const o=sel.options[sel.selectedIndex]; if(!o) return;
+  $('sshHost').value=o.dataset.host; $('sshPort').value=o.dataset.port;
+  $('sshUser').value=o.dataset.user; $('sshKey').value=o.dataset.key;
+}
+async function loadSshHosts(){
+  try{
+    const r=await fetch('/api/ssh/hosts'); const j=await r.json();
+    const sel=$('sshSaved'); sel.innerHTML='';
+    (j.hosts||[]).forEach(function(h){
+      const o=document.createElement('option'); o.value=h.id;
+      o.textContent=h.name+' ('+h.host+':'+h.port+')';
+      o.dataset.host=h.host; o.dataset.port=h.port;
+      o.dataset.user=h.username||''; o.dataset.key=h.key_id||'';
+      sel.appendChild(o);
+    });
+    const r2=await fetch('/api/ssh/keys'); const j2=await r2.json();
+    const ksel=$('sshKey'); ksel.innerHTML='<option value="">no key</option>';
+    (j2.keys||[]).forEach(function(k){
+      const o=document.createElement('option'); o.value=k.id;
+      o.textContent=k.id+(k.fingerprint ? ' ('+k.fingerprint+')' : '');
+      ksel.appendChild(o);
+    });
+    const kdel=$('sshKeyDel');
+    if(kdel){
+      kdel.innerHTML='<option value="">select key to delete</option>';
+      (j2.keys||[]).forEach(function(k){
+        const o=document.createElement('option'); o.value=k.id; o.textContent=k.id;
+        kdel.appendChild(o);
+      });
+    }
+    let pick=null;
+    if(sshPendingHost){
+      pick=Array.from(sel.options).find(function(o){
+        return o.value===sshPendingHost || o.dataset.host===sshPendingHost;
+      });
+      sshPendingHost=null;
+    }
+    if(!pick && sel.options.length) pick=sel.options[0];
+    if(pick){ sel.value=pick.value; sshFillFromSaved(); }
+  }catch(e){ $('sshStatus').textContent='Failed to load hosts: '+e.message; }
+}
+async function sshSaveHost(){
+  const name=$('sshName').value.trim() || $('sshHost').value.trim();
+  const r=await fetch('/api/ssh/hosts',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name, host:$('sshHost').value.trim(),
+      port:parseInt($('sshPort').value||'22',10),
+      username:$('sshUser').value.trim(), key_id:$('sshKey').value||''})});
+  const j=await r.json();
+  if(j.error){ $('sshStatus').textContent='Save failed: '+j.error; return; }
+  $('sshStatus').textContent='Host saved.';
+  await loadSshHosts();
+}
+async function sshDeleteHost(){
+  const id=$('sshSaved').value; if(!id) return;
+  await fetch('/api/ssh/hosts/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id})});
+  await loadSshHosts();
+}
+async function sshGenKey(){
+  const id=$('sshNewKey').value.trim();
+  if(!id){ $('sshStatus').textContent='Enter a key name first.'; return; }
+  const r=await fetch('/api/ssh/keys/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id})});
+  const j=await r.json();
+  if(j.error){ $('sshStatus').textContent='Key failed: '+j.error; return; }
+  $('sshStatus').textContent='Key generated: '+id;
+  await loadSshHosts();
+}
+async function sshDeleteKey(){
+  const id=$('sshKeyDel').value; if(!id) return;
+  await fetch('/api/ssh/keys/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id})});
+  await loadSshHosts();
+}
+async function sshAttach(sid){
+  await ensureXterm();
+  if(sshTerm){ try{ sshTerm.dispose(); }catch(e){} }
+  sshTerm=new window.Terminal({cursorBlink:true, fontFamily:'monospace', scrollback:5000});
+  // The vendored addon-fit UMD exposes the constructor as
+  // FitAddon.FitAddon (a namespace object), NOT as FitAddon itself —
+  // `new window.FitAddon()` threw "not a constructor" on the laptop
+  // and blanked the pane. Accept either shape, fail loudly otherwise.
+  var FitCtor = window.FitAddon && (window.FitAddon.FitAddon || window.FitAddon);
+  if(typeof FitCtor !== 'function') throw new Error('FitAddon failed to load');
+  sshFit=new FitCtor();
+  sshTerm.loadAddon(sshFit);
+  const el=$('ssh-term'); el.innerHTML='';
+  sshTerm.open(el);
+  sshFit.fit();
+  const dims=sshFit.proposeDimensions();
+  if(dims){
+    fetch('/api/ssh/resize',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:sid, cols:dims.cols, rows:dims.rows})});
+  }
+  sshTerm.onData(function(d){
+    fetch('/api/ssh/input',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:sid,
+        data_b64:btoa(unescape(encodeURIComponent(d)))})});
+  });
+  sshTerm.onResize(function(sz){
+    fetch('/api/ssh/resize',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:sid, cols:sz.cols, rows:sz.rows})});
+  });
+  if(!sshResizeBound){
+    sshResizeBound=true;
+    window.addEventListener('resize', function(){
+      if(sshTerm && sshFit && currentType==='SSH'){ try{ sshFit.fit(); }catch(e){} }
+    });
+  }
+  if(sshEs) sshEs.close();
+  sshEs=new EventSource('/api/ssh/output?session_id='+encodeURIComponent(sid)+'&since=0');
+  var sshEsGotData=false;
+  sshEs.onerror=function(){
+    if(!sshEsGotData) $('sshStatus').textContent='Stream failed before any output arrived — session may still be running.';
+  };
+  sshEs.onmessage=function(ev){
+    if(ev.data==='[DONE]') return;
+    try{
+      const chunk=JSON.parse(ev.data);
+      if(chunk.data_b64){
+        sshEsGotData=true;
+        const bin=atob(chunk.data_b64);
+        const arr=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        sshTerm.write(arr);
+      }
+      if(chunk.kind==='end'){
+        if(sshEs){ sshEs.close(); sshEs=null; }
+        if(sshTerm) sshTerm.write('\r\n[session ended]\r\n');
+        sshSid=null;
+        $('sshConnectBtn').disabled=false; $('sshDisconnectBtn').disabled=true;
+        $('sshStatus').textContent='Session ended.';
+      }
+    }catch(e){}
+  };
+}
+async function sshConnect(){
+  const host=$('sshHost').value.trim();
+  const port=parseInt($('sshPort').value||'22',10);
+  const username=$('sshUser').value.trim();
+  const keyId=$('sshKey').value||'';
+  if(!host){ $('sshStatus').textContent='Enter a host.'; return; }
+  $('sshStatus').textContent='Connecting…';
+  try{
+    // Load the terminal scripts BEFORE creating the server session,
+    // so a script failure can't orphan a running ssh session.
+    await ensureXterm();
+    const r=await fetch('/api/ssh/connect',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({host:host, port:port, username:username,
+        key_id:keyId, cols:80, rows:24})});
+    const j=await r.json();
+    if(j.error) throw new Error(j.error);
+    sshSid=j.session_id; sshWorkspaceSid=currentSid;
+    await sshAttach(sshSid);
+    $('sshStatus').textContent='Connected to '+host
+      + (j.build ? ' · '+j.build : '')
+      + (j.session_type ? ' · '+j.session_type+' pid '+j.pid : '');
+    (function(sid){
+      setTimeout(async function(){
+        if(sshSid!==sid) return;
+        try{
+          const r=await fetch('/api/ssh/status?session_id='+encodeURIComponent(sid));
+          const s=await r.json();
+          if(sshSid!==sid) return;
+          $('sshStatus').textContent+=' · '+(s.buffered>0 ? s.buffered+' bytes received' : 'no output yet');
+        }catch(e){}
+      }, 3000);
+    })(sshSid);
+    $('sshConnectBtn').disabled=true; $('sshDisconnectBtn').disabled=false;
+    // Remember the selected host on the workspace record (type + host only).
+    if(currentSid){
+      fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:currentSid,
+          title:(sessById(currentSid)||{}).title||'Untitled workspace',
+          messages:[], type:'SSH', ssh_host:host})});
+    }
+  }catch(e){ $('sshStatus').textContent='Failed: '+e.message; }
+}
+async function sshDisconnect(){
+  if(sshEs){ sshEs.close(); sshEs=null; }
+  if(sshSid){
+    try{
+      await fetch('/api/ssh/disconnect',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({session_id:sshSid})});
+    }catch(e){}
+    sshSid=null;
+  }
+  if(sshTerm) sshTerm.write('\r\n[disconnected]\r\n');
+  $('sshStatus').textContent='Disconnected.';
+  $('sshConnectBtn').disabled=false; $('sshDisconnectBtn').disabled=true;
 }
 
 // ---------- Streaming chat ----------
@@ -3112,7 +3385,7 @@ $('teleTemp').textContent = $('tempInput').value || '0.7';
 $('tempInput').addEventListener('change', function(){ $('teleTemp').textContent = $('tempInput').value; });
 if($('nodeLobbyText')) $('nodeLobbyText').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); sendLobby(); } });
 if($('nodeChatText')) $('nodeChatText').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); sendNodeChat(); } });
-showWelcome(); loadStatus(); loadSessions(); loadStories();
+showWelcome(); loadStatus(); loadSessions({openChat:true}); loadStories();
 showTab('chat'); // Refresh always lands on Chat, the default page. Node is one click away.
 // Live clock + page uptime (real, local only)
 const _t0 = Date.now();

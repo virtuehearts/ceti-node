@@ -225,7 +225,7 @@ def main():
           "nodePage-identity" in ui and 'data-nodepage="identity"' in ui
           and 'id="nodeName"' in ui and 'id="nodeIdent"' in ui)
     check("ui: Chat is the default on refresh",
-          "showWelcome(); loadStatus(); loadSessions(); loadStories();\nshowTab('chat');" in ui)
+          "showWelcome(); loadStatus(); loadSessions({openChat:true}); loadStories();\nshowTab('chat');" in ui)
     check("ui: lobby auto-refresh every 5s client side",
           "nodeTimer" in ui and "pollNodeLobby" in ui
           and "setInterval(function(){ pollNodeLobby(); }, 5000)" in ui)

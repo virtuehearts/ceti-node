@@ -61,7 +61,21 @@ Endpoints (JSON unless noted):
   POST /api/node/poller/stop  -> stop the mailbox poller
   POST /api/node/job/send    -> {to_pubkey, capability, text|prompt...} send a job to a peer
   GET  /api/node/jobs        -> fetch + clear mailbox (job replies land here)
+  GET  /api/ssh/hosts        -> saved SSH hosts (operator-local only)
+  POST /api/ssh/hosts        -> {name, host, port, username?, key_id?} save a host
+  POST /api/ssh/hosts/delete -> {id} delete a saved host
+  GET  /api/ssh/keys         -> saved SSH public keys + fingerprints (never private material)
+  POST /api/ssh/keys/generate -> {id?|name?} generate an ed25519 keypair (0600)
+  POST /api/ssh/keys/delete -> {id} delete a keypair
+  POST /api/ssh/connect     -> {host_id} or {host, port, username?, key_id?} start a PTY session
+  GET  /api/ssh/output?session_id&since -> SSE stream of base64 terminal chunks
+  POST /api/ssh/input        -> {session_id, data_b64} write bytes to the PTY
+  POST /api/ssh/resize       -> {session_id, cols, rows} resize the PTY
+  POST /api/ssh/disconnect   -> {session_id} close a PTY session
+  GET  /api/ssh/status?session_id -> session liveness + size + idle seconds
+  GET  /assets/<name>        -> vendored xterm.js assets only (strict allowlist)
 """
+import base64
 import json
 import os
 import threading
@@ -71,7 +85,26 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 from . import memory
 from . import nodeapi
+
+
+def _read_build():
+    """Release letter from the tree README (e.g. 0.0.1r), so the
+    UI can show which build is actually running and end the
+    'did you install the latest?' ambiguity. Falls back quietly."""
+    try:
+        import re as _re
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(here, "README.md"),
+                  encoding="utf-8") as f:
+            m = _re.search(r"Version:\*\* (0\.0\.1\w)", f.read())
+        return m.group(1) if m else "0.0.1"
+    except Exception:
+        return "0.0.1"
+
+
+BUILD = _read_build()
 from . import regula
+from . import sshterm
 from .config import chat_port, embed_port, data_dir, models_dir, load_catalog
 from .identity import ensure_identity
 from .package import create_package, verify_package
@@ -133,6 +166,28 @@ def sessions_dir() -> str:
     d = os.path.join(data_dir(), "web-sessions")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+# Local SSH terminal managers, one per data dir (HUB_DATA_DIR can
+# change under tests). Operator-only: only the web handlers below
+# touch these; nothing here is exposed to the node network.
+_ssh_managers = {}
+_ssh_managers_lock = threading.Lock()
+# Test seam only: tests monkeypatch this to a builder returning a
+# local command (e.g. ["cat"]); shipped code leaves it None, so the
+# manager always spawns the real ssh binary. Never set from the
+# environment or from any request.
+_ssh_command_builder = None
+
+
+def _ssh_manager():
+    d = data_dir()
+    with _ssh_managers_lock:
+        mgr = _ssh_managers.get(d)
+        if mgr is None:
+            mgr = sshterm.SshManager(d, command_builder=_ssh_command_builder)
+            _ssh_managers[d] = mgr
+        return mgr
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -309,6 +364,21 @@ class Handler(BaseHTTPRequestHandler):
             name = unquote(path[len("/api/chat-images/"):].strip("/"))
             self._chat_image_get(name)
             return
+        if path == "/api/ssh/hosts":
+            self._ssh_hosts()
+            return
+        if path == "/api/ssh/keys":
+            self._ssh_keys()
+            return
+        if path == "/api/ssh/status":
+            self._ssh_status(parsed)
+            return
+        if path == "/api/ssh/output":
+            self._ssh_output(parsed)
+            return
+        if path.startswith("/assets/"):
+            self._serve_asset(unquote(path[len("/assets/"):]).strip("/"))
+            return
         self._send_json({"error": "not found"}, status=404)
 
     def do_DELETE(self):
@@ -452,6 +522,30 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/node/serving":
             self._send_json(nodeapi.set_serving(body))
+            return
+        if path == "/api/ssh/hosts":
+            self._ssh_host_save(body)
+            return
+        if path == "/api/ssh/hosts/delete":
+            self._ssh_host_delete(body)
+            return
+        if path == "/api/ssh/keys/generate":
+            self._ssh_key_generate(body)
+            return
+        if path == "/api/ssh/keys/delete":
+            self._ssh_key_delete(body)
+            return
+        if path == "/api/ssh/connect":
+            self._ssh_connect(body)
+            return
+        if path == "/api/ssh/input":
+            self._ssh_input(body)
+            return
+        if path == "/api/ssh/resize":
+            self._ssh_resize(body)
+            return
+        if path == "/api/ssh/disconnect":
+            self._ssh_disconnect(body)
             return
         if path.startswith("/api/sessions/") and path.endswith("/share"):
             sid = unquote(path[len("/api/sessions/"):-len("/share")].strip("/"))
@@ -691,15 +785,15 @@ class Handler(BaseHTTPRequestHandler):
     # the picker keys and the tags themselves are both accepted on input.
     SESSION_TYPES = {
         "chat": "CHAT", "story": "STORY/EZINE", "code": "CODE SPACES",
-        "research": "RESEARCH",
+        "research": "RESEARCH", "ssh": "SSH",
     }
-    SESSION_TAGS = {"CHAT", "STORY/EZINE", "CODE SPACES", "RESEARCH"}
+    SESSION_TAGS = {"CHAT", "STORY/EZINE", "CODE SPACES", "RESEARCH", "SSH"}
 
     @staticmethod
     def _canon_session_type(value):
         """Normalize any session-type input to a canonical tag.
 
-        Accepts picker keys (chat/story/code/research), the tags
+        Accepts picker keys (chat/story/code/research/ssh), the tags
         themselves (any case), and "STORY" as shorthand. Anything else
         (including missing/None) falls back to CHAT — never an error,
         so old clients and old session files keep working.
@@ -743,13 +837,193 @@ class Handler(BaseHTTPRequestHandler):
                     stype = self._canon_session_type(json.load(f).get("type"))
             except Exception:
                 pass
+        messages = body.get("messages", [])
+        if stype == "SSH":
+            # Terminal bytes are never saved into a workspace record.
+            messages = []
         data = {"id": sid, "title": body.get("title", sid),
-                "messages": body.get("messages", []), "type": stype,
+                "messages": messages, "type": stype,
                 "saved_at": time.strftime("%Y-%m-%d %H:%M")}
+        if body.get("ssh_host") is not None:
+            data["ssh_host"] = body.get("ssh_host")
         with open(pth, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         self._send_json({"ok": True, "id": sid,
                          "ledger": self._ledger_record("session", pth, stype)})
+
+    # ---- local SSH terminal (operator-only) -------------------------
+    # The Hub binds to loopback and these handlers are the only
+    # callers of hub/sshterm.py: no mailbox, lobby, or nodeapi
+    # surface reaches an SSH session, and no session is offered to
+    # peers. Private key material is never included in any response.
+    def _ssh_hosts(self):
+        try:
+            hosts = _ssh_manager().store.list_hosts()
+        except ValueError as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"hosts": hosts})
+
+    def _ssh_host_save(self, body):
+        try:
+            host = _ssh_manager().store.save_host(body)
+        except ValueError as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"ok": True, "host": host})
+
+    def _ssh_host_delete(self, body):
+        try:
+            ok = _ssh_manager().store.delete_host(body.get("id", ""))
+        except ValueError as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"ok": ok})
+
+    def _ssh_keys(self):
+        self._send_json({"keys": _ssh_manager().store.list_keys()})
+
+    def _ssh_key_generate(self, body):
+        try:
+            key_id = body.get("id") or ""
+            if not key_id:
+                key_id = sshterm._slug(body.get("name", "") or "id_sshterm")
+            key = _ssh_manager().store.generate_key(key_id)
+        except (ValueError, RuntimeError) as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"ok": True, "key": key})
+
+    def _ssh_key_delete(self, body):
+        try:
+            ok = _ssh_manager().store.delete_key(body.get("id", ""))
+        except ValueError as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"ok": ok})
+
+    def _ssh_connect(self, body):
+        mgr = _ssh_manager()
+        try:
+            cols = int(body.get("cols", 80) or 80)
+            rows = int(body.get("rows", 24) or 24)
+            if body.get("host_id"):
+                host = mgr.store.get_host(body["host_id"])
+                if host is None:
+                    self._send_json({"error": "unknown host_id"},
+                                    status=404)
+                    return
+                sid = mgr.connect(host["host"], host["port"],
+                                  host["username"], host["key_id"],
+                                  cols, rows)
+            else:
+                sid = mgr.connect(body.get("host", ""),
+                                  body.get("port", 22),
+                                  body.get("username", ""),
+                                  body.get("key_id", ""), cols, rows)
+        except (ValueError, RuntimeError) as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        try:
+            st = mgr.status(sid)
+            extra = {"session_type": st["session_type"],
+                     "pid": st["pid"], "build": BUILD}
+        except Exception:
+            extra = {"build": BUILD}
+        self._send_json({"ok": True, "session_id": sid, **extra})
+
+    def _ssh_output(self, parsed):
+        qs = parse_qs(parsed.query)
+        session_id = (qs.get("session_id") or [""])[0]
+        try:
+            since = int((qs.get("since") or ["0"])[0])
+        except ValueError:
+            since = 0
+        mgr = _ssh_manager()
+
+        def gen():
+            offset = since
+            while True:
+                try:
+                    data, offset, alive = mgr.read_since(session_id, offset)
+                except KeyError:
+                    yield {"kind": "end", "alive": False}
+                    return
+                if data:
+                    yield {"kind": "data",
+                           "data_b64": base64.b64encode(data).decode(),
+                           "offset": offset, "alive": alive}
+                if not alive:
+                    yield {"kind": "end", "alive": False}
+                    return
+                time.sleep(0.2)
+        self._sse(gen())
+
+    def _ssh_input(self, body):
+        try:
+            data = base64.b64decode(body.get("data_b64", ""))
+            _ssh_manager().write(body.get("session_id", ""), data)
+        except KeyError:
+            self._send_json({"error": "unknown session"}, status=404)
+            return
+        except (ValueError, OSError) as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"ok": True})
+
+    def _ssh_resize(self, body):
+        try:
+            _ssh_manager().resize(body.get("session_id", ""),
+                                  body.get("cols", 80),
+                                  body.get("rows", 24))
+        except KeyError:
+            self._send_json({"error": "unknown session"}, status=404)
+            return
+        except (ValueError, TypeError) as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json({"ok": True})
+
+    def _ssh_disconnect(self, body):
+        ok = _ssh_manager().disconnect(body.get("session_id", "") or "")
+        self._send_json({"ok": ok})
+
+    def _ssh_status(self, parsed):
+        qs = parse_qs(parsed.query)
+        session_id = (qs.get("session_id") or [""])[0]
+        try:
+            st = _ssh_manager().status(session_id)
+        except KeyError:
+            self._send_json({"error": "unknown session"}, status=404)
+            return
+        except ValueError as e:
+            self._send_json({"error": str(e)}, status=400)
+            return
+        self._send_json(st)
+
+    _ASSET_TYPES = {"xterm.js": "text/javascript",
+                    "xterm.css": "text/css",
+                    "addon-fit.js": "text/javascript"}
+
+    def _serve_asset(self, name):
+        # Strict allowlist: the name must match exactly, so no
+        # traversal or unexpected file can ever be served here.
+        ctype = self._ASSET_TYPES.get(name)
+        if ctype is None:
+            self._send_json({"error": "not found"}, status=404)
+            return
+        pth = os.path.join(os.path.dirname(__file__), "assets", name)
+        try:
+            with open(pth, "rb") as f:
+                body = f.read()
+        except OSError:
+            self._send_json({"error": "not found"}, status=404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     # ---- signed chat packages ----------------------------------------
     def _safe_sid(self, sid: str) -> bool:

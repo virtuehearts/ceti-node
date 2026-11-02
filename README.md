@@ -281,10 +281,90 @@ same ledger, same rule: nothing counts until it is signed.
 
 ## Status
 
-- **Version:** 0.0.1l, the initial 0.0.1 release. (Lettered builds
-  mark exactly which 0.0.1 is in hand; l is this one.)
-- **Tests:** 314 checks green at this build (Hub 118, node 81,
-  nodeapi 101, transfers/serving 14).
+- **Version:** 0.0.1t. (Lettered builds
+  mark exactly which 0.0.1 is in hand; t is this one.)
+- **Tests:** 337 checks green at this build (Hub 118, node 81,
+  nodeapi 101, transfers/serving 14, SSH terminal 23).
+- **New in 0.0.1t:** the remote-size fix. s connected, but the
+  HF TUI laid its input out one char per line while a normal
+  console connection renders standard size: with
+  CREATE_NO_WINDOW the ssh child has no console, and Windows
+  OpenSSH reads the remote PTY size from the console, so it
+  negotiated 0x0. The pipe session now inherits the parent
+  console when one exists (launched from PowerShell/cmd) so
+  ssh reads a real size — stdio stays piped, so nothing
+  writes to that console and no new window appears; with no
+  parent console it keeps CREATE_NO_WINDOW as before. The
+  child also carries COLUMNS/LINES from the session size.
+  Note: the browser pane's resize still only records — the
+  size the TUI uses is the console's, so resizing the
+  console window reflows it, not resizing the pane.
+- **New in 0.0.1s:** the remote-PTY fix. r got the session
+  into the browser pane with no window, but the laptop's
+  Windows OpenSSH refused the PTY under a single -t with
+  piped stdin ("Pseudo-terminal will not be allocated
+  because stdin is not a terminal"), so the HF gateway
+  closed the session with "Requires an active PTY". The
+  pipe session now passes -tt, the form that forces
+  allocation even with no local tty at all. A regression
+  test pins -tt before the host token in the argv.
+- **New in 0.0.1r:** the Windows window fix, by removing the
+  window's cause instead of fighting it. ConPTY opened a
+  visible Terminal window on the laptop across n–q, so
+  Windows now uses a pipe session: ssh runs with piped
+  stdio plus CREATE_NO_WINDOW, which cannot open a window
+  by construction, while `ssh -tt` still gives the remote
+  side the PTY the fullscreen chat needs. The connect line
+  also shows the running build (read from this README), so
+  "did you install the latest?" is answered on screen.
+  Note: with no local PTY, the remote PTY keeps ssh's
+  connect-time default size; resize is recorded, not
+  propagated. ssh also now passes IdentitiesOnly=yes, so
+  with no key selected the gateway sees an anonymous
+  session (its TUI) instead of a stray default key.
+- **New in 0.0.1q:** the ConPTY attachment fix. On the laptop
+  the ssh child kept landing in a visible Terminal window
+  with empty pipes ("conpty pid … · no output yet") instead
+  of on the pseudo console. The one way this code deviated
+  from Microsoft's ConPTY sample was pipe inheritability:
+  os.pipe() fds are non-inheritable by default, and the
+  handles handed to CreatePseudoConsole are now made
+  inheritable to match the sample. Windows-only change;
+  untestable from a Linux sandbox, so the laptop run is the
+  proof — see `tools/conpty_selftest.py`.
+- **New in 0.0.1p:** the real blank-pane fix. The vendored
+  addon-fit UMD exposes its constructor as FitAddon.FitAddon
+  (a namespace object), not as FitAddon — so the pane threw
+  "window.FitAddon is not a constructor" on the laptop and
+  never attached, while the server session ran on unseen.
+  The pane now resolves either shape and fails loudly if
+  neither exists, and it loads the terminal scripts before
+  creating the server session so a script failure can't
+  orphan a running ssh.
+- **New in 0.0.1o:** SSH diagnostics for the laptop's blank-pane
+  report. The status line now shows the session type and child
+  pid at connect, and 3 seconds later how many bytes actually
+  reached the browser — so a blank pane with "no output yet"
+  points at the child never feeding the pipes, while bytes
+  received with a blank pane points at stream delivery. A
+  failed stream no longer fails silently (visible error instead
+  of a blank pane). Ships `tools/conpty_selftest.py`: one
+  command on the laptop that proves whether ConPTY carries
+  output headlessly, no window.
+- **New in 0.0.1n:** the Windows fix for m, which crashed on
+  native Windows because sshterm imported Unix-only fcntl/pty at
+  module level. Those imports are now guarded, so the web UI can
+  never die at import again, and Windows gets a real terminal via
+  ConPTY (ctypes, no new dependencies). First load also now opens
+  the most recent chat instead of stopping at the welcome screen.
+- **New in 0.0.1m:** a local-operator-only SSH terminal workspace.
+  New workspace → SSH terminal opens a real terminal pane in the
+  node UI: saved hosts (chat.hf.co on port 22 is the pre-seeded
+  default), saved ed25519 keys kept 0600 and never displayed, and
+  host keys accepted on first sight with a hard fail if one ever
+  changes. Terminal bytes are never saved into session records,
+  and SSH is never offered to peers — it is the operator's own
+  shell to a host they chose, not a network capability.
 - **New in 0.0.1l:** the initial GitHub release build. The repo
   now ships an `info/` folder with a self-contained rendering of
   this README (`info/ceti-readme-baked.html`, images baked in for
