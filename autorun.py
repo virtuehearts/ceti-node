@@ -114,7 +114,7 @@ def main():
     print(f"platform: {platform.system()} {platform.machine()} | WSL: {is_wsl()} | python: {sys.version.split()[0]}")
     print("=" * 60)
 
-    from hub.config import data_dir, models_dir, load_catalog, chat_port, embed_port
+    from hub.config import data_dir, models_dir, load_catalog, chat_port, embed_port, effective_chat_model
     from hub.identity import ensure_identity
     from hub.llama import find_server, install_server, doctor, server_build, MIN_EMBED_BUILD
     from hub.hfdownload import download_model
@@ -148,7 +148,10 @@ def main():
         print(f"{m['id']}: ready via {method}")
 
     gpu = not args.ram
-    chat_m = next(m for m in cat if m["role"] == "chat")
+    # The operator's System-tab pick wins over the catalog default;
+    # without one this is the first catalog chat entry, as before.
+    chat_eff = effective_chat_model()
+    chat_m = chat_eff if chat_eff else next(m for m in cat if m["role"] == "chat")
     emb_m = next(m for m in cat if m["role"] == "embed")
     print(f"starting servers (ctx {args.ctx}, {'RAM' if args.ram else 'VRAM'} first, RAM fallback if VRAM fails) ...")
     chat_ok, emb_ok = ensure_servers(
