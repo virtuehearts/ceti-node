@@ -180,6 +180,41 @@ class CetiChatTest(unittest.TestCase):
         self.assertEqual(cas["matches"][0]["source"], "one.aiml")
         self.assertEqual(ceti_chat.facts_search("unrelated nothing")["matches"], [])
 
+    def test_record_answer_memory_writes_and_dedupes(self):
+        from hub import memory
+        d = tempfile.mkdtemp()
+        conn = memory.connect(d)
+        conn.close()
+
+        def fake_embed(text):
+            return [1.0, 0.0]
+
+        def connect_fn(_d):
+            return memory.connect(_d)
+
+        ok = ceti_chat.record_answer_memory(
+            d, "testhash", "capital of canada",
+            "Canada — capital: Ottawa", "facts",
+            embed_fn=fake_embed, connect_fn=connect_fn)
+        self.assertTrue(ok)
+        conn = memory.connect(d)
+        try:
+            self.assertEqual(memory.count(conn, "testhash"), 2)
+            ok2 = ceti_chat.record_answer_memory(
+                d, "testhash", "capital of canada",
+                "Canada — capital: Ottawa", "facts",
+                embed_fn=fake_embed, connect_fn=connect_fn)
+            self.assertFalse(ok2)
+            self.assertEqual(memory.count(conn, "testhash"), 2)
+            ok3 = ceti_chat.record_answer_memory(
+                d, "testhash", "what is fidonet",
+                "some miss text", "cloud-suggested",
+                embed_fn=fake_embed, connect_fn=connect_fn)
+            self.assertFalse(ok3)
+            self.assertEqual(memory.count(conn, "testhash"), 2)
+        finally:
+            conn.close()
+
     def test_record_miss_dedupes_and_caps(self):
         with tempfile.TemporaryDirectory() as d:
             ceti_chat.record_miss(d, "what is fidonet")

@@ -109,6 +109,9 @@ code{color:var(--amber)}
 .chan:hover{background:var(--panel-2)}
 .chan.active:hover{background:var(--panel-3)}
 .chan:focus-visible{outline:1px solid var(--phos-dim);outline-offset:-1px}
+.chan-actions{display:flex;align-items:center;gap:2px}
+.chan-act{flex:0 0 auto;color:var(--dim);background:none;border:none;padding:2px 5px;cursor:pointer;font-size:13px}
+.chan-act.danger{color:#ff6b8a}
 button.chan{
   font:inherit;color:inherit;text-align:left;width:100%;background:none;
   border:none;border-top:1px dashed var(--line);margin-top:4px;
@@ -624,6 +627,7 @@ button.chan .label{color:var(--dim)}
     <button class="view-tab" data-tab="system" type="button" aria-pressed="false" onclick="showTab('system')">System</button>
     <button class="view-tab" data-tab="node" type="button" aria-pressed="false" onclick="showTab('node')">Node</button>
     <button class="view-tab" data-tab="debug" type="button" aria-pressed="false" onclick="showTab('debug')">Debug</button>
+    <button class="view-tab" data-tab="research" type="button" aria-pressed="false" onclick="showTab('research')">Research</button>
   </nav>
   <div class="spacer"></div>
   <div class="readout">
@@ -658,6 +662,7 @@ button.chan .label{color:var(--dim)}
     <div class="provbar">
       <select id="provider" onchange="onProvider()">
         <option value="local">Local — uncensored (private)</option>
+        <option value="orcarouter">OrcaRouter (cloud)</option>
         <option value="openrouter">OpenRouter (cloud)</option>
         <option value="nvidia">Nvidia (cloud)</option>
       </select>
@@ -856,6 +861,32 @@ button.chan .label{color:var(--dim)}
           <button type="button" onclick="loadServers()">Refresh servers</button>
         </div>
         <div id="serverOut" style="padding:0 12px 10px;font-size:11px;color:var(--dim)">Loading servers…</div>
+        <div class="sys-card">
+          <div class="panel-head"><span>Models &amp; cloud API</span><span class="val">LINKED</span></div>
+          <div style="padding:10px 12px">
+            <p class="small">The same controls as Chat — changing them here changes Chat. Keys live in your browser only; the server never writes them to disk.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+              <label class="small">Provider</label>
+              <select id="sysProvider" onchange="sysProviderChange()">
+                <option value="local">Local — uncensored (private)</option>
+                <option value="orcarouter">OrcaRouter (cloud)</option>
+                <option value="openrouter">OpenRouter (cloud)</option>
+                <option value="nvidia">Nvidia (cloud)</option>
+              </select>
+              <label class="small">Model</label>
+              <select id="sysCloudModel" onchange="sysModelChange()" style="min-width:240px"></select>
+            </div>
+            <div class="kv">
+              <div class="row"><span>ORCAROUTER KEY</span><b id="sysKeyOrca">—</b></div>
+              <div class="row"><span>OPENROUTER KEY</span><b id="sysKeyOR">—</b></div>
+              <div class="row"><span>NVIDIA KEY</span><b id="sysKeyNV">—</b></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              <button type="button" onclick="showTab('settings')">API keys &amp; test →</button>
+              <button type="button" onclick="showTab('chat')">Back to Chat →</button>
+            </div>
+          </div>
+        </div>
         <div class="panel-head"><span>Log — last lines</span><span class="val" id="log-count">0</span></div>
         <div class="log" id="sys-log"></div>
       </div>
@@ -1089,6 +1120,66 @@ button.chan .label{color:var(--dim)}
     </div>
   </div>
 </div></div>
+<div id="view-research" class="tabview" hidden><div class="panel">
+      <h2>Research — local agent with a heartbeat</h2>
+      <p class="small">The agent works a task queue on a 60-second heartbeat: it compiles what CETI already knows locally for a topic, reads source pages as text (lynx-style, no rendering), distills QA pairs and fact triples with the local model first and cloud as fallback, and proposes them for your approval. Nothing it finds reaches the brain until you approve it — that is what moves the ladder, and the benchmark, without re-querying what is already known.</p>
+      <div class="sys-card">
+        <div class="panel-head"><span>Agent heartbeat</span><span class="val" id="resBeat">—</span></div>
+        <div style="padding:10px 12px">
+          <div class="kv">
+            <div class="row"><span>LAST TICK</span><b id="resLastTick">never</b></div>
+            <div class="row"><span>NOTE</span><b id="resNote">—</b></div>
+            <div class="row"><span>TASKS</span><b id="resCounts">—</b></div>
+            <div class="row"><span>PROPOSALS WAITING</span><b id="resProps">—</b></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" id="resWorkerBtn" onclick="toggleWorker()">Pause worker</button>
+            <button type="button" onclick="tickNow()">Tick now</button>
+          </div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>Benchmark — ladder vs its own knowledge</span><span class="val" id="resBenchVal">—</span></div>
+        <div style="padding:10px 12px">
+          <p class="small">Quizzes the ladder on knowledge QA: a hit needs a local tier (facts, AIML, local model) plus half the answer's key terms. Misses are gaps — turn them into research tasks and watch the score move as approvals land.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+            <label class="small">Questions</label>
+            <select id="resBenchN"><option value="25">25</option><option value="50">50</option><option value="158">158 (all)</option></select>
+            <button type="button" onclick="runBench()">Run benchmark</button>
+            <button type="button" onclick="researchMisses()">Research the misses</button>
+          </div>
+          <div id="resBenchOut" class="small">No run yet.</div>
+          <div id="resMisses" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>What CETI already knows — local compile</span><span class="val">NO MODEL CALL</span></div>
+        <div style="padding:10px 12px">
+          <p class="small">Facts, AIML categories, and memory nodes for a topic, before any model is involved. If the answer is here, the agent does not re-query it.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+            <input id="resCompileTopic" placeholder="topic, e.g. fidonet" style="flex:1;min-width:200px">
+            <button type="button" onclick="compileTopic()">Compile</button>
+            <button type="button" onclick="showTab('memory')">Full Memory tab →</button>
+          </div>
+          <div id="resCompileOut" class="small"></div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>New research task</span></div>
+        <div style="padding:10px 12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+            <input id="resTopic" placeholder="topic, e.g. fidonet history" style="flex:1;min-width:200px">
+          </div>
+          <textarea id="resUrls" placeholder="Source URLs, one per line (optional — without them the agent asks the model for sources)" rows="3" style="width:100%"></textarea>
+          <div style="margin-top:8px"><button type="button" onclick="createTask()">Queue task</button></div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="panel-head"><span>Tasks</span><span class="val" id="resTaskCount">—</span></div>
+        <div id="resTaskList" style="padding:10px 12px"></div>
+        <div id="resTaskDetail" style="padding:10px 12px;border-top:1px solid #222"></div>
+      </div>
+    </div></div>
 <div id="view-stories" class="tabview" hidden><div class="panel">
 <h2>Stories &amp; Storyboard</h2>
 <p class="small">Context stays within the configured window. Total output grows on disk, to 256k tokens and beyond. Writing is resumable — if it stops, write again and it continues at the next block.</p>
@@ -1157,7 +1248,10 @@ button.chan .label{color:var(--dim)}
 
 <div id="view-settings" class="tabview" hidden><div class="panel">
 <h2>Settings &amp; API Test</h2>
-<p class="small">Keys are stored in <b>your browser only</b> (localStorage) and sent with each cloud request. The server never writes them to disk. You can also set <code>OPENROUTER_API_KEY</code> / <code>NVIDIA_API_KEY</code> in WSL instead.</p>
+<p class="small">Keys are stored in <b>your browser only</b> (localStorage) and sent with each cloud request. The server never writes them to disk. You can also set <code>ORCAROUTER_API_KEY</code> / <code>OPENROUTER_API_KEY</code> / <code>NVIDIA_API_KEY</code> in WSL instead.</p>
+<label>OrcaRouter API key</label><input id="keyOrca" type="password" placeholder="sk-orca-…">
+<label>OrcaRouter model for test</label><input id="testModelOrca" placeholder="orcarouter/auto">
+<button type="button" onclick="testApi('orcarouter')">Test OrcaRouter</button>
 <label>OpenRouter API key</label><input id="keyOR" type="password" placeholder="sk-or-…">
 <label>OpenRouter model for test</label><input id="testModelOR" placeholder="recursive/flint-v1.0:free">
 <button type="button" onclick="testApi('openrouter')">Test OpenRouter</button>
@@ -1215,13 +1309,14 @@ button.chan .label{color:var(--dim)}
     <button class="drawer-navbtn" data-tab="search" type="button" onclick="showTab('search')">Library Search</button>
     <button class="drawer-navbtn" data-tab="memory" type="button" onclick="showTab('memory')">Memory</button>
     <button class="drawer-navbtn" data-tab="debug" type="button" onclick="showTab('debug')">Debug</button>
+    <button class="drawer-navbtn" data-tab="research" type="button" onclick="showTab('research')">Research</button>
     <button class="drawer-navbtn" data-tab="samples" type="button" onclick="showTab('samples')">Samples &amp; PDFs</button>
     <button class="drawer-navbtn" data-tab="system" type="button" onclick="showTab('system')">System</button>
     <button class="drawer-navbtn" data-tab="models" type="button" onclick="showTab('models')">Models</button>
     <button class="drawer-navbtn" data-tab="settings" type="button" onclick="showTab('settings')">Settings &amp; API Test</button>
   </div>
   <div class="drawer-list" id="drawer-list"></div>
-  <div class="drawer-foot"><button class="drawer-new" id="drawer-new" type="button">+ NEW WORKSPACE</button></div>
+  <div class="drawer-foot"><button class="drawer-new" id="drawer-archived-toggle" type="button">SHOW ARCHIVED</button><button class="drawer-new" id="drawer-new" type="button">+ NEW WORKSPACE</button></div>
 </aside>
 
 <!-- ===== New workspace picker ===== -->
@@ -1232,13 +1327,13 @@ button.chan .label{color:var(--dim)}
       <p>What kind of work is this? Pick one — you can always start more later.</p>
     </div>
     <div class="picker-grid">
+      <button class="pick" type="button" data-type="ceti">
+        <span class="pick-tag">CETI SESSION</span>
+        <span class="pick-main"><b>CETI session</b><span class="pick-desc">Test the CETI ladder — facts, AIML, local knowledge first, cloud only as a suggestion. Every answer shows its tier and its ladder steps in Thinking.</span></span>
+      </button>
       <button class="pick" type="button" data-type="chat">
         <span class="pick-tag">CHAT</span>
         <span class="pick-main"><b>Chat</b><span class="pick-desc">Everyday talk — questions, drafts, decisions, thinking out loud.</span></span>
-      </button>
-      <button class="pick" type="button" data-type="story">
-        <span class="pick-tag">STORY/EZINE</span>
-        <span class="pick-main"><b>Story / Ezine</b><span class="pick-desc">Long-form writing — chapters, scenes, and serial parts that build over time.</span></span>
       </button>
       <button class="pick" type="button" data-type="code">
         <span class="pick-tag">CODE SPACES</span>
@@ -1252,10 +1347,6 @@ button.chan .label{color:var(--dim)}
         <span class="pick-tag">SSH</span>
         <span class="pick-main"><b>SSH terminal</b><span class="pick-desc">A terminal in the workspace — saved hosts, saved keys, default chat.hf.co. Local operator only.</span></span>
       </button>
-      <button class="pick" type="button" data-type="ceti">
-        <span class="pick-tag">CETI SESSION</span>
-        <span class="pick-main"><b>CETI session</b><span class="pick-desc">Test the CETI ladder — facts, AIML, local knowledge first, cloud only as a suggestion. Every answer shows its tier and its ladder steps in Thinking.</span></span>
-      </button>
     </div>
     <button class="picker-cancel" id="picker-cancel" type="button">Cancel</button>
   </div>
@@ -1265,7 +1356,7 @@ button.chan .label{color:var(--dim)}
 let messages=[], currentSid=null, currentType='CHAT', provider='local', selectedSamples=[];
 let allSessions=[];
 const TYPE_TAGS={chat:'CHAT',story:'STORY/EZINE',code:'CODE SPACES',research:'RESEARCH',ssh:'SSH',ceti:'CETI SESSION'};
-const VIEWS=['chat','system','node','debug','stories','ezines','code','search','memory','samples','settings','models'];
+const VIEWS=['chat','system','node','debug','research','stories','ezines','code','search','memory','samples','settings','models'];
 
 function $(id){return document.getElementById(id);}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1360,9 +1451,10 @@ function showTab(name){
     b.classList.toggle('active', b.dataset.tab===name);
   });
   if(name==='stories') loadStories();
-  if(name==='system'){ loadSystem(); loadServers(); }
+  if(name==='system'){ loadSystem(); loadServers(); loadSysModels(); }
   if(name==='node'){ loadNode(); startNodeAutoRefresh(); } else { stopNodeAutoRefresh(); }
   if(name==='debug') loadDebugConsole();
+  if(name==='research'){ loadResearch(); startResearchTimer(); } else { stopResearchTimer(); }
   if(name==='samples') loadSamples();
   if(name==='ezines') loadEzines();
   if(name==='chat'){ const inp=$('chatInput'); if(inp) inp.focus(); }
@@ -1659,8 +1751,14 @@ function switchToSession(s){
   updateSshPane();
 }
 async function deleteSession(id){
+  if(!confirm('Delete this session permanently?')) return;
   await fetch('/api/sessions/'+encodeURIComponent(id),{method:'DELETE'});
   if(id===currentSid) showWelcome();
+  loadSessions();
+}
+async function archiveSession(id, flag){
+  await fetch('/api/sessions/'+encodeURIComponent(id)+(flag?'/archive':'/unarchive'),{method:'POST'});
+  if(flag && id===currentSid) showWelcome();
   loadSessions();
 }
 function vuHtml(active, idle){
@@ -1677,8 +1775,17 @@ function chanRow(s, idx){
   d.setAttribute('role','button');
   d.setAttribute('aria-label','Switch to session ' + dispNum(idx) + ', ' + (s.title||s.id));
   d.innerHTML = '<span class="id">' + dispNum(idx) + '</span>' +
-    '<span class="label">' + escHtml(s.title||s.id) + '<small>' + escHtml(s.type||'CHAT') + ' · ' + n + ' messages</small></span>' +
-    vuHtml(s.id===currentSid, n===0);
+    '<span class="label">' + escHtml(s.title||s.id) + '<small>' + escHtml(s.type||'CHAT') + ' · ' + n + ' messages</small></span>';
+  const acts = document.createElement('span'); acts.className='chan-actions';
+  acts.innerHTML = vuHtml(s.id===currentSid, n===0);
+  const arch = document.createElement('button'); arch.className='chan-act'; arch.type='button'; arch.textContent='🗄';
+  arch.title='Archive session'; arch.setAttribute('aria-label','Archive session');
+  arch.addEventListener('click', function(e){ e.stopPropagation(); archiveSession(s.id, true); });
+  const del = document.createElement('button'); del.className='chan-act danger'; del.type='button'; del.textContent='×';
+  del.title='Delete session'; del.setAttribute('aria-label','Delete session');
+  del.addEventListener('click', function(e){ e.stopPropagation(); deleteSession(s.id); });
+  acts.append(arch, del);
+  d.appendChild(acts);
   d.addEventListener('click', function(){ switchToSession(s); });
   d.addEventListener('keydown', function(e){
     if(e.key==='Enter' || e.key===' '){ e.preventDefault(); switchToSession(s); }
@@ -1688,12 +1795,13 @@ function chanRow(s, idx){
 function renderChannels(){
   const list = $('chan-list');
   list.innerHTML = '';
-  const shown = allSessions.slice(0,3);
+  const active = allSessions.filter(function(s){ return !s.archived; });
+  const shown = active.slice(0,3);
   shown.forEach(function(s, i){ list.appendChild(chanRow(s, i)); });
   const more = document.createElement('button');
   more.className = 'chan'; more.type = 'button'; more.id = 'more-sessions';
   more.setAttribute('aria-label','Show all sessions');
-  more.innerHTML = '<span class="id">»</span><span class="label">More sessions<small id="more-small">see all ' + allSessions.length + ' sessions</small></span><span></span>';
+  more.innerHTML = '<span class="id">»</span><span class="label">More sessions<small id="more-small">see all ' + active.length + ' sessions</small></span><span></span>';
   more.addEventListener('click', openDrawer);
   list.appendChild(more);
   const nw = document.createElement('button');
@@ -1702,7 +1810,7 @@ function renderChannels(){
   nw.innerHTML = '<span class="id">+</span><span class="label">New workspace<small>pick a type first</small></span><span></span>';
   nw.addEventListener('click', openPicker);
   list.appendChild(nw);
-  $('sess-count').textContent = String(allSessions.length).padStart(2,'0');
+  $('sess-count').textContent = String(active.length).padStart(2,'0');
 }
 async function loadSessions(opts){
   const r = await fetch('/api/sessions');
@@ -1713,21 +1821,29 @@ async function loadSessions(opts){
   // conversation, not just the welcome screen. Any other caller
   // (new workspace, delete, save) leaves the current view alone.
   if(opts && opts.openChat && !currentSid){
-    const chat = allSessions.find(function(s){ return (s.type||'CHAT')==='CHAT'; });
+    const chat = allSessions.find(function(s){ return (s.type||'CHAT')==='CHAT' && !s.archived; });
     if(chat) switchToSession(chat);
   }
 }
 
 // ---------- Drawer: all sessions (opens ONLY via More sessions) ----------
 const drawer = $('session-drawer'), drawerScrim = $('drawer-scrim');
+var showArchived = false;
 function buildDrawer(){
   const list = $('drawer-list');
   list.innerHTML = '';
-  $('drawer-count').textContent = allSessions.length + ' TOTAL';
-  allSessions.forEach(function(s, i){
-    const row = document.createElement('button');
+  const shown = showArchived ? allSessions.filter(function(s){ return s.archived; }) : allSessions.filter(function(s){ return !s.archived; });
+  $('drawer-count').textContent = shown.length + (showArchived ? ' ARCHIVED' : ' ACTIVE');
+  $('drawer-archived-toggle').textContent = showArchived ? 'SHOW ACTIVE' : 'SHOW ARCHIVED';
+  shown.forEach(function(s){
+    const i = sessIndex(s.id);
+    // A div, not a button: buttons nested inside a <button> are
+    // invalid HTML and browsers drop their clicks — which is why
+    // the old drawer × never deleted anything.
+    const row = document.createElement('div');
     row.className = 'drawer-item' + (s.id===currentSid ? ' active' : '');
-    row.type = 'button';
+    row.setAttribute('role','button');
+    row.setAttribute('tabindex','0');
     const idEl = document.createElement('span'); idEl.className='d-id'; idEl.textContent = dispNum(i);
     const main = document.createElement('span'); main.className='d-main';
     const lab = document.createElement('span'); lab.className='d-label'; lab.textContent = s.title||s.id;
@@ -1740,6 +1856,13 @@ function buildDrawer(){
       const live = document.createElement('span'); live.className='d-live'; live.textContent='OPEN';
       row.appendChild(live);
     }
+    const arch = document.createElement('button');
+    arch.className='d-del'; arch.type='button';
+    arch.textContent = s.archived ? '↩' : '🗄';
+    arch.title = s.archived ? 'Unarchive session' : 'Archive session';
+    arch.setAttribute('aria-label', s.archived ? 'Unarchive session' : 'Archive session');
+    arch.addEventListener('click', function(e){ e.stopPropagation(); archiveSession(s.id, !s.archived); });
+    row.appendChild(arch);
     const del = document.createElement('button');
     del.className='d-del'; del.type='button'; del.textContent='×';
     del.setAttribute('aria-label','Delete session');
@@ -1751,6 +1874,9 @@ function buildDrawer(){
     shr.addEventListener('click', function(e){ e.stopPropagation(); shareSession(s.id); });
     row.appendChild(shr);
     row.addEventListener('click', function(){ const cur = sessById(s.id); if(cur){ switchToSession(cur); } closeDrawer(); });
+    row.addEventListener('keydown', function(e){
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); const cur = sessById(s.id); if(cur){ switchToSession(cur); } closeDrawer(); }
+    });
     list.appendChild(row);
   });
 }
@@ -1776,6 +1902,7 @@ function closeDrawer(){
 }
 $('drawer-close').addEventListener('click', closeDrawer);
 drawerScrim.addEventListener('click', closeDrawer);
+$('drawer-archived-toggle').addEventListener('click', function(){ showArchived = !showArchived; buildDrawer(); });
 $('drawer-new').addEventListener('click', function(){ closeDrawer(); openPicker(); });
 
 // ---------- New workspace picker ----------
@@ -2121,7 +2248,7 @@ function onProvider(){
   $('teleEngine').textContent = provider;
 }
 async function refreshCloudModels(){
-  const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : localStorage.getItem('nv_key')||'';
+  const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='orcarouter' ? localStorage.getItem('orca_key')||'' : localStorage.getItem('nv_key')||'';
   const r = await fetch('/api/cloud/models?provider='+provider,{headers:{'X-API-Key':key}});
   const j = await r.json();
   const sel = $('cloudModel'); sel.innerHTML='';
@@ -2205,6 +2332,183 @@ function renderCetiNodes(container, memories, headText){
 }
 function brainRow(k,v){ return '<div class="row"><span>'+escHtml(k)+'</span><b>'+escHtml(v)+'</b></div>'; }
 let _consoleModules=[];
+function loadSysModels(){
+  const sp=$('sysProvider'); if(!sp) return;
+  sp.value = provider;
+  const sm=$('sysCloudModel');
+  const cm=$('cloudModel');
+  sm.innerHTML='';
+  Array.from(cm.options).forEach(function(o){
+    const n=document.createElement('option'); n.value=o.value; n.textContent=o.textContent; sm.appendChild(n);
+  });
+  sm.value = cm.value;
+  $('sysKeyOrca').textContent = localStorage.getItem('orca_key') ? 'SET' : 'NOT SET';
+  $('sysKeyOR').textContent = localStorage.getItem('or_key') ? 'SET' : 'NOT SET';
+  $('sysKeyNV').textContent = localStorage.getItem('nv_key') ? 'SET' : 'NOT SET';
+}
+async function sysProviderChange(){
+  const v=$('sysProvider').value;
+  $('provider').value = v;
+  onProvider();
+  const sm=$('sysCloudModel');
+  if(v==='local'){ sm.innerHTML=''; return; }
+  const key = v==='openrouter' ? localStorage.getItem('or_key')||'' : v==='orcarouter' ? localStorage.getItem('orca_key')||'' : localStorage.getItem('nv_key')||'';
+  try{
+    const r=await fetch('/api/cloud/models?provider='+v,{headers:{'X-API-Key':key}});
+    const j=await r.json();
+    sm.innerHTML='';
+    (j.models||[]).slice(0,100).forEach(function(m){
+      const o=document.createElement('option'); o.value=m; o.textContent=m; sm.appendChild(o);
+    });
+    const cm=$('cloudModel');
+    cm.innerHTML='';
+    Array.from(sm.options).forEach(function(o){
+      const n=document.createElement('option'); n.value=o.value; n.textContent=o.textContent; cm.appendChild(n);
+    });
+    if(cm.options.length) cm.value = cm.options[0].value;
+    sm.value = cm.value;
+  }catch(e){}
+}
+function sysModelChange(){
+  const cm=$('cloudModel');
+  const v=$('sysCloudModel').value;
+  let found=false;
+  Array.from(cm.options).forEach(function(o){ if(o.value===v) found=true; });
+  if(!found){
+    const o=document.createElement('option'); o.value=v; o.textContent=v; cm.appendChild(o);
+  }
+  cm.value=v;
+}
+var researchTimer = null;
+function startResearchTimer(){ stopResearchTimer(); researchTimer = setInterval(loadResearch, 15000); }
+function stopResearchTimer(){ if(researchTimer){ clearInterval(researchTimer); researchTimer = null; } }
+function researchCloudBody(){
+  const body = {};
+  if(provider && provider !== 'local'){
+    body.provider = provider;
+    body.api_key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='orcarouter' ? localStorage.getItem('orca_key')||'' : localStorage.getItem('nv_key')||'';
+    body.model = $('cloudModel') ? $('cloudModel').value : '';
+  }
+  return body;
+}
+function fmtTick(ts){
+  if(!ts) return 'never';
+  return new Date(parseFloat(ts)*1000).toLocaleTimeString();
+}
+async function loadResearch(){
+  try{
+    const r = await fetch('/api/research/status');
+    const j = await r.json();
+    const fresh = j.heartbeat_last && (Date.now()/1000 - parseFloat(j.heartbeat_last) < 180);
+    $('resBeat').textContent = j.worker_enabled ? (fresh ? '● LIVE' : '● STALE') : '○ PAUSED';
+    $('resLastTick').textContent = fmtTick(j.heartbeat_last);
+    $('resNote').textContent = j.heartbeat_note || '—';
+    const c = j.task_counts || {};
+    $('resCounts').textContent = Object.entries(c).map(function(kv){ return kv[0]+' '+kv[1]; }).join(' · ') || 'none';
+    $('resProps').textContent = j.proposals_pending;
+    $('resWorkerBtn').textContent = j.worker_enabled ? 'Pause worker' : 'Resume worker';
+    window._resWorker = j.worker_enabled;
+    const b = j.last_bench;
+    if(b){
+      $('resBenchVal').textContent = Math.round(b.accuracy*100) + '%';
+      $('resBenchOut').textContent = 'Run #' + b.id + ': ' + b.n + ' questions, accuracy ' + Math.round(b.accuracy*100) + '%, ' + (b.summary && b.summary.misses ? b.summary.misses.length : 0) + ' misses.';
+      if(b.summary && b.summary.misses){
+        $('resMisses').innerHTML = b.summary.misses.slice(0,10).map(function(m){ return '<div class="small">✗ ' + escHtml(m.question) + ' <span style="opacity:.6">(' + escHtml(m.tier) + ')</span></div>'; }).join('');
+      }
+    } else if(j.bench_running){
+      $('resBenchOut').textContent = 'Benchmark running…';
+    }
+    if(j.bench_running) $('resBenchVal').textContent = 'RUNNING';
+  }catch(e){}
+  try{
+    const r = await fetch('/api/research/tasks');
+    const j = await r.json();
+    const tasks = j.tasks || [];
+    $('resTaskCount').textContent = tasks.length + ' tasks';
+    $('resTaskList').innerHTML = tasks.map(function(t){
+      return '<div class="row" style="cursor:pointer" onclick="showTask(' + t.id + ')"><span>#' + t.id + ' ' + escHtml(t.title) + '</span><b>' + escHtml(t.status) + '</b></div>';
+    }).join('') || '<div class="small">No tasks yet. Queue one above, or run the benchmark and research its misses.</div>';
+  }catch(e){}
+}
+async function showTask(id){
+  const r = await fetch('/api/research/tasks/' + id);
+  const j = await r.json();
+  if(j.error){ $('resTaskDetail').textContent = j.error; return; }
+  const t = j.task, res = t.result || {};
+  let html = '<h3>#' + t.id + ' ' + escHtml(t.title) + ' — ' + escHtml(t.status) + '</h3>';
+  html += '<div class="small">Topic: ' + escHtml(t.topic) + (t.urls && t.urls.length ? '<br>URLs: ' + t.urls.map(escHtml).join(', ') : '') + '</div>';
+  if(res.steps) html += '<div class="small" style="margin-top:8px">' + res.steps.map(escHtml).join('<br>') + '</div>';
+  if(res.pages) html += '<div class="small" style="margin-top:8px">Pages: ' + res.pages.map(function(p){ return escHtml(p.url) + ' (' + (p.error ? 'error: ' + escHtml(p.error) : p.chars + ' chars') + ')'; }).join('<br>') + '</div>';
+  if(res.distill_error) html += '<div class="small" style="margin-top:8px">Distill: ' + escHtml(res.distill_error) + '</div>';
+  if(res.model_used) html += '<div class="small">Model: ' + escHtml(res.model_used) + '</div>';
+  const props = j.proposals || [];
+  if(props.length){
+    html += '<h4 style="margin-top:12px">Proposals — approve to land them in the brain</h4>';
+    html += props.map(function(p){
+      let text = p.kind === 'fact' ? escHtml(p.subject) + ' — ' + escHtml(p.predicate) + ': ' + escHtml(p.object) : 'Q: ' + escHtml(p.question) + '<br>A: ' + escHtml(p.answer);
+      let btns = p.status === 'pending'
+        ? ' <button type="button" onclick="approveProposal(' + p.id + ',' + t.id + ')">Approve</button> <button type="button" onclick="rejectProposal(' + p.id + ',' + t.id + ')">Reject</button>'
+        : ' <span style="opacity:.6">(' + escHtml(p.status) + (p.result && p.result.landed ? ': ' + p.result.landed.map(escHtml).join(', ') : '') + ')</span>';
+      return '<div class="small" style="margin:6px 0;padding:6px;border:1px solid #222">' + text + '<br>' + btns + '</div>';
+    }).join('');
+  }
+  if(t.status === 'pending' || t.status === 'needs-model'){
+    html += '<div style="margin-top:8px"><button type="button" onclick="runTask(' + t.id + ')">Run now</button></div>';
+  }
+  $('resTaskDetail').innerHTML = html;
+}
+async function createTask(){
+  const topic = $('resTopic').value.trim();
+  if(!topic) return;
+  const urls = $('resUrls').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+  const r = await fetch('/api/research/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:topic, urls:urls})});
+  const j = await r.json();
+  if(j.id){ $('resTopic').value=''; $('resUrls').value=''; loadResearch(); }
+}
+async function tickNow(){
+  await fetch('/api/research/tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(researchCloudBody())});
+  setTimeout(loadResearch, 2000);
+}
+async function toggleWorker(){
+  const enabled = !window._resWorker;
+  await fetch('/api/research/worker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:enabled})});
+  loadResearch();
+}
+async function runTask(id){
+  await fetch('/api/research/run/' + id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(researchCloudBody())});
+  setTimeout(function(){ showTask(id); loadResearch(); }, 2000);
+}
+async function approveProposal(id, taskId){
+  await fetch('/api/research/proposals/' + id + '/approve',{method:'POST'});
+  showTask(taskId);
+}
+async function rejectProposal(id, taskId){
+  await fetch('/api/research/proposals/' + id + '/reject',{method:'POST'});
+  showTask(taskId);
+}
+async function runBench(){
+  const n = parseInt($('resBenchN').value, 10) || 25;
+  $('resBenchOut').textContent = 'Benchmark running in background…';
+  await fetch('/api/research/benchmark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({max_questions:n})});
+  setTimeout(loadResearch, 3000);
+}
+async function researchMisses(){
+  const r = await fetch('/api/research/bench/research-misses',{method:'POST'});
+  const j = await r.json();
+  if(j.created !== undefined){ loadResearch(); }
+}
+async function compileTopic(){
+  const topic = $('resCompileTopic').value.trim();
+  if(!topic) return;
+  $('resCompileOut').textContent = 'Compiling…';
+  const r = await fetch('/api/research/compile?topic=' + encodeURIComponent(topic));
+  const j = await r.json();
+  let html = '';
+  html += '<div><b>Facts (' + j.facts.length + ')</b><br>' + (j.facts.map(function(f){ return escHtml(f.subject) + ' — ' + escHtml(f.predicate) + ': ' + escHtml(f.object); }).join('<br>') || 'none') + '</div>';
+  html += '<div style="margin-top:8px"><b>AIML (' + j.aiml.length + ')</b><br>' + (j.aiml.map(function(a){ return escHtml(a.answer) + ' <span style="opacity:.6">[' + escHtml(a.evidence) + ']</span>'; }).join('<br>') || 'none') + '</div>';
+  html += '<div style="margin-top:8px"><b>Memory nodes (' + j.memories.length + ')</b><br>' + (j.memories.map(function(m){ return '#' + m.id + ' (' + m.score + ', ' + escHtml(m.source) + ') ' + escHtml(m.text); }).join('<br>') || 'none — embed server down or no nodes') + '</div>';
+  $('resCompileOut').innerHTML = html;
+}
 async function loadDebugConsole(){
   const st=$('brain-console-state'); if(st) st.textContent='…';
   let s=null;
@@ -2316,7 +2620,7 @@ async function askDebugConsole(){
   const box=$('brain-console-answer');
   box.textContent='Asking…';
   try{
-    const r=await fetch('/api/ceti/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const r=await fetch('/api/ceti/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,record:false})});
     const j=await r.json();
     box.textContent='';
     const ans=document.createElement('div');
@@ -2383,7 +2687,7 @@ async function doSend(text, isRegen){
   const timeSpan = metaEl.querySelectorAll('span')[1];
   let full='', thinkText='', gotText=false, gotThinking=false, textChunks=0, usageTokens=0, firstTextAt=0, lastSpeedAt=0;
   let doneAt=0, effToks=0, effSecs=0, doneMemories=[], doneMemoriesUsed=0;
-  const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='nvidia' ? localStorage.getItem('nv_key')||'' : '';
+  const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='orcarouter' ? localStorage.getItem('orca_key')||'' : provider==='nvidia' ? localStorage.getItem('nv_key')||'' : '';
   const useMemory = memOn();
   const sampleSources = sampOn() ? selectedSamples : null;
   const temp = parseFloat($('tempInput').value||'0.7');
@@ -2613,8 +2917,8 @@ async function loadSystem(){
     '<div class="kv">' +
     '<div class="row"><span>CPU</span><b>' + j.cpu_pct + '%</b></div>' +
     '<div class="row"><span>DISK FREE</span><b>' + j.disk_free_gb + ' GB</b></div>' +
-    '<div class="row"><span>EMBED MODEL</span><b>' + (j.embed_up ? 'UP' : 'DOWN') + '</b></div>' +
-    '<div class="row"><span>CHAT MODEL</span><b>' + (j.chat_up ? 'UP' : 'DOWN') + '</b></div>' +
+    '<div class="row"><span>CHAT MODEL</span><b>' + escHtml(j.chat_model || 'none configured') + ' · ' + (j.chat_up ? 'UP' : 'DOWN') + '</b></div>' +
+    '<div class="row"><span>EMBED MODEL</span><b>' + escHtml(j.embed_model || 'none configured') + ' · ' + (j.embed_up ? 'UP' : 'DOWN') + '</b></div>' +
     '<div class="row"><span>VECTOR MEMORY</span><b>' + j.vector_memories + ' entries</b></div>' +
     '<div class="row"><span>SAMPLES IN USE</span><b>' + (Object.entries(j.samples||{}).map(function(kv){ return kv[0] + ' (' + kv[1] + ' chunks)'; }).join(', ') || 'none ingested yet') + '</b></div>' +
     '</div>';
@@ -3435,8 +3739,8 @@ async function uploadPdf(){
   $('samplesOut').textContent = JSON.stringify(j,null,2); loadSamples();
 }
 async function testApi(providerName){
-  const key = providerName==='openrouter' ? $('keyOR').value : $('keyNV').value;
-  const model = providerName==='openrouter' ? $('testModelOR').value : $('testModelNV').value;
+  const key = providerName==='openrouter' ? $('keyOR').value : providerName==='orcarouter' ? $('keyOrca').value : $('keyNV').value;
+  const model = providerName==='openrouter' ? $('testModelOR').value : providerName==='orcarouter' ? $('testModelOrca').value : $('testModelNV').value;
   $('apiTestOut').textContent = 'Testing ' + providerName + '…';
   const r = await fetch('/api/cloud/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:providerName,api_key:key,model:model})});
   const j = await r.json();
@@ -3449,13 +3753,14 @@ async function testLocal(){
   $('apiTestOut').textContent = 'chat '+(j.chat_up?'up':'down')+' · embed '+(j.embed_up?'up':'down')+' · vector memories '+j.vector_memories+' · GPU '+(j.gpu.present?j.gpu.name:'none');
 }
 function saveKeys(){
+  localStorage.setItem('orca_key',$('keyOrca').value);
   localStorage.setItem('or_key',$('keyOR').value);
   localStorage.setItem('nv_key',$('keyNV').value);
   $('keyNote').textContent = 'Saved in this browser only.';
 }
 function clearKeys(){
-  localStorage.removeItem('or_key'); localStorage.removeItem('nv_key');
-  $('keyOR').value=''; $('keyNV').value='';
+  localStorage.removeItem('orca_key'); localStorage.removeItem('or_key'); localStorage.removeItem('nv_key');
+  $('keyOrca').value=''; $('keyOR').value=''; $('keyNV').value='';
   $('keyNote').textContent = 'Cleared.';
 }
 async function loadEzines(){
@@ -3739,6 +4044,7 @@ function collapseVec(){
   const rb = $('ram-bar');
   for(let i=0;i<24;i++) rb.appendChild(document.createElement('i'));
 })();
+$('keyOrca').value = localStorage.getItem('orca_key')||'';
 $('keyOR').value = localStorage.getItem('or_key')||'';
 $('keyNV').value = localStorage.getItem('nv_key')||'';
 $('teleTemp').textContent = $('tempInput').value || '0.7';

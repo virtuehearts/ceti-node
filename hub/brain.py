@@ -29,6 +29,13 @@ def _default_candidates():
     if env:
         cands.append(env)
     cands.append(os.path.join(data_dir(), "brain"))
+    # Packaged seed: the brain/ dir shipped in the node tree itself.
+    # It sits below the operator's own <data>/brain/ (which still wins)
+    # and above the CETI dev-tree fallback (which never exists on a
+    # laptop install). It carries the public CETI knowledge — cassettes,
+    # facts, research — never identity, sessions, or vector memory.
+    tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cands.append(os.path.join(tree, "brain"))
     ws = os.path.dirname(os.path.dirname(
         os.path.dirname(os.path.abspath(__file__))))
     cands.append(os.path.join(ws, "ceti", "data"))

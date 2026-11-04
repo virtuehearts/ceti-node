@@ -1,10 +1,16 @@
-"""Cloud chat via OpenRouter or Nvidia, OpenAI-compatible, stdlib only.
+"""Cloud chat via OrcaRouter, OpenRouter or Nvidia, OpenAI-compatible,
+stdlib only.
 
 Keys are NEVER written to disk by this module. The caller supplies
 the key per request (from the browser's localStorage, or from the
-OPENROUTER_API_KEY / NVIDIA_API_KEY environment variables on the
-server). Local chat remains the default and sends nothing anywhere.
+ORCAROUTER_API_KEY / OPENROUTER_API_KEY / NVIDIA_API_KEY environment
+variables on the server). Local chat remains the default and sends
+nothing anywhere.
 
+OrcaRouter: https://api.orcarouter.ai/v1/chat/completions
+  Keys look like sk-orca-...; orcarouter/auto is seeded on signup
+  and picks the cheapest live chat model. Models listed via
+  /v1/models with the key.
 OpenRouter: https://openrouter.ai/api/v1/chat/completions
   Free models are listed dynamically via /api/v1/models (pricing
   prompt == "0" or 0) — no hardcoded free-model list to go stale.
@@ -17,6 +23,13 @@ import urllib.request
 import urllib.error
 
 PROVIDERS = {
+    "orcarouter": {
+        "base": "https://api.orcarouter.ai/v1",
+        "env": "ORCAROUTER_API_KEY",
+        "suggest": ["orcarouter/auto",
+                    "openai/gpt-4o-mini",
+                    "anthropic/claude-sonnet-4.6"],
+    },
     "openrouter": {
         "base": "https://openrouter.ai/api/v1",
         "env": "OPENROUTER_API_KEY",

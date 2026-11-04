@@ -105,6 +105,19 @@ class BrainTest(unittest.TestCase):
         self.assertEqual(s["library"]["files"], 0)
         self.assertEqual(s["knowledge"]["qa"], 0)
 
+    def test_packaged_seed_fallback(self):
+        cands = brain._default_candidates()
+        tree_brain = os.path.join(
+            os.path.dirname(os.path.dirname(
+                os.path.abspath(brain.__file__))), "brain")
+        self.assertIn(tree_brain, cands)
+        self.assertLess(cands.index(tree_brain),
+                        len(cands) - 1)  # before the CETI dev-tree fallback
+        roots = brain.resolve_roots(candidates=[tree_brain])
+        self.assertTrue(roots["found"])
+        mods = brain.list_modules(roots)
+        self.assertEqual(len(mods), 31)
+
     def test_list_modules(self):
         mods = brain.list_modules()
         self.assertEqual([m["name"] for m in mods], ["a.aiml", "geo/b.aiml"])

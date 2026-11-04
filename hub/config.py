@@ -23,6 +23,21 @@ def load_catalog():
         return json.load(f)
 
 
+def default_model(role):
+    """The model a startup loads for a role: the catalog entry flagged
+    "default", else the first entry of that role, else None. This is
+    the single source of truth the System tab displays and the web
+    server-start paths use, so the shown name is the loaded name."""
+    cat = load_catalog()["models"]
+    for m in cat:
+        if m.get("role") == role and m.get("default"):
+            return m
+    for m in cat:
+        if m.get("role") == role:
+            return m
+    return None
+
+
 def chat_port() -> int:
     return int(os.environ.get("HUB_CHAT_PORT", "8080"))
 

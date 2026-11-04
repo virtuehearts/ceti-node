@@ -226,6 +226,63 @@ def answer(query, roots=None, ident_hash=None):
             "thinking": "\n".join(steps)}
 
 
+def record_answer_memory(data_dir, ident_hash, query, answer, tier,
+                         embed_fn=None, connect_fn=None):
+    """Record a CETI session answer in vector memory, like regular chat.
+
+    Writes two nodes — "User: <query>" and "Assistant: <answer>" —
+    with source "ceti", so a repeated question retrieves the earlier
+    exchange as context instead of reporting no memory hits. Only real
+    answer tiers are recorded (facts, aiml, local-model); a
+    cloud-suggested miss is a suggestion, not knowledge, and is never
+    stored. Deduped on the exact question: a repeat ask does not stack
+    duplicate nodes. Fail-soft by design: any failure (no embedding
+    server, no identity, no store) skips the write and never breaks
+    the answer itself. The Debug console's ad-hoc ask passes
+    record=False at the endpoint and never reaches this function.
+    """
+    if tier not in ("facts", "aiml", "local-model"):
+        return False
+    if not ident_hash or not query or not answer:
+        return False
+    try:
+        if embed_fn is None:
+            from .servers import embed_text as embed_fn
+        if connect_fn is None:
+            from . import memory as _memory
+            connect_fn = _memory.connect
+            search_fn = _memory.search
+            add_fn = _memory.add
+        else:
+            from . import memory as _memory
+            search_fn = _memory.search
+            add_fn = _memory.add
+        user_text = "User: " + query
+        q_emb = embed_fn(query)
+        if q_emb is None:
+            return False
+        conn = connect_fn(data_dir)
+        try:
+            for _sc, text, _s, _rid, _m in search_fn(
+                    conn, ident_hash, q_emb, top_k=5):
+                if text == user_text:
+                    return False
+            add_fn(conn, ident_hash, user_text, q_emb,
+                   source="ceti", tags=tier, model="CETI")
+            a_emb = embed_fn(answer)
+            if a_emb is not None:
+                add_fn(conn, ident_hash, "Assistant: " + answer, a_emb,
+                       source="ceti", tags=tier, model="CETI")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        return True
+    except Exception:
+        return False
+
+
 def facts_search(query, roots=None):
     """Fact-engine tester: every fact whose subject words appear in the
     question, from the fact store and from cassette <fact> elements."""

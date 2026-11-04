@@ -7,7 +7,7 @@ Endpoints (JSON unless noted):
   GET  /                     -> web UI
   GET  /api/status           -> identity, servers, models, key-env flags
   POST /api/chat             -> {messages, provider, model, api_key?} SSE stream
-                               provider: "local" (default), "openrouter", "nvidia"
+                               provider: "local" (default), "orcarouter", "openrouter", "nvidia"
                                api_key is used for this request only, never stored
   GET  /api/sessions         -> saved chat sessions (each carries a type tag)
   POST /api/sessions         -> {title, messages, type?} save a session
@@ -17,7 +17,7 @@ Endpoints (JSON unless noted):
   GET  /api/memories/list?limit=N -> full node view: every memory + source model + replies that used it
   GET  /api/memories/<id>/vector -> that memory's vector + metadata (identity-scoped, read-only)
   GET  /api/memories/<id>/used-by -> replies that used this memory node (identity-scoped)
-  POST /api/ceti/chat       -> {query} CETI ladder answer: facts, AIML, local model; cloud suggested, never called; answer ledgered as ceti.answer
+  POST /api/ceti/chat       -> {query} CETI ladder answer: facts, AIML, local model; cloud suggested, never called; answer ledgered as ceti.answer; session answers recorded in vector memory (record=false opts out)
   GET  /api/brain/fact-search?q= -> facts matching a question (fact engine tester)
   GET  /api/ceti/suggestions -> missed CETI questions awaiting research (operator-local)
   GET  /api/voice/shared     -> local shared files + ledger state
@@ -43,7 +43,18 @@ Endpoints (JSON unless noted):
   POST /api/memory/recall    -> {query}
   POST /api/samples/ingest   -> {folder?} ingest .txt/.md into vector memory
   GET  /api/samples          -> sample counts
-  GET  /api/cloud/models?provider=openrouter|nvidia  (key in X-API-Key header)
+  GET  /api/cloud/models?provider=orcarouter|openrouter|nvidia  (key in X-API-Key header)
+  GET  /api/research/status  -> heartbeat, worker flag, task counts, last bench
+  GET  /api/research/tasks   -> research task list + pending proposals
+  POST /api/research/tasks   -> {topic, urls?} queue a research task
+  POST /api/research/tick    -> fire one heartbeat step now (keys optional)
+  POST /api/research/run/<id> -> run one task now (keys optional)
+  POST /api/research/worker  -> {enabled} toggle the heartbeat worker
+  GET  /api/research/compile?topic= -> local knowledge compiled for a topic
+  POST /api/research/proposals/<id>/approve|reject -> promotion gate
+  POST /api/research/benchmark -> run the ladder benchmark in background
+  GET  /api/research/bench   -> last benchmark run + misses
+  POST /api/research/bench/research-misses -> tasks from the last misses
   POST /api/setup            -> start setup in background (models + llama + servers)
   GET  /api/setup/log        -> setup log lines (JSON)
   GET  /api/node/status      -> node identity (NODE- + HUB- fingerprints), name, list URL, listed?
@@ -111,7 +122,7 @@ def _read_build():
 BUILD = _read_build()
 from . import regula
 from . import sshterm
-from .config import chat_port, embed_port, data_dir, models_dir, load_catalog
+from .config import chat_port, embed_port, data_dir, models_dir, load_catalog, default_model
 from .identity import ensure_identity
 from .package import create_package, verify_package
 from .servers import _health, stream_chat, stream_chat_events, chat_complete, embed_text, ensure_servers, _stop, _pid_path, poller_running, poller_start, poller_stop, poller_log_tail
@@ -121,6 +132,8 @@ from .samples import ingest_folder, sample_counts, samples_dir
 WEB_PORT = int(os.environ.get("HUB_WEB_PORT", "8900"))
 _setup_log = []
 _setup_lock = threading.Lock()
+_bench_lock = threading.Lock()
+_bench_running = False
 _setup_running = False
 
 
@@ -172,6 +185,33 @@ def sessions_dir() -> str:
     d = os.path.join(data_dir(), "web-sessions")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def _session_file(sid: str) -> str:
+    """Validated session file path. Raises ValueError on a bad id.
+
+    The share handler's _safe_sid rule, shared here so DELETE,
+    archive, and unarchive cannot escape web-sessions/ (the old
+    DELETE path took the id unchecked).
+    """
+    import re as _re
+    if not sid or ".." in sid or _re.match(r"^[A-Za-z0-9._-]+$", sid) is None:
+        raise ValueError("invalid session id")
+    return os.path.join(sessions_dir(), sid + ".json")
+
+
+def _set_session_archived(sid: str, archived: bool) -> dict:
+    pth = _session_file(sid)
+    with open(pth, encoding="utf-8") as f:
+        rec = json.load(f)
+    rec["archived"] = bool(archived)
+    with open(pth, "w", encoding="utf-8") as f:
+        json.dump(rec, f, indent=2)
+    return rec
+
+
+def _delete_session_file(sid: str) -> None:
+    os.remove(_session_file(sid))
 
 
 # Local SSH terminal managers, one per data dir (HUB_DATA_DIR can
@@ -336,6 +376,22 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/brain/research":
             self._send_json(brain.research())
             return
+        if path == "/api/research/status":
+            self._research_status()
+            return
+        if path == "/api/research/tasks":
+            self._research_tasks()
+            return
+        if path.startswith("/api/research/tasks/"):
+            tid = unquote(path[len("/api/research/tasks/"):]).strip("/")
+            self._research_task_detail(tid)
+            return
+        if path == "/api/research/compile":
+            self._research_compile(parsed)
+            return
+        if path == "/api/research/bench":
+            self._research_bench()
+            return
         if path == "/api/ezines":
             self._ezines_list()
             return
@@ -437,10 +493,11 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         if path.startswith("/api/sessions/"):
             sid = unquote(path[len("/api/sessions/"):].strip("/"))
-            pth = os.path.join(sessions_dir(), sid + ".json")
             try:
-                os.remove(pth)
+                _delete_session_file(sid)
                 self._send_json({"ok": True})
+            except ValueError:
+                self._send_json({"error": "invalid session id"}, status=400)
             except OSError:
                 self._send_json({"error": "not found"}, status=404)
             return
@@ -498,6 +555,33 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/cloud/test":
             self._cloud_test(body)
+            return
+        if path == "/api/research/tasks":
+            self._research_create(body)
+            return
+        if path == "/api/research/tick":
+            self._research_tick(body)
+            return
+        if path.startswith("/api/research/run/"):
+            tid = unquote(path[len("/api/research/run/"):]).strip("/")
+            self._research_run(tid, body)
+            return
+        if path == "/api/research/worker":
+            self._research_worker(body)
+            return
+        if path.startswith("/api/research/proposals/") and path.endswith("/approve"):
+            pid = unquote(path[len("/api/research/proposals/"):-len("/approve")].strip("/"))
+            self._research_proposal(pid, "approve")
+            return
+        if path.startswith("/api/research/proposals/") and path.endswith("/reject"):
+            pid = unquote(path[len("/api/research/proposals/"):-len("/reject")].strip("/"))
+            self._research_proposal(pid, "reject")
+            return
+        if path == "/api/research/benchmark":
+            self._research_benchmark(body)
+            return
+        if path == "/api/research/bench/research-misses":
+            self._research_bench_misses()
             return
         if path == "/api/samples/upload-pdf":
             self._samples_upload_pdf(body)
@@ -605,6 +689,14 @@ class Handler(BaseHTTPRequestHandler):
             sid = unquote(path[len("/api/sessions/"):-len("/share")].strip("/"))
             self._share_session(sid)
             return
+        if path.startswith("/api/sessions/") and path.endswith("/unarchive"):
+            sid = unquote(path[len("/api/sessions/"):-len("/unarchive")].strip("/"))
+            self._session_archive(sid, False)
+            return
+        if path.startswith("/api/sessions/") and path.endswith("/archive"):
+            sid = unquote(path[len("/api/sessions/"):-len("/archive")].strip("/"))
+            self._session_archive(sid, True)
+            return
         self._send_json({"error": "not found"}, status=404)
 
     # ---- pages --------------------------------------------------------
@@ -632,9 +724,8 @@ class Handler(BaseHTTPRequestHandler):
         Embed 'down' with a missing model file is a download problem,
         not a start problem — the UI must say so, not just show red."""
         import glob as _glob
-        cat = load_catalog()["models"]
-        chat_m = next((m for m in cat if m["role"] == "chat"), None)
-        emb_m = next((m for m in cat if m["role"] == "embed"), None)
+        chat_m = default_model("chat")
+        emb_m = default_model("embed")
         def _log_tail(port):
             try:
                 with open(os.path.join(data_dir(), f"server-{port}.log"), encoding="utf-8", errors="ignore") as f:
@@ -651,6 +742,181 @@ class Handler(BaseHTTPRequestHandler):
             "chat_log": _log_tail(chat_port()), "embed_log": _log_tail(embed_port()),
         })
 
+    # ---- research agent ------------------------------------------------
+    # The node research agent (hub/research.py): tasks + heartbeat +
+    # lynx-like fetching + local-compile + human promotion gate.
+    # Slow work (ticks, single runs, benchmarks) runs in daemon
+    # threads and returns immediately; the tab polls for results.
+
+    def _research_status(self):
+        from . import research
+        st = research.status(data_dir())
+        with _bench_lock:
+            st["bench_running"] = _bench_running
+        self._send_json(st)
+
+    def _research_tasks(self):
+        from . import research
+        store = research.Store(data_dir())
+        self._send_json({"tasks": store.list_tasks(),
+                         "proposals_pending": store.pending_proposal_count()})
+
+    def _research_task_detail(self, tid):
+        from . import research
+        try:
+            tid = int(tid)
+        except (TypeError, ValueError):
+            self._send_json({"error": "bad task id"}, status=400)
+            return
+        store = research.Store(data_dir())
+        task = store.get_task(tid)
+        if not task:
+            self._send_json({"error": "unknown task"}, status=404)
+            return
+        self._send_json({"task": task,
+                         "proposals": store.list_proposals(task_id=tid)})
+
+    def _research_create(self, body):
+        from . import research
+        topic = ((body or {}).get("topic") or "").strip()
+        urls = (body or {}).get("urls") or []
+        if isinstance(urls, str):
+            urls = [u.strip() for u in urls.splitlines() if u.strip()]
+        if not topic:
+            self._send_json({"error": "topic required"}, status=400)
+            return
+        store = research.Store(data_dir())
+        tid = store.add_task("research", topic, topic, urls)
+        self._send_json({"id": tid})
+
+    def _research_tick(self, body):
+        from . import research
+        try:
+            ident_hash = self._ident().hash
+        except Exception:
+            ident_hash = None
+        cloud = research.resolve_cloud(body or {})
+        dd = data_dir()
+
+        def run():
+            try:
+                research.tick(dd, ident_hash, cloud=cloud)
+            except Exception:
+                pass
+        threading.Thread(target=run, daemon=True).start()
+        self._send_json({"started": True})
+
+    def _research_run(self, tid, body):
+        from . import research
+        try:
+            tid = int(tid)
+        except (TypeError, ValueError):
+            self._send_json({"error": "bad task id"}, status=400)
+            return
+        try:
+            ident_hash = self._ident().hash
+        except Exception:
+            ident_hash = None
+        cloud = research.resolve_cloud(body or {})
+        dd = data_dir()
+
+        def run():
+            try:
+                research.run_task(dd, ident_hash, tid, cloud=cloud)
+            except Exception:
+                pass
+        threading.Thread(target=run, daemon=True).start()
+        self._send_json({"started": True, "id": tid})
+
+    def _research_worker(self, body):
+        from . import research
+        enabled = bool((body or {}).get("enabled", True))
+        store = research.Store(data_dir())
+        store.set_meta("worker_enabled", "1" if enabled else "0")
+        self._send_json({"worker_enabled": enabled})
+
+    def _research_compile(self, parsed):
+        from . import research
+        qs = parse_qs(parsed.query)
+        topic = (qs.get("topic", [""])[0] or "").strip()
+        if not topic:
+            self._send_json({"error": "topic required"}, status=400)
+            return
+        try:
+            ident_hash = self._ident().hash
+        except Exception:
+            ident_hash = None
+        self._send_json({"topic": topic,
+                         **research.compile_local(data_dir(), ident_hash,
+                                                  topic)})
+
+    def _research_proposal(self, pid, action):
+        from . import research
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            self._send_json({"error": "bad proposal id"}, status=400)
+            return
+        try:
+            ident_hash = self._ident().hash
+        except Exception:
+            ident_hash = None
+        if action == "approve":
+            out = research.approve_proposal(data_dir(), ident_hash, pid)
+        else:
+            out = research.reject_proposal(data_dir(), pid)
+        if "error" in out:
+            self._send_json(out, status=400)
+            return
+        self._send_json(out)
+
+    def _research_benchmark(self, body):
+        global _bench_running
+        from . import research
+        try:
+            ident_hash = self._ident().hash
+        except Exception:
+            ident_hash = None
+        try:
+            max_q = int((body or {}).get("max_questions", 25))
+        except (TypeError, ValueError):
+            max_q = 25
+        max_q = max(1, min(158, max_q))
+        with _bench_lock:
+            if _bench_running:
+                self._send_json({"started": False,
+                                 "reason": "benchmark already running"})
+                return
+            _bench_running = True
+        dd = data_dir()
+
+        def run():
+            global _bench_running
+            try:
+                research.run_benchmark(dd, ident_hash, max_questions=max_q)
+            except Exception:
+                pass
+            finally:
+                with _bench_lock:
+                    _bench_running = False
+        threading.Thread(target=run, daemon=True).start()
+        self._send_json({"started": True, "max_questions": max_q})
+
+    def _research_bench(self):
+        from . import research
+        store = research.Store(data_dir())
+        with _bench_lock:
+            running = _bench_running
+        self._send_json({"running": running, "last": store.last_bench()})
+
+    def _research_bench_misses(self):
+        from . import research
+        out = research.research_misses(data_dir())
+        if "error" in out:
+            self._send_json(out, status=400)
+            return
+        self._send_json(out)
+
     def _servers_restart(self, body):
         """Restart chat and/or embed servers from the UI. Runs in a
         background thread (server startup takes 30–90s) and returns
@@ -659,9 +925,8 @@ class Handler(BaseHTTPRequestHandler):
         embed_gpu = bool((body or {}).get("embed_gpu", False))
         def run():
             try:
-                cat = load_catalog()["models"]
-                chat_m = next((m for m in cat if m["role"] == "chat"), None)
-                emb_m = next((m for m in cat if m["role"] == "embed"), None)
+                chat_m = default_model("chat")
+                emb_m = default_model("embed")
                 chat_path = os.path.join(models_dir(), chat_m["file"]) if chat_m else ""
                 emb_path = os.path.join(models_dir(), emb_m["file"]) if emb_m else ""
                 if target in ("chat", "both") and chat_path and os.path.exists(chat_path):
@@ -693,6 +958,7 @@ class Handler(BaseHTTPRequestHandler):
             "chat_port": chat_port(), "embed_port": embed_port(), "web_port": WEB_PORT,
             "memories": memory.count(conn, ident.hash),
             "models": models,
+            "orcarouter_env": bool(os.environ.get("ORCAROUTER_API_KEY")),
             "openrouter_env": bool(os.environ.get("OPENROUTER_API_KEY")),
             "nvidia_env": bool(os.environ.get("NVIDIA_API_KEY")),
         })
@@ -725,11 +991,14 @@ class Handler(BaseHTTPRequestHandler):
         return "local uncensored"
 
     def _ceti_chat(self, body):
-        """POST /api/ceti/chat — CETI ladder answer (test layer).
+        """POST /api/ceti/chat — CETI ladder answer.
 
         {query} -> {tier, answer, evidence, cloud_suggested,
-        memories?}. Read-only except the local-model call: no memory
-        writes, no brain writes, no cloud calls ever.
+        memories?}. A CETI session answer is recorded in vector memory
+        (like regular chat) and ledgered, unless the caller passes
+        record=False — the Debug console's ad-hoc ask does, so the
+        tester never contaminates the tier it tests. No brain writes,
+        no cloud calls ever.
         """
         query = (body.get("query") or "").strip()
         if not query:
@@ -745,6 +1014,13 @@ class Handler(BaseHTTPRequestHandler):
                 ceti_chat.record_miss(data_dir(), query)
             except Exception:
                 pass
+        if body.get("record", True):
+            try:
+                result["memory_recorded"] = ceti_chat.record_answer_memory(
+                    data_dir(), ident_hash, query,
+                    result.get("answer", ""), result.get("tier", ""))
+            except Exception:
+                result["memory_recorded"] = False
         # Every CETI answer lands in the regula ledger as its own signed
         # event (kind ceti.answer, sha of the answer text, tier in the
         # detail). A ledger failure must never lose the answer itself.
@@ -919,6 +1195,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Legacy files predate the type field; normalize on output
                 # (files themselves are untouched until their next save).
                 rec["type"] = self._canon_session_type(rec.get("type"))
+                rec["archived"] = bool(rec.get("archived", False))
                 out.append(rec)
         self._send_json({"sessions": out})
 
@@ -939,8 +1216,21 @@ class Handler(BaseHTTPRequestHandler):
         if stype == "SSH":
             # Terminal bytes are never saved into a workspace record.
             messages = []
+        # Archiving is sticky: a re-save preserves the stored flag
+        # unless the caller sets it explicitly, so editing an archived
+        # session cannot silently unarchive it.
+        if "archived" in body and body.get("archived") is not None:
+            archived = bool(body.get("archived"))
+        else:
+            archived = False
+            try:
+                with open(pth, encoding="utf-8") as f:
+                    archived = bool(json.load(f).get("archived", False))
+            except Exception:
+                pass
         data = {"id": sid, "title": body.get("title", sid),
                 "messages": messages, "type": stype,
+                "archived": archived,
                 "saved_at": time.strftime("%Y-%m-%d %H:%M")}
         if body.get("ssh_host") is not None:
             data["ssh_host"] = body.get("ssh_host")
@@ -948,6 +1238,24 @@ class Handler(BaseHTTPRequestHandler):
             json.dump(data, f, indent=2)
         self._send_json({"ok": True, "id": sid,
                          "ledger": self._ledger_record("session", pth, stype)})
+
+    def _session_archive(self, sid, archived):
+        """POST /api/sessions/<id>/archive|unarchive — ChatGPT-style:
+        archived sessions leave the list but stay on disk until
+        unarchived or deleted."""
+        try:
+            rec = _set_session_archived(sid, archived)
+        except ValueError:
+            self._send_json({"error": "invalid session id"}, status=400)
+            return
+        except OSError:
+            self._send_json({"error": "session not found"}, status=404)
+            return
+        except Exception:
+            self._send_json({"error": "session unreadable"}, status=400)
+            return
+        self._send_json({"ok": True, "id": sid,
+                         "archived": bool(rec.get("archived"))})
 
     # ---- local SSH terminal (operator-only) -------------------------
     # The Hub binds to loopback and these handlers are the only
@@ -1682,8 +1990,8 @@ class Handler(BaseHTTPRequestHandler):
     def _cloud_models(self, parsed):
         qs = parse_qs(parsed.query)
         provider = qs.get("provider", ["openrouter"])[0]
-        if provider not in ("openrouter", "nvidia"):
-            self._send_json({"error": "provider must be openrouter or nvidia"}, status=400)
+        if provider not in ("orcarouter", "openrouter", "nvidia"):
+            self._send_json({"error": "provider must be orcarouter, openrouter or nvidia"}, status=400)
             return
         from .cloud import list_models, PROVIDERS
         api_key = self.headers.get("X-API-Key", "")
@@ -1827,6 +2135,8 @@ class Handler(BaseHTTPRequestHandler):
             "gpu": gpu, "ram": ram, "cpu_pct": cpu_pct,
             "disk_free_gb": round(free / 1073741824, 1),
             "chat_up": _health(chat_port()), "embed_up": _health(embed_port()),
+            "chat_model": (default_model("chat") or {}).get("name"),
+            "embed_model": (default_model("embed") or {}).get("name"),
             "vector_memories": memory.count(conn, ident.hash),
             "samples": sample_counts(ident),
             "identity": ident.fingerprint,
@@ -1863,8 +2173,8 @@ class Handler(BaseHTTPRequestHandler):
     def _cloud_test(self, body):
         import time as _time
         provider = body.get("provider", "openrouter")
-        if provider not in ("openrouter", "nvidia"):
-            self._send_json({"ok": False, "error": "provider must be openrouter or nvidia"}, status=400)
+        if provider not in ("orcarouter", "openrouter", "nvidia"):
+            self._send_json({"ok": False, "error": "provider must be orcarouter, openrouter or nvidia"}, status=400)
             return
         from .cloud import key_for, chat_cloud
         api_key = key_for(provider, body.get("api_key", ""))
@@ -2075,8 +2385,8 @@ class Handler(BaseHTTPRequestHandler):
                                                    size=m.get("size"), sha256=m.get("sha256"))
                     _log(f"{m['id']} ready via {method}")
                 _log("starting chat + embedding servers ...")
-                chat_m = next(m for m in cat if m["role"] == "chat")
-                emb_m = next(m for m in cat if m["role"] == "embed")
+                chat_m = default_model("chat")
+                emb_m = default_model("embed")
                 chat_ok, emb_ok = ensure_servers(
                     os.path.join(_mdir(), chat_m["file"]),
                     os.path.join(_mdir(), emb_m["file"]),
@@ -2096,6 +2406,16 @@ def run_web(port=None, host="127.0.0.1"):
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"web UI: http://{host}:{port}")
     print("localhost only by default. In WSL, open that URL in your Windows browser.")
+    # Research agent heartbeat: a daemon thread ticking every 60s.
+    # Tasks persist in <data>/research.db, so a rebooted server simply
+    # resumes pending work; the tab shows the last tick, so a dead
+    # heartbeat reads as stale, never as healthy.
+    try:
+        from .research import worker_loop
+        threading.Thread(target=lambda: worker_loop(data_dir()),
+                         daemon=True).start()
+    except Exception:
+        pass
     try:
         server.serve_forever()
     except KeyboardInterrupt:
