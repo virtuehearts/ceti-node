@@ -884,7 +884,10 @@ button.chan .label{color:var(--dim)}
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
               <button type="button" onclick="showTab('settings')">API keys &amp; test →</button>
               <button type="button" onclick="showTab('chat')">Back to Chat →</button>
+              <button type="button" onclick="showTab('models')">⬇ Model hub →</button>
             </div>
+            <p class="small" id="sysLocalOut"></p>
+            <p class="small">Drop your preferred model (.gguf) into the <code>models/</code> folder, then refresh this list — it appears above. Downloads from the model hub land there too.</p>
           </div>
         </div>
         <div class="panel-head"><span>Log — last lines</span><span class="val" id="log-count">0</span></div>
@@ -948,7 +951,7 @@ button.chan .label{color:var(--dim)}
         <div class="panel-head"><span>System detail</span></div>
         <div id="systemOut" style="padding:10px 12px;font-size:12px;color:var(--dim)"></div>
       </div>
-      <button type="button" onclick="loadSystem()">Refresh now</button>
+      <button type="button" onclick="loadSystem();loadSysModels()">Refresh now</button>
     </div>
   </div>
 </section>
@@ -1281,7 +1284,7 @@ button.chan .label{color:var(--dim)}
 <!-- ===== Models view ===== -->
 <div id="view-models" class="tabview" hidden><div class="panel">
 <h2>Models — Hugging Face</h2>
-<p class="small">Browse a collection or a single repo and download GGUF files into <code>models/</code>. Downloading a model does <b>not</b> switch the active chat model — pick it in Chat after it lands.</p>
+<p class="small">Browse a collection or a single repo and download GGUF files into <code>models/</code>. Downloading a model does <b>not</b> switch the active chat model — pick it in System → Models &amp; cloud API, with the Local provider, after it lands.</p>
 <label>Collection slug</label><input id="hfCollection" value="chwoo/uncensored-models" placeholder="owner/collection">
 <label>Repo id (optional — overrides the collection above)</label><input id="hfRepo" placeholder="owner/repo">
 <label>HF token (optional — only for gated/private repos)</label><input id="hfToken" type="password" placeholder="hf_…">
@@ -2332,16 +2335,32 @@ function renderCetiNodes(container, memories, headText){
 }
 function brainRow(k,v){ return '<div class="row"><span>'+escHtml(k)+'</span><b>'+escHtml(v)+'</b></div>'; }
 let _consoleModules=[];
-function loadSysModels(){
+async function loadSysLocalModels(){
+  const sm=$('sysCloudModel'); if(!sm) return;
+  try{
+    const r=await fetch('/api/local-models'); const j=await r.json();
+    sm.innerHTML='';
+    (j.models||[]).forEach(function(m){
+      const o=document.createElement('option'); o.value=m.file;
+      o.textContent=m.name + (m.active ? '  ● loaded' : '') + (m.size ? ' (' + fmtBytes(m.size) + ')' : '');
+      sm.appendChild(o);
+    });
+    if(j.active_file){ sm.value=j.active_file; localStorage.setItem('local_chat_file', j.active_file); }
+  }catch(e){}
+}
+async function loadSysModels(){
   const sp=$('sysProvider'); if(!sp) return;
   sp.value = provider;
   const sm=$('sysCloudModel');
-  const cm=$('cloudModel');
-  sm.innerHTML='';
-  Array.from(cm.options).forEach(function(o){
-    const n=document.createElement('option'); n.value=o.value; n.textContent=o.textContent; sm.appendChild(n);
-  });
-  sm.value = cm.value;
+  if(provider==='local'){ await loadSysLocalModels(); }
+  else {
+    const cm=$('cloudModel');
+    sm.innerHTML='';
+    Array.from(cm.options).forEach(function(o){
+      const n=document.createElement('option'); n.value=o.value; n.textContent=o.textContent; sm.appendChild(n);
+    });
+    sm.value = cm.value;
+  }
   $('sysKeyOrca').textContent = localStorage.getItem('orca_key') ? 'SET' : 'NOT SET';
   $('sysKeyOR').textContent = localStorage.getItem('or_key') ? 'SET' : 'NOT SET';
   $('sysKeyNV').textContent = localStorage.getItem('nv_key') ? 'SET' : 'NOT SET';
@@ -2351,7 +2370,7 @@ async function sysProviderChange(){
   $('provider').value = v;
   onProvider();
   const sm=$('sysCloudModel');
-  if(v==='local'){ sm.innerHTML=''; return; }
+  if(v==='local'){ await loadSysLocalModels(); return; }
   const key = v==='openrouter' ? localStorage.getItem('or_key')||'' : v==='orcarouter' ? localStorage.getItem('orca_key')||'' : localStorage.getItem('nv_key')||'';
   try{
     const r=await fetch('/api/cloud/models?provider='+v,{headers:{'X-API-Key':key}});
@@ -2369,7 +2388,22 @@ async function sysProviderChange(){
     sm.value = cm.value;
   }catch(e){}
 }
-function sysModelChange(){
+async function sysModelChange(){
+  if(($('sysProvider')||{}).value==='local' || provider==='local'){
+    const file=$('sysCloudModel').value; if(!file) return;
+    if(!confirm('Load ' + file + ' as the local chat model? The chat server will restart (30–90s).')){ loadSysLocalModels(); return; }
+    const out=$('sysLocalOut'); if(out) out.textContent='Loading ' + file + ' — chat server restarting…';
+    try{
+      const r=await fetch('/api/local-models/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:file})});
+      const j=await r.json();
+      if(j.error){ if(out) out.textContent='Failed: '+j.error; loadSysLocalModels(); return; }
+      localStorage.setItem('local_chat_file', j.file);
+      if(out) out.textContent='Chat server restarting with ' + j.file + ' — watch Servers above, then Refresh.';
+      loadSysLocalModels();
+      setTimeout(function(){ loadServers(); loadSystem(); }, 5000);
+    }catch(e){ if(out) out.textContent='Failed: '+e.message; }
+    return;
+  }
   const cm=$('cloudModel');
   const v=$('sysCloudModel').value;
   let found=false;
@@ -2666,7 +2700,7 @@ async function askFactConsole(){
   }catch(e){ el.textContent='Lookup failed.'; }
 }
 async function doSend(text, isRegen){
-  const model = provider==='local' ? 'local uncensored' : $('cloudModel').value;
+  const model = provider==='local' ? (localStorage.getItem('local_chat_file') || 'local uncensored') : $('cloudModel').value;
   if(!isRegen){ messages.push({role:'user',content:text,ts:Date.now()}); addMsg('user',text,undefined,{ts:Date.now()}); }
   // Peer endpoint: a selected peer backend routes this message as a
   // mailbox text job instead of a local/cloud generation.
@@ -2917,7 +2951,8 @@ async function loadSystem(){
     '<div class="kv">' +
     '<div class="row"><span>CPU</span><b>' + j.cpu_pct + '%</b></div>' +
     '<div class="row"><span>DISK FREE</span><b>' + j.disk_free_gb + ' GB</b></div>' +
-    '<div class="row"><span>CHAT MODEL</span><b>' + escHtml(j.chat_model || 'none configured') + ' · ' + (j.chat_up ? 'UP' : 'DOWN') + '</b></div>' +
+    '<div class="row"><span>RAM AVAILABLE</span><b>' + (j.ram.total_mb ? ((j.ram.free_mb/1024).toFixed(1) + ' GB free of ' + (j.ram.total_mb/1024).toFixed(1) + ' GB') : 'unknown') + '</b></div>' +
+    '<div class="row"><span>CHAT MODEL</span><b>' + escHtml(j.chat_model || 'none configured') + (j.chat_model_overridden ? ' (custom)' : '') + ' · ' + (j.chat_up ? 'UP' : 'DOWN') + '</b></div>' +
     '<div class="row"><span>EMBED MODEL</span><b>' + escHtml(j.embed_model || 'none configured') + ' · ' + (j.embed_up ? 'UP' : 'DOWN') + '</b></div>' +
     '<div class="row"><span>VECTOR MEMORY</span><b>' + j.vector_memories + ' entries</b></div>' +
     '<div class="row"><span>SAMPLES IN USE</span><b>' + (Object.entries(j.samples||{}).map(function(kv){ return kv[0] + ' (' + kv[1] + ' chunks)'; }).join(', ') || 'none ingested yet') + '</b></div>' +

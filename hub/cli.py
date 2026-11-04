@@ -3,7 +3,7 @@ import argparse
 import os
 import sys
 
-from .config import data_dir, models_dir, load_catalog, chat_port, embed_port
+from .config import data_dir, models_dir, load_catalog, chat_port, embed_port, effective_chat_model
 from .identity import ensure_identity
 from .llama import doctor
 from .download import download_hf
@@ -56,7 +56,8 @@ def cmd_serve(args):
     ident, _ = ensure_identity(data_dir())
     print(f"identity: {ident.fingerprint}")
     cat = _catalog_map()
-    chat_m = cat.get("ministral-uncensored")
+    chat_eff = effective_chat_model()
+    chat_m = chat_eff if chat_eff else cat.get("ministral-uncensored")
     embed_m = cat.get("embeddinggemma")
     chat_path = _model_path(chat_m) if chat_m else None
     embed_path = _model_path(embed_m) if embed_m else None

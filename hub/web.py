@@ -122,7 +122,7 @@ def _read_build():
 BUILD = _read_build()
 from . import regula
 from . import sshterm
-from .config import chat_port, embed_port, data_dir, models_dir, load_catalog, default_model
+from .config import chat_port, embed_port, data_dir, models_dir, load_catalog, default_model, effective_chat_model, select_local_model
 from .identity import ensure_identity
 from .package import create_package, verify_package
 from .servers import _health, stream_chat, stream_chat_events, chat_complete, embed_text, ensure_servers, _stop, _pid_path, poller_running, poller_start, poller_stop, poller_log_tail
@@ -212,6 +212,90 @@ def _set_session_archived(sid: str, archived: bool) -> dict:
 
 def _delete_session_file(sid: str) -> None:
     os.remove(_session_file(sid))
+
+
+def system_ram():
+    """RAM in MB: total/used/free(available). /proc first (Linux),
+    then Windows GlobalMemoryStatusEx via ctypes (stdlib, no psutil
+    needed — the laptop path, where /proc does not exist and psutil
+    may not be installed), then psutil. All zeros when unknown."""
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as f:
+            mem = {}
+            for line in f:
+                k, v = line.split(":", 1)
+                mem[k.strip()] = int(v.strip().split()[0])  # kB
+        avail = mem.get("MemAvailable", mem.get("MemFree", 0))
+        return {"total_mb": mem.get("MemTotal", 0) // 1024,
+                "free_mb": avail // 1024,
+                "used_mb": (mem.get("MemTotal", 0) - avail) // 1024}
+    except Exception:
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes
+            class _MemStatus(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong),
+                            ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong),
+                            ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong),
+                            ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong),
+                            ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            st = _MemStatus()
+            st.dwLength = ctypes.sizeof(_MemStatus)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+                total = st.ullTotalPhys // 1048576
+                free = st.ullAvailPhys // 1048576
+                return {"total_mb": total, "free_mb": free,
+                        "used_mb": total - free}
+        except Exception:
+            pass
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        return {"total_mb": vm.total // 1048576,
+                "used_mb": vm.used // 1048576,
+                "free_mb": vm.available // 1048576}
+    except Exception:
+        return {"total_mb": 0, "used_mb": 0, "free_mb": 0}
+
+
+def _local_models_payload():
+    """GGUFs the operator can pick as the local chat model: catalog
+    chat entries first, then on-disk files the catalog doesn't know
+    (dropped into models/ by hand or downloaded from the hub). The
+    active entry is the effective model, not just the default."""
+    from .config import effective_chat_model, load_catalog
+    from . import hfmodels
+    eff = effective_chat_model()
+    active = (eff or {}).get("file")
+    by_file = {}
+    for m in load_catalog()["models"]:
+        if m.get("role") != "chat":
+            continue
+        f = m.get("file")
+        if not f:
+            continue
+        by_file[f] = {"file": f, "name": m.get("name") or f,
+                      "size": m.get("size") or 0,
+                      "quant": hfmodels.parse_quant(f),
+                      "source": "catalog"}
+    for d in hfmodels.local_models():
+        name = d["name"]
+        if name in by_file:
+            by_file[name]["size"] = d["size"]
+            by_file[name]["source"] = "catalog+disk"
+        else:
+            by_file[name] = {"file": name, "name": name, "size": d["size"],
+                             "quant": d.get("quant"), "source": "disk"}
+    models = [dict(v, active=(k == active)) for k, v in by_file.items()]
+    return {"models": models,
+            "active_file": active,
+            "active_name": (eff or {}).get("name"),
+            "overridden": bool(eff and eff.get("overridden"))}
 
 
 # Local SSH terminal managers, one per data dir (HUB_DATA_DIR can
@@ -343,6 +427,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/system":
             self._system()
+            return
+        if path == "/api/local-models":
+            self._send_json(_local_models_payload())
             return
         if path == "/api/brain":
             self._send_json(brain.summary())
@@ -509,6 +596,9 @@ class Handler(BaseHTTPRequestHandler):
         body = self._read_json()
         if path == "/api/servers/restart":
             self._servers_restart(body)
+            return
+        if path == "/api/local-models/select":
+            self._local_model_select(body)
             return
         if path == "/api/chat":
             self._chat(body)
@@ -724,7 +814,7 @@ class Handler(BaseHTTPRequestHandler):
         Embed 'down' with a missing model file is a download problem,
         not a start problem — the UI must say so, not just show red."""
         import glob as _glob
-        chat_m = default_model("chat")
+        chat_m = effective_chat_model()
         emb_m = default_model("embed")
         def _log_tail(port):
             try:
@@ -917,6 +1007,36 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_json(out)
 
+    def _local_model_select(self, body):
+        """POST /api/local-models/select {file} — set the local chat
+        model, then restart the chat server in the background so the
+        choice takes effect. The UI polls /api/servers/status until
+        up. Selecting the catalog default clears the override."""
+        name = (body or {}).get("file") or ""
+        try:
+            eff = select_local_model(name)
+        except ValueError:
+            self._send_json({"error": "not a plain .gguf filename"}, status=400)
+            return
+        except FileNotFoundError:
+            self._send_json({"error": "no such GGUF in models/"}, status=404)
+            return
+        def run():
+            try:
+                _stop(chat_port())
+                import time as _t; _t.sleep(1)
+                emb = default_model("embed")
+                emb_path = os.path.join(models_dir(), emb["file"]) if emb else ""
+                ensure_servers(os.path.join(models_dir(), eff["file"]),
+                               emb_path, gpu=True, ctx=32768)
+            except Exception as e:
+                _log(f"local model restart failed: {e}")
+        threading.Thread(target=run, daemon=True).start()
+        self._send_json({"ok": True, "file": eff["file"],
+                         "name": eff.get("name"),
+                         "overridden": bool(eff.get("overridden")),
+                         "note": "restarting chat server — poll /api/servers/status"})
+
     def _servers_restart(self, body):
         """Restart chat and/or embed servers from the UI. Runs in a
         background thread (server startup takes 30–90s) and returns
@@ -925,7 +1045,7 @@ class Handler(BaseHTTPRequestHandler):
         embed_gpu = bool((body or {}).get("embed_gpu", False))
         def run():
             try:
-                chat_m = default_model("chat")
+                chat_m = effective_chat_model()
                 emb_m = default_model("embed")
                 chat_path = os.path.join(models_dir(), chat_m["file"]) if chat_m else ""
                 emb_path = os.path.join(models_dir(), emb_m["file"]) if emb_m else ""
@@ -2069,7 +2189,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _system(self):
         import shutil
-        # GPU via nvidia-smi, RAM via /proc/meminfo or psutil, CPU via loadavg/psutil
+        # GPU via nvidia-smi, RAM via /proc/meminfo, Windows
+        # GlobalMemoryStatusEx, or psutil — in that order.
         gpu = {"present": False, "name": "", "used_mb": 0, "total_mb": 0, "util_pct": 0}
         try:
             import subprocess as _sp
@@ -2081,23 +2202,7 @@ class Handler(BaseHTTPRequestHandler):
                        "total_mb": int(float(parts[2])), "util_pct": int(float(parts[3]))}
         except Exception:
             pass
-        ram = {"total_mb": 0, "used_mb": 0, "free_mb": 0}
-        try:
-            with open("/proc/meminfo", encoding="utf-8") as f:
-                mem = {}
-                for line in f:
-                    k, v = line.split(":", 1)
-                    mem[k.strip()] = int(v.strip().split()[0])  # kB
-            ram = {"total_mb": mem.get("MemTotal", 0) // 1024,
-                   "free_mb": mem.get("MemAvailable", mem.get("MemFree", 0)) // 1024,
-                   "used_mb": (mem.get("MemTotal", 0) - mem.get("MemAvailable", mem.get("MemFree", 0))) // 1024}
-        except Exception:
-            try:
-                import psutil
-                vm = psutil.virtual_memory()
-                ram = {"total_mb": vm.total // 1048576, "used_mb": vm.used // 1048576, "free_mb": vm.available // 1048576}
-            except Exception:
-                pass
+        ram = system_ram()
         cpu_pct = 0
         try:
             import psutil
@@ -2119,6 +2224,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
         total, _used, free = shutil.disk_usage(data_dir())
+        eff_chat = effective_chat_model()
         ident = self._ident()
         conn = memory.connect(data_dir())
         # Live ledger + regula status for the System tab. These replace
@@ -2135,7 +2241,8 @@ class Handler(BaseHTTPRequestHandler):
             "gpu": gpu, "ram": ram, "cpu_pct": cpu_pct,
             "disk_free_gb": round(free / 1073741824, 1),
             "chat_up": _health(chat_port()), "embed_up": _health(embed_port()),
-            "chat_model": (default_model("chat") or {}).get("name"),
+            "chat_model": (eff_chat or {}).get("name"),
+            "chat_model_overridden": bool(eff_chat and eff_chat.get("overridden")),
             "embed_model": (default_model("embed") or {}).get("name"),
             "vector_memories": memory.count(conn, ident.hash),
             "samples": sample_counts(ident),
