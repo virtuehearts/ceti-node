@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHO DEVELOPED LEGEND OF RED DRAGON</pattern>
+<template>Robinson Technologies, maintained by Michael Preslar.</template>
+</category>
+<category>
+<pattern>WHEN WAS LEGEND OF RED DRAGON RELEASED</pattern>
+<template>1989</template>
+</category>
+<category>
+<pattern>WHAT PLATFORMS DID LEGEND OF RED DRAGON RUN ON</pattern>
+<template>MS-DOS, Windows, OS/2</template>
+</category>
+<category>
+<pattern>WHAT IS GAME S GAMEPLAY</pattern>
+<template>Players advance skills through combat and random events to defeat the Red Dragon; character classes include Death Knight, Mystical, and Thieving Skills.</template>
+</category>
+<category>
+<pattern>WHAT ARE SOME NOTABLE PORTS AND SEQUELS OF LEGEND OF RED DRAGON</pattern>
+<template>Lord II (1992), Tournament LORD (spin-off), WT-LORD (1998)</template>
+</category>
+<category>
+<pattern>WHAT IS LEGAL STATUS OF LEGEND OF RED DRAGON</pattern>
+<template>Acquired by Metropolis Gameport in 2001; considered abandonware/greyware with no further updates since v4.07 (2006)</template>
+</category>
+<category>
+<pattern>WHAT IS RELATIONSHIP BETWEEN LEGEND OF RED DRAGON AND LEGEND OF GREEN DRAGON</pattern>
+<template>Legend of the Green Dragon is a separate web-based variation not authorized by the original creators</template>
+</category>
+<category>
+<pattern>WHAT SEXUAL MECHANICS DOES LEGEND OF RED DRAGON INCLUDE</pattern>
+<template>Game includes flirtation, potential STD transmission, and pregnancy outcomes</template>
+</category>
+</aiml>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WAS GLOBAL BBS NETWORK CALLED</pattern>
+<template>FidoNet</template>
+</category>
+<category>
+<pattern>WHEN DID FIDONET START OPERATING</pattern>
+<template>1984</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK NUMBER OF FIDONET NODES</pattern>
+<template>Over 40,000</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK NUMBER OF FIDONET POINTS</pattern>
+<template>Over 120,000</template>
+</category>
+<category>
+<pattern>WHAT WAS DECLINE TRAJECTORY OF FIDONET S NODELIST</pattern>
+<template>The nodelist declined to ~2,500 nodes, but the text notes this decline has levelled out at that number, indicating stabilization rather than continued contraction.</template>
+</category>
+<category>
+<pattern>WHAT WAS DECLINE TRAJECTORY OF FIDONET S POINTLIST</pattern>
+<template>The pointlist contained over 120,000 points at its peak, but the text notes this decline has levelled out at that number, indicating stabilization rather than continued contraction.</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK NUMBER OF FIDONET COORDINATORS</pattern>
+<template>The text mentions that coordinators were at each level managing administration, but does not provide a specific number.</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK NUMBER OF FIDONET NODES PER REGION</pattern>
+<template>The text mentions that the network grew from 100 nodes in 1984 to over 40,000 by 1993, with a peak of approximately 39,000 systems.</template>
+</category>
+</aiml>

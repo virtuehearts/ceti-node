@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT WAS NAME OF COMMODORE VIC 20</pattern>
+<template>The Commodore VIC-20 was named after the VIC (Video Interface Chip), the video chip that gave it colour graphics.</template>
+</category>
+<category>
+<pattern>WHEN WAS COMMODORE VIC 20 INTRODUCED</pattern>
+<template>The Commodore VIC-20 was introduced in September 1980.</template>
+</category>
+<category>
+<pattern>WHAT WAS FIRST COMPUTER TO SELL OVER ONE MILLION UNITS</pattern>
+<template>The Commodore VIC-20 was the first computer to sell over one million units.</template>
+</category>
+<category>
+<pattern>WHAT WAS TOTAL NUMBER OF VIC 20 UNITS SOLD BEFORE BEING DISCONTINUED</pattern>
+<template>The total number of VIC-20 units sold before being discontinued was 2.5 million.</template>
+</category>
+<category>
+<pattern>WHAT WAS PRICE OF COMMODORE VIC 20</pattern>
+<template>The price of the Commodore VIC-20 was US$299.95.</template>
+</category>
+<category>
+<pattern>WHAT WAS CPU OF COMMODORE VIC 20</pattern>
+<template>The CPU of the Commodore VIC-20 was the MOS Technology 6502.</template>
+</category>
+<category>
+<pattern>WHAT WAS SYSTEM ROM OF COMMODORE VIC 20</pattern>
+<template>The system ROM of the Commodore VIC-20 was 20 KB.</template>
+</category>
+<category>
+<pattern>WHAT WAS RAM OF COMMODORE VIC 20</pattern>
+<template>The RAM of the Commodore VIC-20 was 5 KB.</template>
+</category>
+</aiml>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT IS 2600 HACKER QUARTERLY</pattern>
+<template>2600: The Hacker Quarterly is an American seasonal publication dedicated to technical information and articles, many contributed by the readership.</template>
+</category>
+<category>
+<pattern>WHO IS PUBLISHER OF 2600 HACKER QUARTERLY</pattern>
+<template>Emmanuel Goldstein was the publisher of 2600: The Hacker Quarterly and was a former assistant attorney general of Arizona.</template>
+</category>
+<category>
+<pattern>WHAT IS RELATIONSHIP BETWEEN 2600 HACKER QUARTERLY AND ELECTRONIC FRONTIER FOUNDATION EFF</pattern>
+<template>The publication is linked to the Electronic Frontier Foundation (EFF) and is discussed in the context of hacker subculture events such as Operation Sundevil and the Legion of Doom network.</template>
+</category>
+<category>
+<pattern>WHAT IS TERM 2600 IN RELATION TO 2600 HACKER QUARTERLY</pattern>
+<template>The term '2600' has multiple unrelated meanings (hertz, Atari console, mobile phone, etc.), but the query specifically targets the magazine.</template>
+</category>
+<category>
+<pattern>WHAT IS SIGNIFICANCE OF HACKER CRACKDOWN IN RELATION TO 2600 HACKER QUARTERLY</pattern>
+<template>The Hacker Crackdown (1992) profiles Emmanuel Goldstein as the publisher of 2600: The Hacker Quarterly, confirming his role as the magazine's founder/publisher.</template>
+</category>
+</aiml>

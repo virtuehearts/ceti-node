@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHEN WAS COMMODORE PET RELEASED</pattern>
+<template>The Commodore PET was released in January 1977.</template>
+</category>
+<category>
+<pattern>WHAT WAS CPU OF COMMODORE PET</pattern>
+<template>The Commodore PET featured a MOS Technology 6502 CPU running at 1 MHz.</template>
+</category>
+<category>
+<pattern>WHAT WAS MEMORY CAPACITY OF COMMODORE PET</pattern>
+<template>The Commodore PET 2001 shipped with 4 KB or 8 KB of RAM; later PET models had up to 32 KB.</template>
+</category>
+<category>
+<pattern>WHAT WAS GRAPHICS OF COMMODORE PET</pattern>
+<template>The Commodore PET featured monochrome PETSCII graphics.</template>
+</category>
+<category>
+<pattern>WHAT WAS SUCCESSOR OF COMMODORE PET</pattern>
+<template>The Commodore PET was succeeded by the CBM-II in 1982.</template>
+</category>
+</aiml>

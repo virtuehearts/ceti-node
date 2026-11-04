@@ -1,0 +1,20 @@
+BBS Culture
+
+BBS culture was small and it was personal. A board had a sysop
+you knew by handle, regulars you recognized by their writing,
+and rules that were enforced by the sysop's delete key. There
+were no algorithms. The front page was whatever the sysop put
+there. The new messages were the ones people had left since you
+last called.
+
+FidoNet was the network of boards. CBBS, the first BBS, was
+launched in 1978 by Ward Christensen and Randy Suess in Chicago.
+FidoNet started operating in 1984 and at its peak had over
+40,000 nodes. Messages traveled as echomail, files as file
+echoes, and the whole thing ran on phone calls and trust.
+
+The culture was renegade and it was generous. People shared
+files, wrote doors, ran boards at a loss because the board was
+the point. That is the culture CETI comes from: a BBS of brains,
+signed knowledge passed node to node, your iron, your data,
+your mind.

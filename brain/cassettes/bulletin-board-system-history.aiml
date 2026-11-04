@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHEN WAS COMPUTERIZED BULLETIN BOARD SYSTEM CBBS LAUNCHED</pattern>
+<template>CBBS was launched on February 16, 1978, by Ward Christensen and Randy Suess in Chicago.</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK USAGE OF BULLETIN BOARD SYSTEM</pattern>
+<template>BBS usage peaked around 1994–1996.</template>
+</category>
+<category>
+<pattern>WHAT WAS DECLINE OF BULLETIN BOARD SYSTEM</pattern>
+<template>A rapid market collapse occurred in late 1994 to early 1995 due to internet competition.</template>
+</category>
+<category>
+<pattern>WHAT HAPPENED TO BULLETIN BOARD SYSTEM IN 2000S</pattern>
+<template>By the 2000s, most BBSes transitioned to Internet access via Telnet and SSH.</template>
+</category>
+<category>
+<pattern>WHAT IS SURVIVING SYSTEM OF BULLETIN BOARD SYSTEM</pattern>
+<template>Taiwan's PTT Bulletin Board System remains active as a notable exception to the decline.</template>
+</category>
+<category>
+<pattern>HOW DID HISTORIANS RECONSTRUCT HISTORY OF BULLETIN BOARD SYSTEM</pattern>
+<template>Historians reconstruct BBS history from mixed sources including contemporary magazines, manuals, archived message bases, and sysop recollections.</template>
+</category>
+<category>
+<pattern>WHAT SOURCES WERE USED TO RECONSTRUCT HISTORY OF BULLETIN BOARD SYSTEM</pattern>
+<template>Sources include Wikipedia, Spectrum.ieee.org, Archania.org, and Ethw.org.</template>
+</category>
+<category>
+<pattern>WHAT WAS FIRST BULLETIN BOARD SYSTEM BBS CREATED BY WARD CHRISTENSEN AND RANDY SUESS IN CHICAGO</pattern>
+<template>The first BBS, CBBS, was launched on February 16, 1978 by Ward Christensen and Randy Suess in Chicago.</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK USAGE OF BULLETIN BOARD SYSTEMS BBS IN MID 1990S</pattern>
+<template>BBS usage peaked around 1996, with a local scene in St. Louis peaking in June 1994.</template>
+</category>
+<category>
+<pattern>WHAT WAS DECLINE OF BULLETIN BOARD SYSTEMS BBS AFTER 1995</pattern>
+<template>The market collapsed starting late 1994 to early 1995 due to the introduction of inexpensive dial-up internet and the Mosaic web browser.</template>
+</category>
+<category>
+<pattern>WHAT WAS CURRENT STATE OF TRADITIONAL BULLETIN BOARD SYSTEMS BBS AS OF JUNE 2026</pattern>
+<template>As of June 2026, only 1,046 traditional BBSes are listed in the Telnet BBS Guide, representing a small fraction of the original ecosystem.</template>
+</category>
+<category>
+<pattern>WHAT WAS DECENTRALIZED NATURE OF BULLETIN BOARD SYSTEMS BBS</pattern>
+<template>BBSes were not a single network but a collection of local dial-up services with no central infrastructure.</template>
+</category>
+<category>
+<pattern>WHAT WAS CULTURAL IMPACT OF BULLETIN BOARD SYSTEMS BBS</pattern>
+<template>BBSes are considered a precursor to the modern World Wide Web, social networks, and other Internet services.</template>
+</category>
+</aiml>

@@ -1,0 +1,20 @@
+Calling the First BBSs
+
+The first BBSs were one phone line and one computer. A sysop ran a
+board from a spare room, the modem answered on the second ring, and
+if someone was already on, you got a busy signal and tried again
+later. There was no web. There were boards, and the boards were
+everything.
+
+You called a number, the modem shook hands, and the board answered
+in ASCII: a welcome screen, a menu, message bases, file areas. You
+read what people had left since your last call. You left a message.
+You downloaded a file if the sysop trusted you and the phone bill
+allowed it. Then you hung up and the line was free for the next
+caller.
+
+FidoNet stitched the boards together. Messages hopped from board to
+board overnight, carried by machines calling each other when the
+rates were cheap. That was the network: no backbone, no cloud, just
+modems and sysops who kept the mail moving. darknet.ca started in
+that spirit — a board, a sysop, a line that answered.

@@ -1,0 +1,28 @@
+# brain research topics — one per line.
+# The idle researcher works down this list Wikipedia-style: broad,
+# timeless, encyclopedic. Each finished topic becomes a cassette in
+# data/cassettes/<slug>.aiml. Lines starting with # are ignored.
+# Add topics freely; the researcher skips ones already recorded.
+
+bulletin board system history
+dial-up modems
+ANSI art and the demoscene
+FidoNet
+phone phreaking and blue boxes
+BBS door games
+Usenet
+gopher protocol
+early internet service providers
+textfiles and the underground ezine scene
+Commodore 64
+the WELL and early online communities
+BBS software: Wildcat, TBBS, and PCBoard
+the Morris worm
+Phrack magazine and the hacker ezine
+2600: The Hacker Quarterly
+ANSI art vs ASCII art
+demoscene music and trackers
+BBS door games: TradeWars and Legend of the Red Dragon
+packet radio and amateur digital modes
+the demoscene on Commodore 64 and Amiga
+telnet BBSes in the modern era

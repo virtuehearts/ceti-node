@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT ARE SOME NOTABLE FEATURES OF INTERBBS BLACKJACK DOOR</pattern>
+<template>InterBBS BlackJack supports multi-node operation, packet radio integration, and complaint handling. It is designed for FidoNet DoorGames and related BBS software.</template>
+</category>
+<category>
+<pattern>WHAT IS PURPOSE OF COMPLAINT DEPARTMENT CDEPT22C IN DOOR UTILITIES</pattern>
+<template>The Complaint Department provides user feedback mechanisms for sysops managing multiple doors. It is a crucial feature for maintaining a positive and respectful environment on BBS networks.</template>
+</category>
+<category>
+<pattern>WHAT IS SIGNIFICANCE OF CHECKPOP TCHKPOP1 TOOL IN DOOR UTILITIES</pattern>
+<template>CheckPOP is a tool for checking the status of users and their connections on BBS networks. It is used for monitoring and troubleshooting network issues.</template>
+</category>
+<category>
+<pattern>WHAT IS COPYRIGHT STATUS OF DOOR UTILITIES</pattern>
+<template>Most door utilities are marked as FREEWARE or freeware, with copyrights typically held by [REDACTED_PHONE] software companies.</template>
+</category>
+<category>
+<pattern>WHAT IS TIMELINE OF DOOR UTILITIES</pattern>
+<template>The collection spans nearly a decade, showing evolution from basic text doors to more sophisticated multi-node systems, but some entries appear to be duplicates or variants of the same program.</template>
+</category>
+<category>
+<pattern>WHAT IS PURPOSE OF JPVP103 FILE TRANSFER DOOR</pattern>
+<template>JPVP103 supports file transfer between users, allowing users to share files with each other.</template>
+</category>
+<category>
+<pattern>WHAT IS PURPOSE OF EQUEST FILE FILE TRANSFER DOOR</pattern>
+<template>EQUEST-A-FILE is another file transfer door that supports file transfer between users.</template>
+</category>
+<category>
+<pattern>WHAT IS PURPOSE OF FLREQV22 FILE TRANSFER DOOR</pattern>
+<template>FLREQV22 is a file transfer door that supports file transfer between users.</template>
+</category>
+</aiml>

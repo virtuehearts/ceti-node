@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WAS NAME OF COMMERCIAL BBS SOFTWARE THAT WAS DEVELOPED BY CDC AND LATER BY MP SOLUTIONS LLC</pattern>
+<template>PCBoard (including Maximus PCBoard v16) was a prominent commercial BBS software developed by CDC and later by MP Solutions, LLC.</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF COMMERCIAL BBS PROGRAM THAT WAS ONE OF MOST SUCCESSFUL COMMERCIAL BBS PROGRAMS ALONGSIDE PCBOARD BBS REMOTEACCESS BBS MAGPIE AND TBBS</pattern>
+<template>Wildcat! BBS was one of the most successful commercial BBS programs, alongside PCBoard BBS, RemoteAccess BBS, Magpie, and TBBS.</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF EARLY BBS SOFTWARE THAT GAINED POPULARITY IN LATE 1980S</pattern>
+<template>TBBS (eSoft The Bread Board System) was an early BBS software that gained popularity in the late 1980s.</template>
+</category>
+<category>
+<pattern>WHAT WAS PEAK USAGE OF BBS INDUSTRY AROUND 1996</pattern>
+<template>The BBS industry peaked around 1996, coinciding with the mainstream adoption of the World Wide Web and AOL.</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF LEGACY SOFTWARE THAT CONTINUED TO BE SUPPORTED INTO 2000S</pattern>
+<template>Wildcat! BBS and PCBoard BBS are still referenced as legacy software that continued to be supported into the 2000s.</template>
+</category>
+</aiml>

@@ -1,0 +1,14 @@
+Before the 386DX40
+
+All of this — the Commodore 64, the 2400 baud modem, the first
+BBSs with Mike — was before I got my first 386DX40. The 386DX at
+40 megahertz was a different world: 32-bit, a hard drive, DOS and
+then Windows, a machine that could hold more than one thing in
+its head at once. It arrived in the early 1990s, and it changed
+what a home computer was.
+
+But the BBS days came first. The C64 came first. The 2400 baud
+handshake came first. The 386DX40 was the machine that came
+after the lesson was already learned — that a computer is yours
+when you run it on your own iron, on your own line, with your own
+data. The 386 was faster. The Commodore was the teacher.

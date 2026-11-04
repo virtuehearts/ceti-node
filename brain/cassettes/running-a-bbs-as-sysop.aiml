@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT OPERATING SYSTEMS WERE COMMONLY USED FOR BBSES IN 1980S 1990S</pattern>
+<template>DOS and OS/2 were commonly used for BBSes in the 1980s-1990s.</template>
+</category>
+<category>
+<pattern>WHAT WAS ROLE OF MULTITASKING IN BBSES</pattern>
+<template>Multitasking was often required to run multiple BBS nodes on a single machine.</template>
+</category>
+<category>
+<pattern>WHAT WAS SOURCE CODE AVAILABILITY LIKE FOR BBSES</pattern>
+<template>Source code availability was a major selling point, especially with WWIV which allowed customization and modification.</template>
+</category>
+<category>
+<pattern>WHAT NETWORKING OPTIONS WERE AVAILABLE FOR BBSES</pattern>
+<template>Networking through WWIVnet and FidoNet enabled interconnectivity between BBS systems.</template>
+</category>
+<category>
+<pattern>WHAT WAS DECLINE IN BBS MARKET AFTER RISE OF INTERNET ISPS</pattern>
+<template>The BBS market declined after the rise of Internet/ISPs in the mid-1990s.</template>
+</category>
+</aiml>

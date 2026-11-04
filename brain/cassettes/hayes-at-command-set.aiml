@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT IS HAYES AT COMMAND SET</pattern>
+<template>The Hayes AT command set is a command language used by modem manufacturers to control various aspects of modem operation, such as dialing, hanging up, and modifying connection parameters. It is a variant of the original command set developed by Dale Heatherington and Dennis Hayes in 1981 for the Hayes Smartmodem. The vast majority of dial-up modems use a variant of this command set, which has been refined over time with extended and proprietary command sets. Despite its dominance, compatibility issues arose because the original standard lacked formal documentation, leading manufacturers to add variations and proprietary extensions.</template>
+</category>
+<category>
+<pattern>WHAT IS DIFFERENCE BETWEEN HAYES AT COMMAND SET AND OTHER COMMAND SETS</pattern>
+<template>The Hayes AT command set is a standard for modem operation, while other command sets may have different features or variations. For example, USRobotics introduced proprietary command sets that were not part of the Hayes AT command set. Hayes faced additional challenges from ISDN and the rise of the Internet, leading to financial difficulties and eventual liquidation in 1999.</template>
+</category>
+<category>
+<pattern>WHAT IS ESCAPE SEQUENCE USED FOR IN HAYES AT COMMAND SET</pattern>
+<template>The +++ escape sequence switches a modem from online (data) mode back to command mode. +++ATH0 hangs up the call.</template>
+</category>
+</aiml>

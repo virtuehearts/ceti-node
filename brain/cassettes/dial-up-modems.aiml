@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT IS MOST COMMON SPEED OF DIAL UP MODEMS</pattern>
+<template>56k was the fastest common dial-up modem speed, becoming the standard for dial-up internet access in the 1990s.</template>
+</category>
+<category>
+<pattern>WHAT IS DISTINCTIVE SOUND OF DIAL UP CONNECTIONS</pattern>
+<template>The distinctive "chirping" sound of dial-up connections is a well-documented characteristic of modem operation.</template>
+</category>
+<category>
+<pattern>WHAT IS HAYES AT COMMAND SET USED FOR IN MODEM OPERATION</pattern>
+<template>Hayes AT command set is a protocol used for communication between modems and computers.</template>
+</category>
+<category>
+<pattern>WHAT IS WARDIALING AND HOW DOES IT WORK</pattern>
+<template>Wardialing is a technique where modems scan local area code number lists to find available modems.</template>
+</category>
+<category>
+<pattern>WHAT IS SEARCH RESULT CONTAMINATION ISSUE WITH DIAL UP MODEMS RESEARCH</pattern>
+<template>The search results are heavily contaminated: the majority of passages (2-7) are actually about Dial soap (a personal care brand), not modems. This is a significant issue as the results appear to be mixed from different sources.</template>
+</category>
+<category>
+<pattern>WHAT IS SOURCE OF INFORMATION ABOUT DIAL UP INTERNET ACCESS</pattern>
+<template>The Wikipedia articles on dial-up internet access and Hayes AT command set provide the most authoritative technical information.</template>
+</category>
+<category>
+<pattern>WHAT IS SOURCE OF INFORMATION ABOUT HAYES AT COMMAND SET</pattern>
+<template>The Wikipedia articles on dial-up internet access and Hayes AT command set provide the most authoritative technical information.</template>
+</category>
+</aiml>

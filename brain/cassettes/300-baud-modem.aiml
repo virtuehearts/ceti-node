@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT WAS FIRST STANDARD DIAL UP MODEM INTRODUCED BY BELL IN 1962</pattern>
+<template>The Bell 103 (V.21) standard was introduced in 1962 as the earliest standard dial-up modem, using FSK modulation at 0.3 kbit/s.</template>
+</category>
+<category>
+<pattern>WHAT WAS HAYES AT COMMAND SET DEVELOPED IN 1981 FOR HAYES SMARTMODEM</pattern>
+<template>The Hayes AT command set was developed in 1981 for the Hayes Smartmodem and covered operations for the earliest 300 bit/s modems.</template>
+</category>
+<category>
+<pattern>WHAT WAS DE FACTO STANDARD FOR EARLY 300 BAUD MODEMS AND WAS WIDELY ADOPTED BY MANUFACTURERS</pattern>
+<template>The Hayes AT command set became the de facto standard for early 300 baud modems and was widely adopted by manufacturers.</template>
+</category>
+<category>
+<pattern>WHAT WAS EXPANSION TO 1200 AND 2400 BAUD REQUIRED FOR EARLY 300 BAUD MODEMS</pattern>
+<template>Expansion to 1200 and 2400 baud required new commands with ampersand (&amp;) prefixes, and the command set structure was shared across vendors with minor variations.</template>
+</category>
+<category>
+<pattern>WHAT WAS RISE OF DIAL MODEMS AT 300 1200 BAUD IN 1980S</pattern>
+<template>The Hayes command set's verbatim structure was copied by most early 300 baud modem manufacturers, reinforcing its dominance.</template>
+</category>
+<category>
+<pattern>WHAT WAS INTRODUCTION OF MICROCOMPUTER SYSTEMS WITH INTERNAL EXPANSION SLOTS IN 1980S</pattern>
+<template>The introduction of microcomputer systems with internal expansion slots in the 1980s led to smaller internal modems and the rise of dial modems at 300/1200 baud.</template>
+</category>
+</aiml>

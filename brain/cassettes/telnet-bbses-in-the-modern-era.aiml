@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT IS MODERN STATE OF DIAL UP BBSES</pattern>
+<template>As of June 2026, approximately 1,046 BBSes are listed in the Telnet BBS Guide, indicating a small but active community of traditional dial-up BBSes.</template>
+</category>
+<category>
+<pattern>WHAT IS CURRENT STATUS OF MODERN TELNET BBSES</pattern>
+<template>Modern telnet BBSes represent a niche but enduring legacy of the bulletin board system era. While the commercial BBS market collapsed in the mid-1990s due to internet competition, a small but active community persists, with most surviving BBSes still accessible via Telnet. The FidoNet network continues to operate with Telnet-based BBS connections, and a resurgence around 2014 brought renewed interest in internet-connected BBS.</template>
+</category>
+<category>
+<pattern>WHAT IS HISTORY OF MODERN TELNET BBSES</pattern>
+<template>Modern telnet BBSes represent a niche but enduring legacy of the bulletin board system era. While the commercial BBS market collapsed in the mid-1990s due to internet competition, a small but active community persists, with most surviving BBSes still accessible via Telnet. The FidoNet network continues to operate with Telnet-based BBS connections, and a resurgence around 2014 brought renewed interest in internet-connected BBS.</template>
+</category>
+<category>
+<pattern>WHAT IS CURRENT STATE OF FIDONET</pattern>
+<template>FidoNet is a network of interconnected BBSes that continues to operate with Telnet-based connections. It is a legacy of the bulletin board system era and represents a niche but enduring legacy of the internet.</template>
+</category>
+<category>
+<pattern>WHAT IS HISTORY OF FIDONET</pattern>
+<template>FidoNet is a network of interconnected BBSes that continues to operate with Telnet-based connections. It is a legacy of the bulletin board system era and represents a niche but enduring legacy of the internet.</template>
+</category>
+<category>
+<pattern>WHAT IS CURRENT STATE OF MODERN BBSES</pattern>
+<template>Modern BBSes represent a niche but enduring legacy of the bulletin board system era. While the commercial BBS market collapsed in the mid-1990s due to internet competition, a small but active community persists, with most surviving BBSes still accessible via Telnet. The FidoNet network continues to operate with Telnet-based BBS connections, and a resurgence around 2014 brought renewed interest in internet-connected BBS.</template>
+</category>
+<category>
+<pattern>WHAT IS HISTORY OF MODERN BBSES</pattern>
+<template>Modern BBSes represent a niche but enduring legacy of the bulletin board system era. While the commercial BBS market collapsed in the mid-1990s due to internet competition, a small but active community persists, with most surviving BBSes still accessible via Telnet. The FidoNet network continues to operate with Telnet-based BBS connections, and a resurgence around 2014 brought renewed interest in internet-connected BBS.</template>
+</category>
+<category>
+<pattern>WHAT IS CURRENT STATE OF INTERNET CONNECTED BBSES</pattern>
+<template>Internet-connected BBSes represent a niche but enduring legacy of the internet. While the commercial BBS market collapsed in the mid-1990s due to internet competition, a small but active community persists, with most surviving BBSes still accessible via Telnet. The FidoNet network continues to operate with Telnet-based BBS connections, and a resurgence around 2014 brought renewed interest in internet-connected BBS.</template>
+</category>
+<category>
+<pattern>WHAT IS HISTORY OF INTERNET CONNECTED BBSES</pattern>
+<template>Internet-connected BBSes represent a niche but enduring legacy of the internet. While the commercial BBS market collapsed in the mid-1990s due to internet competition, a small but active community persists, with most surviving BBSes still accessible via Telnet. The FidoNet network continues to operate with Telnet-based BBS connections, and a resurgence around 2014 brought renewed interest in internet-connected BBS.</template>
+</category>
+</aiml>

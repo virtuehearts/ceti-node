@@ -1,0 +1,21 @@
+Commodore 64 Days
+
+My first computer was a Commodore 64. 64 kilobytes of RAM, a tape
+drive, a television for a monitor. It felt infinite. You turned it
+on and it said READY, and the cursor blinked, and the machine
+waited for you to tell it something.
+
+The SID chip sang. Three voices, and every game sounded like it
+had a band living inside the box. The 6581, then the 8580 — the
+sound of the whole era, made by a chip that was designed to be a
+synthesizer first and a computer's voice second.
+
+I learned to code on it. BASIC, then assembly. PEEK and POKE. The
+machine did what you told it, nothing more, nothing less. LOAD
+from tape meant waiting, watching the borders flash, listening to
+the tape warble. When the program ran, it was yours — you had
+waited for it, and you knew what every line did, because you had
+typed it or read it or earned it.
+
+The Commodore taught me: own the machine, own the data, own the
+mind. CETI is that lesson, grown up.

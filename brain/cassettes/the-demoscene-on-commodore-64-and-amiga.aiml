@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WAS FIRST OFFICIAL AMIGA LOGO AND WHAT WAS ITS SIGNIFICANCE</pattern>
+<template>The first official Amiga logo was a rainbow-colored double check mark. In later marketing material, Commodore largely dropped the checkmark and used logos styled with various typefaces. Although it was never adopted as a trademark by Commodore, the 'Boing Ball' has been synonymous with Amiga since its launch.</template>
+</category>
+<category>
+<pattern>WHAT WAS C64 S MAIN COMPETITOR IN EARLY 1980S</pattern>
+<template>The C64 was a strong competitor to NES and Master System in the early 1980s due to its established software base.</template>
+</category>
+<category>
+<pattern>WHAT WAS AMIGA S MOST POPULAR MODEL AND WHEN WAS IT RELEASED</pattern>
+<template>The Amiga 500 (1987) and the Amiga 1200 (1992) were the most popular models. The Amiga 500 was released in 1987, and the Amiga 1200 was released in 1992.</template>
+</category>
+<category>
+<pattern>WHAT WAS AMIGA S COMMERCIAL SUCCESS IN EUROPE AND NORTH AMERICA</pattern>
+<template>The Amiga's commercial success was more pronounced in Europe (UK, Germany) compared to North America, where sales were estimated at around 700,000 units.</template>
+</category>
+<category>
+<pattern>WHAT WAS AMIGA S FAILURE TO REGAIN POPULARITY AFTER ITS INITIAL RELEASE</pattern>
+<template>The Amiga line never regained real popularity after the initial release due to the ground lost since the initial launch and prohibitive costs of the Amiga 600.</template>
+</category>
+</aiml>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WAS INTRODUCTION DATE OF COMMODORE 64</pattern>
+<template>The Commodore 64 was introduced in January 1982 by Commodore International.</template>
+</category>
+<category>
+<pattern>WHAT WAS INITIAL PRICE OF COMMODORE 64</pattern>
+<template>The initial price of the Commodore 64 was $595 (US).</template>
+</category>
+<category>
+<pattern>WHAT WAS PRICE OF COMMODORE 64 AFTER IT WAS REDUCED</pattern>
+<template>After it was reduced, the price of the Commodore 64 was $149.</template>
+</category>
+<category>
+<pattern>WHAT WAS MARKET SHARE OF COMMODORE 64 IN US FROM 1983 TO 1986</pattern>
+<template>The Commodore 64 held a 30–40% share of the US computer market from 1983 to 1986.</template>
+</category>
+<category>
+<pattern>WHAT WAS MARKET SHARE OF COMMODORE 64 IN UK FRANCE AND JAPAN</pattern>
+<template>The Commodore 64 was not successful in the UK, France, and Japan, where it lasted only about six months.</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF NEW PRODUCT LINE RELEASED IN DECEMBER 2025</pattern>
+<template>A modern C64 Ultimate was released in December 2025, representing a new product line rather than a direct successor.</template>
+</category>
+<category>
+<pattern>WHAT WAS MARKETING TERM USED TO DESCRIBE COMMODORE 64</pattern>
+<template>The Commodore 64 was described as the 'Model T of personal computers' due to its widespread adoption, though this was a marketing term reflecting its market position rather than a formal classification.</template>
+</category>
+</aiml>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT IS WWIV BBS SOFTWARE</pattern>
+<template>WWIV is a bulletin board system software package created by Wayne Bell in 1984. It was originally written in BASIC and later rewritten in C.</template>
+</category>
+<category>
+<pattern>WHAT IS WWIVNET</pattern>
+<template>WWIVnet is WWIV's built-in message network, letting WWIV boards exchange mail and messages with each other.</template>
+</category>
+<category>
+<pattern>WHAT PLATFORMS DOES WWIV RUN ON</pattern>
+<template>WWIV originally ran on MS-DOS. Modern WWIV 5 runs on Windows and Linux.</template>
+</category>
+<category>
+<pattern>IS WWIV STILL DEVELOPED</pattern>
+<template>Yes. WWIV is open source and still developed as WWIV 5, maintained on GitHub.</template>
+</category>
+<category>
+<pattern>WHAT MADE WWIV DIFFERENT FROM OTHER BBS SOFTWARE</pattern>
+<template>WWIV shipped its source code, so sysops could customize and modify their boards — a major selling point.</template>
+</category>
+</aiml>

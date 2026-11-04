@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT IS ANSI ART AND HOW DOES IT DIFFER FROM MONOCHROME ASCII ART</pattern>
+<template>ANSI art uses the IBM PC CP437 code page with escape codes to create colorful, blocky graphics. It differs from monochrome ASCII art in that it uses color and block characters, distinguishing it from monochrome ASCII art [3][10].</template>
+</category>
+<category>
+<pattern>WHEN DID ANSI ART ORIGINATE AND HOW DID IT EVOLVE</pattern>
+<template>ANSI art originated on BBSes in the 1980s-1990s as a mass medium [1][9]. It became a cornerstone of the demoscene community, with key groups like ACiD, iCE, Blocktronics, and Black Maiden driving its evolution. Despite the decline of BBSes with the rise of the web, ANSI art persists in demoscene events (Revision, Evoke, RSync) and digital archives. Modern editing tools such as TheDraw, PabloDraw, and Moebius continue the tradition, while 16colo.rs serves as a major archive of artpacks.</template>
+</category>
+<category>
+<pattern>WHAT ARE SOME NOTABLE KEY GROUPS ASSOCIATED WITH ANSI ART IN DEMOSCENE</pattern>
+<template>ACiD (ANSI Creators In Demand), iCE (Insane Computer Entertainment), Blocktronics, and Black Maiden were key groups associated with ANSI art in the demoscene. They drove the evolution of the art form and contributed significantly to its popularity and influence.</template>
+</category>
+<category>
+<pattern>WHAT IS THEDRAW AND HOW DOES IT RELATE TO ANSI ART</pattern>
+<template>TheDraw is a popular editing tool used by demoscene artists to create and edit ANSI art. It allows artists to create complex graphics using a combination of ASCII characters and color codes.</template>
+</category>
+<category>
+<pattern>WHAT IS PABLODRAW AND HOW DOES IT RELATE TO ANSI ART</pattern>
+<template>PabloDraw is another popular editing tool used by demoscene artists to create and edit ANSI art. It allows artists to create complex graphics using a combination of ASCII characters and color codes.</template>
+</category>
+<category>
+<pattern>WHAT IS MOEBIUS AND HOW DOES IT RELATE TO ANSI ART</pattern>
+<template>Moebius is a popular editing tool used by demoscene artists to create and edit ANSI art. It allows artists to create complex graphics using a combination of ASCII characters and color codes.</template>
+</category>
+<category>
+<pattern>WHAT IS 16COLO RS AND HOW DOES IT RELATE TO ANSI ART</pattern>
+<template>16colo.rs is a major archive of artpacks, including those created using ANSI art. It serves as a valuable resource for demoscene enthusiasts and artists.</template>
+</category>
+<category>
+<pattern>WHAT IS CURRENT STATE OF ANSI ART IN DEMOSCENE</pattern>
+<template>Modern editing tools such as TheDraw, PabloDraw, and Moebius continue the tradition of ANSI art, while 16colo.rs serves as a major archive of artpacks. Despite the decline of BBSes with the rise of the web, ANSI art persists in demoscene events (Revision, Evoke, RSync) and digital archives.</template>
+</category>
+</aiml>

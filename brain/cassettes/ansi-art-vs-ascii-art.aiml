@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT IS ANSI ART</pattern>
+<template>ANSI art is created using standard ASCII characters and does not require additional control sequences.</template>
+</category>
+<category>
+<pattern>WHAT IS ASCII</pattern>
+<template>ASCII is a character encoding that uses 7-bit codes to represent characters.</template>
+</category>
+<category>
+<pattern>WHAT IS ANSI ESCAPE SEQUENCES</pattern>
+<template>ANSI escape sequences are control codes used to control terminal features such as color, bold, underline, and other terminal formatting.</template>
+</category>
+<category>
+<pattern>WHAT IS MONOSPACED FONT</pattern>
+<template>Monospaced fonts ensure all characters occupy the same horizontal width, which is necessary for clean alignment in text-based art.</template>
+</category>
+<category>
+<pattern>WHAT IS ANSI STANDARD</pattern>
+<template>The ANSI standard (ANSI X3.4 series) has been updated multiple times to support the features used in ANSI art.</template>
+</category>
+<category>
+<pattern>WHAT IS COMMON LISP</pattern>
+<template>Common Lisp is associated with the ANSI standard document ANSI INCITS [REDACTED_PHONE] (S2018), which further defines ANSI standards for computing.</template>
+</category>
+</aiml>

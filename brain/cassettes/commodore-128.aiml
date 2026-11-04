@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT WAS RELEASE DATE OF COMMODORE 128</pattern>
+<template>The Commodore 128 was introduced in January 1985 at the CES in Las Vegas.</template>
+</category>
+<category>
+<pattern>WHAT WAS CPU USED IN COMMODORE 128</pattern>
+<template>The Commodore 128 had two CPUs: the MOS 8502 (2 MHz, 6502-compatible) and a Zilog Z80 (4 MHz, for CP/M mode).</template>
+</category>
+<category>
+<pattern>WHAT WAS RAM EXPANDABLE TO IN COMMODORE 128</pattern>
+<template>The Commodore 128 featured 128 KB standard RAM expandable to 640 KB.</template>
+</category>
+<category>
+<pattern>WHAT WAS GRAPHICS AND SOUND OF COMMODORE 128</pattern>
+<template>The Commodore 128 featured VIC-II E graphics (320×200, 16 colors) and MOS 6581/8580 SID synthesizer chip.</template>
+</category>
+<category>
+<pattern>HOW MANY UNITS WERE SOLD OF COMMODORE 128</pattern>
+<template>Approximately 2.5 million units were sold during its four-year production run (1985–1989).</template>
+</category>
+<category>
+<pattern>WHAT WAS SOFTWARE ECOSYSTEM OF COMMODORE 128</pattern>
+<template>Many developers focused on C64 mode, so the Commodore 128's native 128-mode software library stayed small.</template>
+</category>
+<category>
+<pattern>WHAT WAS REASON FOR DISCONTINUING COMMODORE 128</pattern>
+<template>The Commodore 128 was discontinued in 1989, while the C64 remained popular longer.</template>
+</category>
+</aiml>

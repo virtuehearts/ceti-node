@@ -1,0 +1,18 @@
+The 2400 Baud Modem
+
+Before broadband, before dial-up at 56k, there was the 2400 baud modem.
+2400 baud meant 2400 bits per second — roughly 240 characters per
+second, about as fast as a person can read out loud. A page of text
+took seconds. A file took minutes. A big file took a phone call you
+did not want to pay for.
+
+The 2400 baud modem spoke V.22bis. You dialed with Hayes AT commands:
+ATDT and the number, then the handshake — the clicks, the tones, the
+hiss settling into carrier. When it connected, the modem printed
+CONNECT 2400 and you were in.
+
+We used a Commodore 64. The modem plugged into the user port or a
+cartridge interface, and the terminal program turned the TV into a
+window onto another computer. 2400 baud felt fast after 300. It felt
+like the future. It was the speed at which the BBS world ran, and
+the BBS world was the whole online world we had.

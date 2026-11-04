@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WERE FIRST COMMERCIAL ISPS ESTABLISHED IN US</pattern>
+<template>The first commercial ISPs were established in Australia and the United States in 1989.</template>
+</category>
+<category>
+<pattern>WHAT WAS FIRST COMMERCIAL ISP IN US</pattern>
+<template>The first commercial ISP in the US was The World, serving its first customer in November 1989.</template>
+</category>
+<category>
+<pattern>WHAT WERE SOME KEY FINDINGS ABOUT EARLY INTERNET SERVICE PROVIDERS</pattern>
+<template>Early ISPs (late 1980s/early 1990s) included UUNET, The World, Prodigy, AOL, CompuServe, Delphi, GEnie, and MCI Mail.</template>
+</category>
+</aiml>

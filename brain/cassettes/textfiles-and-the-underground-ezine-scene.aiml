@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WAS TERM COINED BY CULT OF DEAD COW CDC IN HACKER COMMUNITY</pattern>
+<template>Elite</template>
+</category>
+<category>
+<pattern>WHAT WAS FIRST DEDICATED USENET NEWSGROUP FOR HACKING GROUPS CREATED BY CULT OF DEAD COW CDC IN OCTOBER 1994</pattern>
+<template>alt.fan.cult-dead-cow</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF SWEDISH HACKERS ASSOCIATION THAT FOUNDED UXU</pattern>
+<template>SweHackers Association</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF HACKER MOVEMENT FORMED IN 1999 THAT OPPOSED FULL DISCLOSURE OF SECURITY VULNERABILITIES</pattern>
+<template>Antisec Movement</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF PRIMARY PUBLICATION PLATFORM FOR MULTIPLE UNDERGROUND EZINES INCLUDING CULT OF DEAD COW CDC AND ANTISEC MOVEMENT DURING 1990S</pattern>
+<template>textfiles.com</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF GRAFFITI IN SAN DIEGO THAT WAS INCORRECTLY ASSOCIATED WITH ORIGINAL MOVEMENT</pattern>
+<template>LulzSec and Anonymous</template>
+</category>
+<category>
+<pattern>WHAT WAS NAME OF SECURITY COMPANY TARGETED BY ANTISEC MOVEMENT</pattern>
+<template>SecurityFocus, SecuriTeam, Packet Storm, milw0rm, etc.</template>
+</category>
+</aiml>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT IS PURPOSE OF GOPHER PROTOCOL</pattern>
+<template>Gopher is an application-layer protocol designed for distributing, searching, and retrieving documents in Internet Protocol networks.</template>
+</category>
+<category>
+<pattern>WHO INVENTED GOPHER PROTOCOL</pattern>
+<template>The protocol was invented by Mark P. McCahill and colleagues at the University of Minnesota in 1991.</template>
+</category>
+<category>
+<pattern>WHAT IS INTERFACE DESIGN OF GOPHER PROTOCOL</pattern>
+<template>It uses a text menu-driven hierarchical interface with strong document hierarchy, distinct from the free-form HTML of the Web.</template>
+</category>
+<category>
+<pattern>WHAT WAS DECLINE AND LEGACY OF GOPHER PROTOCOL</pattern>
+<template>Gopher was popular in the early 1990s but was eventually supplanted by HTTP/Web; the University of Minnesota later re-licensed its Gopher software under the GNU General Public License.</template>
+</category>
+<category>
+<pattern>WHAT WAS SEARCH ENGINE SYSTEM FOR GOPHER CALLED</pattern>
+<template>Veronica was a search engine system for Gopher, released in November 1992 by Steven Foster and Fred Barrie at the University of Nevada, Reno.</template>
+</category>
+<category>
+<pattern>WHAT IS TCP PORT USED FOR COMMUNICATION WITH GOPHER PROTOCOL</pattern>
+<template>The Gopher protocol uses TCP port 70 for communication.</template>
+</category>
+<category>
+<pattern>WHAT IS GOPHER AND WHAT IS ITS RELATIONSHIP TO GOPHER PROTOCOL</pattern>
+<template>Gopher+ is a forward-compatible enhancement that was never widely adopted by servers.</template>
+</category>
+<category>
+<pattern>WHAT IS NAMING CONVENTION FOR GOPHER SERVERS</pattern>
+<template>Gopher servers are typically named after the first letter of their domain name.</template>
+</category>
+</aiml>

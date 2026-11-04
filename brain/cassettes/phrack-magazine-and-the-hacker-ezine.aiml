@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+<category>
+<pattern>WHAT WAS NAME OF UNDERGROUND HACKER EZINE PHRACK</pattern>
+<template>Phrack was an underground hacker ezine that served as the platform where the Hacker Manifesto was first published.</template>
+</category>
+<category>
+<pattern>WHO WAS ONE OF FOUNDING EDITORS OF PHRACK MAGAZINE</pattern>
+<template>Craig Neidorf was one of the founding editors of Phrack Magazine.</template>
+</category>
+<category>
+<pattern>WHAT WAS SIGNIFICANCE OF PHRACK IN EARLY HACKER CULTURE</pattern>
+<template>Phrack was described as having 'its finger on the pulse of hacker culture' and being 'hugely influential in the early' hacker scene.</template>
+</category>
+<category>
+<pattern>WHAT WAS MOST FAMOUS PIECE OF HACKER LITERATURE PUBLISHED IN PHRACK</pattern>
+<template>The Hacker Manifesto in Phrack remains the most famous piece of hacker literature and is widely used to illustrate hacker mindset.</template>
+</category>
+<category>
+<pattern>WHAT WERE SOME OF KEY FINDINGS OF RESEARCH ON PHRACK MAGAZINE AND HACKER EZINE</pattern>
+<template>The research found that Phrack was described as having 'its finger on the pulse of hacker culture' and being 'hugely influential in the early' hacker scene, the Hacker Manifesto was first published in the underground hacker ezine Phrack, Craig Neidorf was one of the founding editors of Phrack Magazine, Phrack served as a platform for the hacker subculture, documenting its philosophy and practices, and the Hacker Manifesto in Phrack remains the most famous piece of hacker literature and is widely used to illustrate hacker mindset.</template>
+</category>
+</aiml>

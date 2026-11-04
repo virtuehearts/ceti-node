@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learned.aiml — auto-promoted by the brain's relevance classifier. Safe to delete. -->
+<aiml version="1.0">
+
+<category>
+<pattern>WHAT IS V 22BIS AND HOW DOES IT DIFFER FROM V 32BIS AND V 34BIS</pattern>
+<template>V.22bis is an ITU-T standard approved in 1984: 2,400 bit/s using 16-point QAM at 600 baud (4 bits per symbol). Hayes released the Smartmodem 2400 as a commercial implementation. It is a distinct standard from V.32bis and V.34bis.</template>
+</category>
+<category>
+<pattern>WHAT IS SYMBOL RATE OF V 22BIS</pattern>
+<template>V.22bis keeps V.22's 600-baud symbol rate but carries 4 bits per symbol (QAM), doubling the bit rate to 2,400 bit/s.</template>
+</category>
+<category>
+<pattern>WHAT MODULATION FORMAT IS USED IN V 22BIS</pattern>
+<template>V.22bis uses QAM (quadrature amplitude modulation), which varies both amplitude and phase.</template>
+</category>
+<category>
+<pattern>WHAT IS MAXIMUM DATA TRANSFER SPEED OF V 22BIS</pattern>
+<template>V.22bis supports bidirectional data transfer at up to 2,400 bit/s.</template>
+</category>
+<category>
+<pattern>WHAT IS APPROVAL DATE OF V 22BIS</pattern>
+<template>V.22bis was approved in 1984.</template>
+</category>
+<category>
+<pattern>WHAT IS COMMERCIAL IMPLEMENTATION OF V 22BIS</pattern>
+<template>Hayes Microcomputer Products released the V.22bis Smartmodem 2400 as a commercial implementation.</template>
+</category>
+<category>
+<pattern>WHAT IS DIFFERENCE BETWEEN V 22BIS AND V 32BIS</pattern>
+<template>V.22bis is a distinct standard from V.32bis and V.34bis, which are separate higher-speed iterations in the V-series.</template>
+</category>
+</aiml>

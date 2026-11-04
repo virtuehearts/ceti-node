@@ -144,6 +144,39 @@ by default so they don't steal VRAM). GPU memory figures in the
 Models tab are labelled estimates (file size × 1.2), not
 measurements.
 
+## Cloud providers
+
+Local chat is the default and sends nothing anywhere. When you pick
+a cloud provider in Chat, the key stays in your browser
+(localStorage) and rides along with each request; the server never
+writes it to disk. You can also set the key as an environment
+variable on the machine running the Hub instead.
+
+Providers, in list order:
+
+- **OrcaRouter** — `https://api.orcarouter.ai/v1`
+  (OpenAI-compatible). Keys look like `sk-orca-…` (browser:
+  `orca_key`, env: `ORCAROUTER_API_KEY`). `orcarouter/auto` is
+  seeded on signup and picks the cheapest live chat model; the
+  model list is public, so the dropdown populates before you add
+  a key.
+- **OpenRouter** — `https://openrouter.ai/api/v1` (browser:
+  `or_key`, env: `OPENROUTER_API_KEY`). Free models list first.
+- **Nvidia** — `https://integrate.api.nvidia.com/v1` (browser:
+  `nv_key`, env: `NVIDIA_API_KEY`).
+
+Node endpoints (same OpenAI-compatible shape for all three):
+
+- `GET /api/cloud/models?provider=orcarouter|openrouter|nvidia`
+  (key in the `X-API-Key` header; without a key the provider's
+  suggestion list is returned)
+- `POST /api/cloud/test` — `{provider, api_key, model}` tests one
+  model and reports back
+- `POST /api/chat` — `{messages, provider, model, api_key?}`
+  streams the reply; the System tab's Models & cloud API card
+  drives these same controls, and Settings holds the keys and the
+  test buttons.
+
 ## Screenshots
 
 Chat, the default view:
@@ -281,13 +314,65 @@ same ledger, same rule: nothing counts until it is signed.
 
 ## Status
 
-- **Version:** 0.0.1x. (Lettered builds
-  mark exactly which 0.0.1 is in hand; x is this one.)
-- **Tests:** 360 checks green at this build (unit 164: Hub 118,
-  Brain 5, CETI 12, SSH terminal 29; script suites 196:
-  nodeapi 101, community 16, image 13, node_client 12,
-  text_handler 8, transfer 13, transfers/serving 14,
-  tunnel 19).
+- **Version:** 0.0.1z. (Lettered builds
+  mark exactly which 0.0.1 is in hand; z is this one.)
+- **Tests:** 394 checks green at this build (unit 198: Hub 124,
+  Brain 6, CETI 13, SSH terminal 29, Research 21, Sessions 5;
+  script suites 196: nodeapi 101, community 16, image 13,
+  node_client 12, text_handler 8, transfer 13,
+  transfers/serving 14, tunnel 19).
+- **New in 0.0.1z:** the Research tab — a local agent with a
+  heartbeat. It works a task queue on a 60-second tick (plus
+  Tick now from the tab): for each topic it first compiles what
+  CETI already knows locally (facts, AIML categories, memory
+  nodes), then reads source pages as text through a lynx-like
+  harness (no rendering, no headless browser), distills QA pairs
+  and fact triples with the local model first and cloud as
+  fallback, and proposes them for operator approval. Approved
+  facts land in the operator fact store and approved QA in a
+  learned cassette (+ vector memory), which is what moves the
+  ladder — and the benchmark, which quizzes the ladder on its
+  own knowledge QA and turns misses into research tasks. A
+  distill that returns no answer (a reasoning model spending
+  its whole budget inside `<think>`, seen live on LFM3) now
+  falls back to cloud or parks the task as needs-model instead
+  of landing "done" with zero proposals. Chat sessions can be
+  archived or deleted from the session list, ChatGPT-style:
+  the drawer's × button works again (its buttons were nested
+  inside a `<button>`, which browsers drop), every row now has
+  archive + delete, archived sessions hide from the list and
+  return via SHOW ARCHIVED, and archiving survives re-saves.
+  The README also gains a Cloud providers section documenting
+  OrcaRouter (endpoint, `sk-orca-…` keys, `orcarouter/auto`)
+  above OpenRouter and Nvidia, with the `/api/cloud/models`,
+  `/api/cloud/test`, and `/api/chat` endpoints. Carries the
+  0.0.1y brain seed, memory learning, picker, System card,
+  OrcaRouter provider, and startup-model display unchanged.
+- **New in 0.0.1y:** the packaged CETI brain seed, CETI
+  session memory learning, the picker reorder, the linked
+  System models card, OrcaRouter, and the startup model on
+  the System tab. A fresh extract used to have no brain data
+  at all, so the facts and AIML tiers were empty and every
+  question fell through to the local model; the tree now
+  ships `brain/` (all 31 cassettes including the expanded
+  195-country module, the fact store, 158-QA knowledge base,
+  22-topic research log, library, persona) as a fallback
+  below the operator's own `<data>/brain/`, carrying no
+  identity, sessions, or vector memory. CETI session answers
+  are now recorded in vector memory (User + Assistant nodes,
+  source CETI) for facts, AIML, and local-model tiers, so a
+  repeat question retrieves the earlier exchange; cloud
+  misses are never stored, repeats dedupe, and the Debug
+  console's ad-hoc ask stays read-only. The new-workspace
+  picker puts CETI session first and drops Story/Ezine.
+  The System tab has a linked Models & cloud API card that
+  drives the Chat controls, and its detail now names the
+  default startup models (Ministral chat, EmbeddingGemma
+  embed) with their up/down state. OrcaRouter joins the
+  provider list above OpenRouter (chat, Settings, System
+  card) via the same OpenAI-compatible path. Carries the
+  0.0.1x CETI session, Debug tab, and ledgered output, the
+  0.0.1w Brain code, and the 0.0.1v ConPTY fix unchanged.
 - **New in 0.0.1x:** the CETI session, the Brain console as a
   Debug tab, and ledgered CETI output. The picker now offers a
   CETI session that loads and behaves like regular chat; every
