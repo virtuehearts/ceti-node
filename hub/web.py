@@ -16,6 +16,10 @@ Endpoints (JSON unless noted):
   GET  /api/memories?limit=N&session=<id> -> constellation nodes + similarity edges + core links
   GET  /api/memories/list?limit=N -> full node view: every memory + source model + replies that used it
   GET  /api/memories/<id>/vector -> that memory's vector + metadata (identity-scoped, read-only)
+  GET  /api/memories/<id>/used-by -> replies that used this memory node (identity-scoped)
+  POST /api/ceti/chat       -> {query} CETI ladder answer: facts, AIML, local model; cloud suggested, never called; answer ledgered as ceti.answer
+  GET  /api/brain/fact-search?q= -> facts matching a question (fact engine tester)
+  GET  /api/ceti/suggestions -> missed CETI questions awaiting research (operator-local)
   GET  /api/voice/shared     -> local shared files + ledger state
   POST /api/voice/share      -> {filename, data(base64)} store a voice in shared files + ledger
   POST /api/voice/publish    -> {filename} signed Merkle bundle manifest + public offer + ledger
@@ -83,6 +87,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
 
+from . import brain
+from . import ceti_chat
 from . import memory
 from . import nodeapi
 
@@ -228,7 +234,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
             self.wfile.write(b"data: [DONE]\n\n")
             self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError,
+                ConnectionAbortedError, ConnectionError, OSError):
+            # 0.0.1v: a browser that closed the EventSource
+            # mid-stream used to print a full traceback
+            # (WinError 10053, ConnectionAbortedError) from
+            # this write. A disconnected client is not a
+            # server error — stop quietly. ConnectionError
+            # covers the reset/abort family on Windows;
+            # OSError covers the same WinError surfaced
+            # without the specific subclass.
             pass
 
     # ---- routing ------------------------------------------------------
@@ -258,6 +273,10 @@ class Handler(BaseHTTPRequestHandler):
             mid = unquote(path[len("/api/memories/"):-len("/vector")].strip("/"))
             self._memory_vector(mid)
             return
+        if path.startswith("/api/memories/") and path.endswith("/used-by"):
+            mid = unquote(path[len("/api/memories/"):-len("/used-by")].strip("/"))
+            self._memory_used_by(mid)
+            return
         if path == "/api/stories":
             self._list_stories()
             return
@@ -284,6 +303,38 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/system":
             self._system()
+            return
+        if path == "/api/brain":
+            self._send_json(brain.summary())
+            return
+        if path == "/api/brain/modules":
+            self._send_json({"modules": brain.list_modules()})
+            return
+        if path.startswith("/api/brain/modules/"):
+            name = unquote(path[len("/api/brain/modules/"):]).strip("/")
+            try:
+                self._send_json(brain.read_module(name))
+            except ValueError as e:
+                self._send_json({"error": str(e)}, status=404)
+            return
+        if path == "/api/brain/facts":
+            qs = parse_qs(parsed.query)
+            try:
+                limit = int((qs.get("limit") or ["20"])[0])
+            except ValueError:
+                limit = 20
+            self._send_json(brain.facts(limit))
+            return
+        if path == "/api/brain/fact-search":
+            qs = parse_qs(parsed.query)
+            q = (qs.get("q") or [""])[0]
+            self._send_json(ceti_chat.facts_search(q))
+            return
+        if path == "/api/ceti/suggestions":
+            self._send_json({"misses": ceti_chat.read_suggestions(data_dir())})
+            return
+        if path == "/api/brain/research":
+            self._send_json(brain.research())
             return
         if path == "/api/ezines":
             self._ezines_list()
@@ -404,6 +455,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/chat":
             self._chat(body)
+            return
+        if path == "/api/ceti/chat":
+            self._ceti_chat(body)
             return
         if path == "/api/sessions":
             self._save_session(body)
@@ -670,6 +724,46 @@ class Handler(BaseHTTPRequestHandler):
             pass
         return "local uncensored"
 
+    def _ceti_chat(self, body):
+        """POST /api/ceti/chat — CETI ladder answer (test layer).
+
+        {query} -> {tier, answer, evidence, cloud_suggested,
+        memories?}. Read-only except the local-model call: no memory
+        writes, no brain writes, no cloud calls ever.
+        """
+        query = (body.get("query") or "").strip()
+        if not query:
+            self._send_json({"error": "query required"}, status=400)
+            return
+        try:
+            ident_hash = self._ident().hash
+        except Exception:
+            ident_hash = None
+        result = ceti_chat.answer(query, ident_hash=ident_hash)
+        if result.get("cloud_suggested"):
+            try:
+                ceti_chat.record_miss(data_dir(), query)
+            except Exception:
+                pass
+        # Every CETI answer lands in the regula ledger as its own signed
+        # event (kind ceti.answer, sha of the answer text, tier in the
+        # detail). A ledger failure must never lose the answer itself.
+        try:
+            ev = regula.append(
+                data_dir(), "ceti.answer", "ceti:" + query[:120],
+                regula.sha256d_hex(result.get("answer", "").encode("utf-8")),
+                len(result.get("answer", "").encode("utf-8")),
+                detail="tier=%s evidence=%s" % (
+                    result.get("tier", ""),
+                    (result.get("evidence") or "")[:200]))
+            result["ledger"] = {"ok": True,
+                                "event_hash": ev["event_hash"],
+                                "height": ev["index"] + 1}
+        except Exception as e:
+            result["ledger"] = {"ok": False,
+                                "error": f"{type(e).__name__}: {e}"}
+        self._send_json(result)
+
     def _chat(self, body):
         provider = body.get("provider", "local")
         # Strip every message to role + content before anything else.
@@ -785,16 +879,18 @@ class Handler(BaseHTTPRequestHandler):
     # the picker keys and the tags themselves are both accepted on input.
     SESSION_TYPES = {
         "chat": "CHAT", "story": "STORY/EZINE", "code": "CODE SPACES",
-        "research": "RESEARCH", "ssh": "SSH",
+        "research": "RESEARCH", "ssh": "SSH", "ceti": "CETI SESSION",
     }
-    SESSION_TAGS = {"CHAT", "STORY/EZINE", "CODE SPACES", "RESEARCH", "SSH"}
+    SESSION_TAGS = {"CHAT", "STORY/EZINE", "CODE SPACES", "RESEARCH", "SSH",
+                    "CETI SESSION"}
 
     @staticmethod
     def _canon_session_type(value):
         """Normalize any session-type input to a canonical tag.
 
-        Accepts picker keys (chat/story/code/research/ssh), the tags
-        themselves (any case), and "STORY" as shorthand. Anything else
+        Accepts picker keys (chat/story/code/research/ssh/ceti), the tags
+        themselves (any case), "STORY" as shorthand, and the retired
+        "CETI CHAT" tag (renamed to CETI SESSION). Anything else
         (including missing/None) falls back to CHAT — never an error,
         so old clients and old session files keep working.
         """
@@ -804,6 +900,8 @@ class Handler(BaseHTTPRequestHandler):
                 return Handler.SESSION_TYPES[key]
             if key == "story":
                 return "STORY/EZINE"
+            if key == "ceti chat":
+                return "CETI SESSION"
             tag = value.strip().upper()
             if tag in Handler.SESSION_TAGS:
                 return tag
@@ -1424,6 +1522,24 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json({"id": row["id"], "dim": len(vec), "model": self._EMBED_MODEL,
                          "source": row["source"], "created_at": row["created_at"],
                          "text": row["text"], "vector": vec})
+
+    def _memory_used_by(self, mid: str):
+        """GET /api/memories/<id>/used-by — replies that drew on a node.
+
+        Identity-scoped like the vector endpoint: only this node's
+        own rows. This is the link half of the node view — a memory
+        lists the outputs that used it.
+        """
+        if not mid.isdigit():
+            self._send_json({"error": "not found"}, status=404)
+            return
+        ident = self._ident()
+        conn = memory.connect(data_dir())
+        row = memory.get(conn, ident.hash, int(mid))
+        if row is None:
+            self._send_json({"error": "not found"}, status=404)
+            return
+        self._send_json({"id": int(mid), "used_by": memory.used_by(conn, int(mid))})
 
     # ---- stories -----------------------------------------------------
     def _list_stories(self):

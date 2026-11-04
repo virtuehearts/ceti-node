@@ -113,6 +113,40 @@ def validate_port(port):
     return p
 
 
+_DEFAULT_COLS, _DEFAULT_ROWS = 80, 24
+_MIN_COLS, _MAX_COLS = 10, 500
+_MIN_ROWS, _MAX_ROWS = 5, 200
+
+
+def _clamp_size(cols, rows):
+    """Clamp a terminal size to a sane, non-zero range.
+
+    0.0.1u: a measured size can be 0 when the pane was hidden or
+    not yet laid out at fit time, and CreatePseudoConsole with a
+    0x0 size (or ssh negotiating 0x0) is exactly the vertical-
+    input bug. Never let a 0, negative, or absurd size reach a
+    session: unparseable values fall back to 80x24, everything
+    else is clamped into range."""
+    try:
+        c = int(cols)
+    except (TypeError, ValueError):
+        c = _DEFAULT_COLS
+    try:
+        r = int(rows)
+    except (TypeError, ValueError):
+        r = _DEFAULT_ROWS
+    # Zero or negative is not a small terminal, it is no
+    # terminal at all (the 0x0 case) — fall back, don't clamp
+    # it to the minimum and ship a 10x5 TUI.
+    if c <= 0:
+        c = _DEFAULT_COLS
+    if r <= 0:
+        r = _DEFAULT_ROWS
+    c = max(_MIN_COLS, min(_MAX_COLS, c))
+    r = max(_MIN_ROWS, min(_MAX_ROWS, r))
+    return c, r
+
+
 def _slug(name):
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", (name or "host").strip())
     slug = slug.strip(".-") or "host"
@@ -392,6 +426,7 @@ class _PosixSession:
             raise
 
     def resize(self, cols, rows):
+        cols, rows = _clamp_size(cols, rows)
         self.cols, self.rows = cols, rows
         with self._lock:
             self.last_activity = time.time()
@@ -457,20 +492,25 @@ def _pipe_env(cols, rows):
 
 
 class _PipeSession:
-    """Pipe-based session: the Windows default since 0.0.1r.
+    """Pipe-based session: the Windows default since 0.0.1r, and
+    the ConPTY fallback since 0.0.1u.
 
     ConPTY (below) deterministically opened a visible Terminal
-    window on the laptop across 0.0.1n–q, with empty pipes, so it
-    is no longer the Windows path. This one cannot open a window
-    by construction: ssh runs with piped stdio and, on Windows,
-    CREATE_NO_WINDOW, so it never gets a console at all. The
-    remote side still gets a PTY via `ssh -tt` in the argv, so
-    TUIs render; TERM is set explicitly because there is no
-    local terminal to inherit it from. Same interface as
-    _PosixSession, except resize only records the size: with no
-    local PTY there is nothing to propagate it to, so the remote
-    PTY keeps ssh's connect-time size — since 0.0.1t, the
-    inherited parent console's size when one exists, else 0x0.
+    window on the laptop across 0.0.1n–q, with empty pipes, so
+    it was dropped as the Windows path in r. This one cannot
+    open a window by construction: ssh runs with piped stdio
+    and, on Windows, CREATE_NO_WINDOW, so it never gets a
+    console at all. The remote side still gets a PTY via
+    `ssh -tt` in the argv, so TUIs render; TERM is set
+    explicitly because there is no local terminal to inherit
+    it from. Same interface as _PosixSession, except resize
+    only records the size: with no local PTY there is nothing
+    to propagate it to, so the remote PTY keeps ssh's
+    connect-time size — since 0.0.1t, the inherited parent
+    console's size when one exists, else 0x0. That is why the
+    frontend now measures the pane before connecting: for a
+    pipe session, connect-time size is the only size that
+    ever reaches the remote side.
     """
 
     session_type = "pipe"
@@ -558,6 +598,7 @@ class _PipeSession:
 
     def resize(self, cols, rows):
         # No local PTY to resize; record only.
+        cols, rows = _clamp_size(cols, rows)
         self.cols, self.rows = cols, rows
         with self._lock:
             self.last_activity = time.time()
@@ -592,6 +633,21 @@ if sys.platform == "win32":
     _PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016
     _EXTENDED_STARTUPINFO_PRESENT = 0x00080000
     _CREATE_UNICODE_ENVIRONMENT = 0x00000400
+    # 0.0.1v headless flag: STARTF_USESHOWWINDOW + SW_HIDE
+    # tells a GUI child to start hidden. CREATE_NO_WINDOW was
+    # tried in u and is REMOVED in v: it sets the child's
+    # ConsoleHandle to a reserved no-window value, which can
+    # override the pseudo-console reference passed in the
+    # attribute list — exactly the empty-pipes symptom u
+    # showed on the laptop (conpty pid, no output yet). The
+    # pseudo console itself is the child's console, so no
+    # separate window should appear without it. Laptop gate:
+    # tools/conpty_selftest.py must pass with no window before
+    # this path is trusted — the fallback below only fires on
+    # a creation exception, not on a window popping up or on
+    # empty pipes after a successful start.
+    _STARTF_USESHOWWINDOW = 0x00000001
+    _SW_HIDE = 0
     _STILL_ACTIVE = 259
     _S_OK = 0
 
@@ -667,7 +723,17 @@ if sys.platform == "win32":
     class _ConPtySession:
         """Windows Pseudo Console session. Same interface as
         _PosixSession: buffer/base_offset/last_activity plus
-        alive/read_since/write/resize/close."""
+        alive/read_since/write/resize/close. Since 0.0.1v it
+        starts headless via STARTF_USESHOWWINDOW/SW_HIDE
+        only (CREATE_NO_WINDOW removed — it overrode the
+        pseudo-console reference in u and gave empty pipes),
+        with bInheritHandles=True and a mutable command
+        line, matching Microsoft's ConPTY sample, and
+        resize() really propagates via ResizePseudoConsole
+        — unlike the pipe session, whose resize only
+        records. The initial size is the pane size the
+        frontend measured before connecting, not a
+        hardcoded 80x24."""
 
         session_type = "conpty"
 
@@ -711,9 +777,12 @@ if sys.platform == "win32":
                 self._in_w = in_w
                 self._out_r = out_r
                 # The console reads h_in and writes h_out; we write
-                # in_w and read out_r. Pipe fds stay open until
-                # ClosePseudoConsole — closing them first deadlocks
-                # or breaks the console.
+                # in_w and read out_r. Do not close in_r/out_w
+                # before CreateProcessW — that deadlocks or
+                # breaks the console. They are closed in the
+                # parent AFTER CreateProcessW (0.0.1v, as in
+                # the sample); in_w/out_r stay open until
+                # ClosePseudoConsole.
                 h_in = msvcrt.get_osfhandle(in_r)
                 h_out = msvcrt.get_osfhandle(out_w)
                 hpc = wintypes.HANDLE()
@@ -744,12 +813,27 @@ if sys.platform == "win32":
                             "ConPTY unavailable (attribute update failed)")
                     sie = _STARTUPINFOEX()
                     sie.StartupInfo.cb = ctypes.sizeof(_STARTUPINFOEX)
+                    # 0.0.1v: start hidden, via SW_HIDE only.
+                    # CREATE_NO_WINDOW is deliberately NOT
+                    # here (see the v note above).
+                    sie.StartupInfo.dwFlags = _STARTF_USESHOWWINDOW
+                    sie.StartupInfo.wShowWindow = _SW_HIDE
                     sie.lpAttributeList = ctypes.cast(attr_buf,
                                                       ctypes.c_void_p)
                     pi = _PROCESS_INFORMATION()
-                    cmdline = subprocess.list2cmdline(argv)
+                    # CreateProcessW modifies its command
+                    # line in place, so it must be a mutable
+                    # buffer, not a Python str — the
+                    # Microsoft sample passes a mutable
+                    # wchar buffer, and u passed a str.
+                    cmdline = ctypes.create_unicode_buffer(
+                        subprocess.list2cmdline(argv))
+                    # 0.0.1v: bInheritHandles=True, matching
+                    # Microsoft's ConPTY sample. u passed
+                    # False, a deviation from the sample
+                    # that was never tested on its own.
                     ok = _kernel32.CreateProcessW(
-                        None, cmdline, None, None, False,
+                        None, cmdline, None, None, True,
                         _EXTENDED_STARTUPINFO_PRESENT
                         | _CREATE_UNICODE_ENVIRONMENT,
                         None, None, ctypes.byref(sie),
@@ -762,6 +846,21 @@ if sys.platform == "win32":
                     self._hproc = pi.hProcess
                     self._pid = pi.dwProcessId
                     _kernel32.CloseHandle(pi.hThread)
+                    # 0.0.1v: close the console-owned pipe
+                    # ends in the parent, as the sample
+                    # does. The parent keeps only in_w
+                    # (write to the console) and out_r
+                    # (read from it); keeping out_w open
+                    # in the parent also means the output
+                    # pipe can never report EOF when the
+                    # child dies.
+                    for _fd in (in_r, out_w):
+                        try:
+                            os.close(_fd)
+                        except OSError:
+                            pass
+                        if _fd in self._fds:
+                            self._fds.remove(_fd)
                 finally:
                     _kernel32.DeleteProcThreadAttributeList(attr_buf)
             except Exception:
@@ -824,6 +923,7 @@ if sys.platform == "win32":
                 raise
 
         def resize(self, cols, rows):
+            cols, rows = _clamp_size(cols, rows)
             self.cols, self.rows = cols, rows
             with self._lock:
                 self.last_activity = time.time()
@@ -864,15 +964,38 @@ if sys.platform == "win32":
                 self._dead = True
 
 
+def _make_windows_session(session_id, argv, cols, rows):
+    """Windows session factory, split out so it is testable
+    from Linux: try ConPTY first, fall back to the pipe
+    session on any creation failure. The fallback is
+    creation-failure only — it cannot rescue a ConPTY child
+    that started successfully but popped a window or fed
+    empty pipes, which is why the laptop self-test gate in
+    tools/conpty_selftest.py (no window, output on the pipe,
+    session_type conpty) must pass before this path ships
+    as the default. The pipe fallback keeps the 0.0.1t
+    console-inherit behaviour, so a ConPTY failure is no
+    worse than t."""
+    cols, rows = _clamp_size(cols, rows)
+    try:
+        return _ConPtySession(session_id, argv, cols, rows)
+    except Exception:
+        return _PipeSession(session_id, argv, cols, rows)
+
+
 def _make_session(session_id, argv, cols, rows):
     """Platform session factory. Never crashes at import: a platform
     with no PTY at all fails here, at connect time, with a clear
     error the endpoint returns as JSON."""
+    cols, rows = _clamp_size(cols, rows)
     if sys.platform == "win32":
-        # Pipe session since 0.0.1r: ConPTY opened a visible
-        # window on the laptop across n–q and is kept below for
-        # reference only, not used.
-        return _PipeSession(session_id, argv, cols, rows)
+        # 0.0.1u: ConPTY first (headless, real resize), pipe
+        # fallback on creation failure. Pipe was the sole
+        # Windows path in r–t because ConPTY opened a visible
+        # window on the laptop across n–q; the u headless
+        # flags plus the laptop self-test gate are what make
+        # the return to ConPTY safe to attempt.
+        return _make_windows_session(session_id, argv, cols, rows)
     if not _HAVE_POSIX_PTY:
         raise RuntimeError("PTY unavailable on this platform")
     return _PosixSession(session_id, argv, cols, rows)
@@ -917,6 +1040,10 @@ class SshManager:
                 cols=80, rows=24):
         host = validate_host(host)
         port = validate_port(port)
+        # 0.0.1u: clamp here as well as in _make_session, so a
+        # measured 0x0 (hidden pane) or absurd size can never
+        # reach CreatePseudoConsole or the remote PTY.
+        cols, rows = _clamp_size(cols, rows)
         if username and (not isinstance(username, str) or any(
                 ch in username for ch in " \t\r\n/;|&$`\"'\\")):
             raise ValueError("invalid username")
@@ -947,7 +1074,8 @@ class SshManager:
         self._get(session_id).write(data)
 
     def resize(self, session_id, cols, rows):
-        self._get(session_id).resize(int(cols), int(rows))
+        cols, rows = _clamp_size(cols, rows)
+        self._get(session_id).resize(cols, rows)
 
     def status(self, session_id):
         sess = self._get(session_id)

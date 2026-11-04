@@ -130,6 +130,18 @@ button.chan .label{color:var(--dim)}
 .nodelist .row{display:flex;justify-content:space-between;padding:2px 0}
 .nodelist .row b{color:var(--ink);font-weight:500}
 .nodelist .ok{color:var(--phos)}
+/* ---------- Brain pane (left of Chat) ---------- */
+.brain-card{padding:8px 10px;border-bottom:1px dashed var(--line);font-size:11.5px;color:var(--dim)}
+.brain-card:last-child{border-bottom:none}
+.brain-card .kv .row{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+.brain-card .kv .row b{color:var(--ink);font-weight:500;text-align:right}
+.brain-list{max-height:150px;overflow-y:auto;margin-top:4px}
+.brain-mod{display:block;width:100%;text-align:left;background:none;border:none;color:var(--ink);font:inherit;font-size:11.5px;padding:2px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brain-mod:hover{color:var(--phos)}
+.brain-mod small{color:var(--dim)}
+.brain-pre{max-height:170px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--ink);background:var(--panel-2);padding:6px;margin-top:6px}
+.brain-fact{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.brain-err{color:var(--amber)}
 .mockpill{display:inline-block;background:#3a2a10;color:#ffb454;padding:1px 8px;font-size:10px;font-weight:700;letter-spacing:.5px}
 
 /* ---------- Chat zone ---------- */
@@ -611,6 +623,7 @@ button.chan .label{color:var(--dim)}
     <button class="view-tab" data-tab="chat" type="button" aria-pressed="true" onclick="showTab('chat')">Chat</button>
     <button class="view-tab" data-tab="system" type="button" aria-pressed="false" onclick="showTab('system')">System</button>
     <button class="view-tab" data-tab="node" type="button" aria-pressed="false" onclick="showTab('node')">Node</button>
+    <button class="view-tab" data-tab="debug" type="button" aria-pressed="false" onclick="showTab('debug')">Debug</button>
   </nav>
   <div class="spacer"></div>
   <div class="readout">
@@ -1030,6 +1043,52 @@ button.chan .label{color:var(--dim)}
 </div>
 </div></div>
 
+<div id="view-debug" class="tabview" hidden><div class="panel">
+  <div class="panel-head"><span>CETI Debug</span><span class="val" id="brain-console-state">…</span></div>
+  <div style="padding:12px">
+    <p class="small">Debug console — the ladder's view of the brain. Ask below and watch which tier answers, browse the stores, trace the node graph behind each answer, and see what it wants to research next. The CETI session itself is the chat; this is its debug menu.</p>
+    <div style="display:flex;gap:8px;margin:12px 0">
+      <input id="brainQuery" type="text" placeholder="Ask the CETI console…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();askDebugConsole();}">
+      <button type="button" onclick="askDebugConsole()">Ask</button>
+      <button type="button" onclick="loadDebugConsole()">↻ Refresh</button>
+    </div>
+    <div id="brain-console-answer"></div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>BIOS</span><span class="val" id="console-bios-val">—</span></div>
+      <div class="kv" id="console-bios"></div>
+    </div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>Fact engine</span><span class="val" id="console-facts-val">—</span></div>
+      <div style="display:flex;gap:8px;margin:6px 0">
+        <input id="factQuery" type="text" placeholder="Test a fact lookup…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();askFactConsole();}">
+        <button type="button" onclick="askFactConsole()">Look up</button>
+      </div>
+      <div id="console-facts"></div>
+    </div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>AIML</span><span class="val" id="console-aiml-val">—</span></div>
+      <div class="brain-list" id="console-modules"></div>
+      <pre class="brain-pre" id="console-module-text" hidden></pre>
+    </div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>Memory layers</span><span class="val" id="console-memory-val">—</span></div>
+      <div class="kv" id="console-memory"></div>
+      <div style="margin-top:6px"><button type="button" onclick="showTab('memory')">Open full node view →</button></div>
+    </div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>Library &amp; knowledge</span><span class="val" id="console-library-val">—</span></div>
+      <div class="kv" id="console-library"></div>
+    </div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>Graph nodes — contexts &amp; answers</span><span class="val" id="console-graph-val">—</span></div>
+      <div id="console-graph"></div>
+    </div>
+    <div class="brain-card">
+      <div class="panel-head" style="padding:0 0 4px;border-bottom:none;background:none"><span>Research suggestions</span><span class="val" id="console-sugg-val">—</span></div>
+      <div id="console-suggestions"></div>
+    </div>
+  </div>
+</div></div>
 <div id="view-stories" class="tabview" hidden><div class="panel">
 <h2>Stories &amp; Storyboard</h2>
 <p class="small">Context stays within the configured window. Total output grows on disk, to 256k tokens and beyond. Writing is resumable — if it stops, write again and it continues at the next block.</p>
@@ -1155,6 +1214,7 @@ button.chan .label{color:var(--dim)}
     <button class="drawer-navbtn" data-tab="code" type="button" onclick="showTab('code')">Code</button>
     <button class="drawer-navbtn" data-tab="search" type="button" onclick="showTab('search')">Library Search</button>
     <button class="drawer-navbtn" data-tab="memory" type="button" onclick="showTab('memory')">Memory</button>
+    <button class="drawer-navbtn" data-tab="debug" type="button" onclick="showTab('debug')">Debug</button>
     <button class="drawer-navbtn" data-tab="samples" type="button" onclick="showTab('samples')">Samples &amp; PDFs</button>
     <button class="drawer-navbtn" data-tab="system" type="button" onclick="showTab('system')">System</button>
     <button class="drawer-navbtn" data-tab="models" type="button" onclick="showTab('models')">Models</button>
@@ -1192,6 +1252,10 @@ button.chan .label{color:var(--dim)}
         <span class="pick-tag">SSH</span>
         <span class="pick-main"><b>SSH terminal</b><span class="pick-desc">A terminal in the workspace — saved hosts, saved keys, default chat.hf.co. Local operator only.</span></span>
       </button>
+      <button class="pick" type="button" data-type="ceti">
+        <span class="pick-tag">CETI SESSION</span>
+        <span class="pick-main"><b>CETI session</b><span class="pick-desc">Test the CETI ladder — facts, AIML, local knowledge first, cloud only as a suggestion. Every answer shows its tier and its ladder steps in Thinking.</span></span>
+      </button>
     </div>
     <button class="picker-cancel" id="picker-cancel" type="button">Cancel</button>
   </div>
@@ -1200,8 +1264,8 @@ button.chan .label{color:var(--dim)}
 <script>
 let messages=[], currentSid=null, currentType='CHAT', provider='local', selectedSamples=[];
 let allSessions=[];
-const TYPE_TAGS={chat:'CHAT',story:'STORY/EZINE',code:'CODE SPACES',research:'RESEARCH',ssh:'SSH'};
-const VIEWS=['chat','system','node','stories','ezines','code','search','memory','samples','settings','models'];
+const TYPE_TAGS={chat:'CHAT',story:'STORY/EZINE',code:'CODE SPACES',research:'RESEARCH',ssh:'SSH',ceti:'CETI SESSION'};
+const VIEWS=['chat','system','node','debug','stories','ezines','code','search','memory','samples','settings','models'];
 
 function $(id){return document.getElementById(id);}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1298,6 +1362,7 @@ function showTab(name){
   if(name==='stories') loadStories();
   if(name==='system'){ loadSystem(); loadServers(); }
   if(name==='node'){ loadNode(); startNodeAutoRefresh(); } else { stopNodeAutoRefresh(); }
+  if(name==='debug') loadDebugConsole();
   if(name==='samples') loadSamples();
   if(name==='ezines') loadEzines();
   if(name==='chat'){ const inp=$('chatInput'); if(inp) inp.focus(); }
@@ -1415,6 +1480,15 @@ function addMsg(role, text, model, extra){
   const p = document.createElement('p'); p.textContent = text;
   body.appendChild(p);
   art.append(meta, body);
+  if(role === 'assistant' && extra && extra.thinking){
+    const think = buildThink();
+    think.querySelector('.thinkText').textContent = extra.thinking;
+    const lbl = think.querySelector('.think-label');
+    if(lbl) lbl.textContent = 'Reasoning — done · click to expand';
+    const tm = think.querySelector('.thinkTime');
+    if(tm) tm.textContent = '';
+    art.insertBefore(think, body);
+  }
   if(role !== 'system'){
     const foot = document.createElement('div');
     foot.className = 'foot';
@@ -1459,6 +1533,22 @@ function addMsg(role, text, model, extra){
           det.appendChild(line);
         });
         foot.appendChild(det);
+      }
+      if(role === 'assistant' && extra.ceti_tier){
+        const tier = document.createElement('span');
+        tier.textContent = 'CETI tier: ' + extra.ceti_tier + (extra.ceti_evidence ? ' · ' + String(extra.ceti_evidence).slice(0,200) : '');
+        foot.appendChild(tier);
+      }
+      if(role === 'assistant' && extra.ceti_memories && extra.ceti_memories.length){
+        const ctx = document.createElement('div');
+        ctx.className = 'memtrace';
+        renderCetiNodes(ctx, extra.ceti_memories, 'IN CURRENT CONTEXT');
+        foot.appendChild(ctx);
+      }
+      if(role === 'assistant' && extra.ceti_ledger && extra.ceti_ledger.ok){
+        const lg = document.createElement('span');
+        lg.textContent = 'ledger ✓ ' + String(extra.ceti_ledger.event_hash || '').slice(0, 12);
+        foot.appendChild(lg);
       }
     }
   }
@@ -1557,7 +1647,7 @@ async function saveSession(){
 function switchToSession(s){
   messages=s.messages||[]; currentSid=s.id; currentType=s.type||'CHAT';
   $('msgs').innerHTML='';
-  messages.forEach(function(m){ addMsg(m.role, m.content, m.model || m.via, {ts: m.ts, tokens: m.tokens, tok_s: m.tok_s, memories: m.memories, memories_used: m.memories_used, image: m.image}); });
+  messages.forEach(function(m){ addMsg(m.role, m.content, m.model || m.via, {ts: m.ts, tokens: m.tokens, tok_s: m.tok_s, memories: m.memories, memories_used: m.memories_used, image: m.image, ceti_tier: m.ceti_tier, ceti_evidence: m.ceti_evidence, ceti_memories: m.ceti_memories, thinking: m.thinking, ceti_ledger: m.ceti_ledger}); });
   $('chat-title').textContent = dispNum(Math.max(0, sessIndex(s.id))) + ' — ' + (s.title||s.id).toUpperCase();
   document.querySelectorAll('#chan-list .chan[data-sid]').forEach(function(x){
     x.classList.toggle('active', x.dataset.sid===s.id);
@@ -1841,9 +1931,14 @@ async function sshDeleteKey(){
     body:JSON.stringify({id:id})});
   await loadSshHosts();
 }
-async function sshAttach(sid){
-  await ensureXterm();
-  if(sshTerm){ try{ sshTerm.dispose(); }catch(e){} }
+function sshCreateTerm(){
+  // Single terminal creation path (0.0.1u): the terminal is
+  // created once and reused by initSshTerm() and sshAttach(),
+  // instead of sshAttach() disposing and recreating it after
+  // connect — which threw away the measured size. Handlers
+  // are registered once and read sshSid at event time, so a
+  // reused terminal always talks to the current session.
+  if(sshTerm) return sshTerm;
   sshTerm=new window.Terminal({cursorBlink:true, fontFamily:'monospace', scrollback:5000});
   // The vendored addon-fit UMD exposes the constructor as
   // FitAddon.FitAddon (a namespace object), NOT as FitAddon itself —
@@ -1855,20 +1950,16 @@ async function sshAttach(sid){
   sshTerm.loadAddon(sshFit);
   const el=$('ssh-term'); el.innerHTML='';
   sshTerm.open(el);
-  sshFit.fit();
-  const dims=sshFit.proposeDimensions();
-  if(dims){
-    fetch('/api/ssh/resize',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({session_id:sid, cols:dims.cols, rows:dims.rows})});
-  }
   sshTerm.onData(function(d){
+    if(!sshSid) return;
     fetch('/api/ssh/input',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({session_id:sid,
+      body:JSON.stringify({session_id:sshSid,
         data_b64:btoa(unescape(encodeURIComponent(d)))})});
   });
   sshTerm.onResize(function(sz){
+    if(!sshSid) return;
     fetch('/api/ssh/resize',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({session_id:sid, cols:sz.cols, rows:sz.rows})});
+      body:JSON.stringify({session_id:sshSid, cols:sz.cols, rows:sz.rows})});
   });
   if(!sshResizeBound){
     sshResizeBound=true;
@@ -1876,6 +1967,44 @@ async function sshAttach(sid){
       if(sshTerm && sshFit && currentType==='SSH'){ try{ sshFit.fit(); }catch(e){} }
     });
   }
+  return sshTerm;
+}
+function sshClampDims(dims){
+  // Mirror the backend clamp, but never ship a measured 0:
+  // a hidden or not-yet-laid-out pane fits to 0x0, which is
+  // the vertical-input bug. Fall back to 80x24 instead.
+  if(!dims || !dims.cols || dims.cols<10 || !dims.rows || dims.rows<5)
+    return {cols:80, rows:24};
+  return {cols:Math.min(500, dims.cols), rows:Math.min(200, dims.rows)};
+}
+async function initSshTerm(){
+  // 0.0.1u: mount and fit the terminal BEFORE connecting, so
+  // the connect request carries the pane's real size instead
+  // of hardcoded 80x24. The double animation frame lets the
+  // pane lay out first — fitting immediately after opening
+  // can still measure a hidden/zero-size element.
+  await ensureXterm();
+  sshCreateTerm();
+  await new Promise(function(res){
+    requestAnimationFrame(function(){ requestAnimationFrame(res); });
+  });
+  try{ sshFit.fit(); }catch(e){}
+  var dims=null;
+  try{ dims=sshFit.proposeDimensions(); }catch(e){ dims=null; }
+  if(!$('ssh-term') || !$('ssh-term').clientWidth) dims=null;
+  return sshClampDims(dims);
+}
+async function sshAttach(sid){
+  var dims=await initSshTerm();
+  // Reuse the terminal initSshTerm() just fitted (previous
+  // code destroyed it here and started over). Clear the old
+  // session's output — destroying the terminal did the same
+  // before — then tell the server the
+  // measured size again: for ConPTY this propagates via
+  // ResizePseudoConsole, for pipe it is recorded only.
+  try{ sshTerm.clear(); }catch(e){}
+  fetch('/api/ssh/resize',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session_id:sid, cols:dims.cols, rows:dims.rows})});
   if(sshEs) sshEs.close();
   sshEs=new EventSource('/api/ssh/output?session_id='+encodeURIComponent(sid)+'&since=0');
   var sshEsGotData=false;
@@ -1910,17 +2039,21 @@ async function sshConnect(){
   const keyId=$('sshKey').value||'';
   if(!host){ $('sshStatus').textContent='Enter a host.'; return; }
   $('sshStatus').textContent='Connecting…';
+  var sid=null;
   try{
-    // Load the terminal scripts BEFORE creating the server session,
-    // so a script failure can't orphan a running ssh session.
-    await ensureXterm();
+    // 0.0.1u: mount and fit the terminal BEFORE creating the
+    // server session, so the connect request carries the
+    // pane's measured size instead of hardcoded 80x24. A
+    // script failure here still can't orphan a session,
+    // because no session exists yet (the 0.0.1p rule).
+    var dims=await initSshTerm();
     const r=await fetch('/api/ssh/connect',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({host:host, port:port, username:username,
-        key_id:keyId, cols:80, rows:24})});
+        key_id:keyId, cols:dims.cols, rows:dims.rows})});
     const j=await r.json();
     if(j.error) throw new Error(j.error);
-    sshSid=j.session_id; sshWorkspaceSid=currentSid;
-    await sshAttach(sshSid);
+    sid=j.session_id; sshSid=sid; sshWorkspaceSid=currentSid;
+    await sshAttach(sid);
     $('sshStatus').textContent='Connected to '+host
       + (j.build ? ' · '+j.build : '')
       + (j.session_type ? ' · '+j.session_type+' pid '+j.pid : '');
@@ -1943,7 +2076,18 @@ async function sshConnect(){
           title:(sessById(currentSid)||{}).title||'Untitled workspace',
           messages:[], type:'SSH', ssh_host:host})});
     }
-  }catch(e){ $('sshStatus').textContent='Failed: '+e.message; }
+  }catch(e){
+    // If connect succeeded but attach failed, disconnect the
+    // server session instead of orphaning a running ssh.
+    if(sid){
+      try{
+        await fetch('/api/ssh/disconnect',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({session_id:sid})});
+      }catch(_e){}
+      sid=null; sshSid=null;
+    }
+    $('sshStatus').textContent='Failed: '+e.message;
+  }
 }
 async function sshDisconnect(){
   if(sshEs){ sshEs.close(); sshEs=null; }
@@ -2002,6 +2146,221 @@ function buildThink(){
   think.append(head, body);
   return think;
 }
+async function toggleCetiNode(btn, id){
+  const links = btn.nextElementSibling;
+  if(!links) return;
+  if(!links.hidden){ links.hidden = true; return; }
+  links.hidden = false;
+  links.textContent = 'Loading links…';
+  try{
+    const r = await fetch('/api/memories/' + encodeURIComponent(id) + '/used-by');
+    const j = await r.json();
+    if(j.error){ links.textContent = 'Links unavailable.'; return; }
+    const used = j.used_by || [];
+    links.textContent = '';
+    if(!used.length){
+      links.textContent = 'No replies have drawn on this node yet.';
+      return;
+    }
+    used.forEach(function(u){
+      const line = document.createElement('div');
+      line.textContent = 'reply #' + u.id + ': ' + String(u.text_preview || '').slice(0,120);
+      links.appendChild(line);
+    });
+  }catch(e){ links.textContent = 'Links unavailable.'; }
+}
+async function cetiSendChat(text){
+  try{
+    const r = await fetch('/api/ceti/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:text})});
+    const j = await r.json();
+    if(j.error){
+      messages.push({role:'assistant',content:'[ceti error] '+j.error,ts:Date.now(),model:'CETI'});
+      addMsg('assistant','[ceti error] '+j.error,'CETI',{ts:Date.now()});
+      saveSession(); return;
+    }
+    messages.push({role:'assistant',content:j.answer,ts:Date.now(),model:'CETI',ceti_tier:j.tier,ceti_evidence:j.evidence||'',ceti_memories:j.memories||null,thinking:j.thinking||'',ceti_ledger:j.ledger||null});
+    addMsg('assistant',j.answer,'CETI',{ts:Date.now(),ceti_tier:j.tier,ceti_evidence:j.evidence||'',ceti_memories:j.memories||null,thinking:j.thinking||'',ceti_ledger:j.ledger||null});
+    saveSession();
+  }catch(e){
+    messages.push({role:'assistant','content':'[ceti error] '+e.message,ts:Date.now(),model:'CETI'});
+    addMsg('assistant','[ceti error] '+e.message,'CETI',{ts:Date.now()});
+    saveSession();
+  }
+}
+function renderCetiNodes(container, memories, headText){
+  const head = document.createElement('div');
+  head.textContent = headText + ' — ' + memories.length + (memories.length===1 ? ' node' : ' nodes') + ' (click a node to see what drew on it)';
+  container.appendChild(head);
+  memories.forEach(function(m){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '#' + m.id + ' (' + (m.model || m.source || 'unknown') + ', score ' + m.score + ') ' + String(m.text || '').slice(0,120);
+    btn.onclick = function(){ toggleCetiNode(btn, m.id); };
+    container.appendChild(btn);
+    const links = document.createElement('div');
+    links.className = 'ceti-links';
+    links.hidden = true;
+    container.appendChild(links);
+  });
+}
+function brainRow(k,v){ return '<div class="row"><span>'+escHtml(k)+'</span><b>'+escHtml(v)+'</b></div>'; }
+let _consoleModules=[];
+async function loadDebugConsole(){
+  const st=$('brain-console-state'); if(st) st.textContent='…';
+  let s=null;
+  try{ const r=await fetch('/api/brain'); s=await r.json(); }catch(e){}
+  if(!s){ if(st) st.textContent='DOWN'; return; }
+  if(st) st.textContent = s.found ? 'OK' : 'NO DATA';
+  $('console-bios-val').textContent = s.bios.found ? (s.bios.persona_chars+' chars') : '—';
+  $('console-facts-val').textContent = s.memory.facts+' facts';
+  $('console-aiml-val').textContent = s.aiml.files+' files · '+s.aiml.categories+' cats';
+  $('console-library-val').textContent = (s.library?s.library.files:0)+' files · '+(s.knowledge?s.knowledge.qa:0)+' QA';
+  let nodeId='—';
+  try{ const r=await fetch('/api/node/status'); const n=await r.json();
+    nodeId = n.node_fingerprint || n.fingerprint || n.node_id || '—'; }catch(e){}
+  let statusMem='—';
+  try{ const r=await fetch('/api/status'); const st2=await r.json();
+    statusMem = (st2.memories!==undefined) ? st2.memories : '—'; }catch(e){}
+  $('console-bios').innerHTML = brainRow('PERSONA', s.bios.found ? (s.bios.persona_chars+' chars') : 'not found')
+    + brainRow('IDENTITY', nodeId)
+    + (s.bios.persona_head.length ? '<div class="brain-fact">'+escHtml(s.bios.persona_head.join(' '))+'</div>' : '');
+  $('console-memory').innerHTML = brainRow('FACTS', s.memory.facts) + brainRow('NODE MEMORIES', statusMem);
+  $('console-memory-val').textContent = s.memory.facts+' facts · '+statusMem+' nodes';
+  $('console-library').innerHTML = brainRow('LIBRARY FILES', (s.library?s.library.files:0)) + brainRow('KNOWLEDGE QA', (s.knowledge?s.knowledge.qa:0));
+  if(!s.found){
+    $('console-modules').innerHTML = '<div class="brain-err">No brain data. Looked in: '+escHtml(s.looked.join(', '))+'</div>';
+    $('console-graph').innerHTML = '';
+    $('console-suggestions').innerHTML = '';
+    return;
+  }
+  try{
+    const r=await fetch('/api/brain/modules'); const m=await r.json();
+    _consoleModules = m.modules||[];
+    $('console-modules').innerHTML = _consoleModules.map(function(mod,i){
+      return '<button type="button" class="brain-mod" onclick="loadConsoleModule('+i+')">'
+        + escHtml(mod.name)+' <small>· '+mod.categories+' cats</small></button>';
+    }).join('') || '<div>no cassettes</div>';
+  }catch(e){ $('console-modules').innerHTML = '<div class="brain-err">modules unreachable</div>'; }
+  try{
+    const r=await fetch('/api/brain/research'); const res=await r.json();
+    loadConsoleSuggestions(res);
+  }catch(e){ $('console-suggestions').innerHTML = '<div class="brain-err">research unreachable</div>'; }
+  loadConsoleGraph();
+}
+async function loadConsoleModule(i){
+  const mod=_consoleModules[i]; if(!mod) return;
+  const pre=$('console-module-text');
+  try{
+    const r=await fetch('/api/brain/modules/'+encodeURIComponent(mod.name));
+    const j=await r.json();
+    if(j.error){ pre.textContent='Error: '+j.error; }
+    else{ pre.textContent = j.text + (j.truncated ? '\n…[truncated]' : ''); }
+    pre.hidden=false;
+  }catch(e){ pre.textContent='Failed: '+e.message; pre.hidden=false; }
+}
+async function loadConsoleSuggestions(res){
+  let misses=[];
+  try{ const r=await fetch('/api/ceti/suggestions'); const j=await r.json(); misses=j.misses||[]; }catch(e){}
+  const gaps=(res||{}).gaps_list||[];
+  $('console-sugg-val').textContent = gaps.length+' gaps · '+misses.length+' misses';
+  let html='';
+  if(gaps.length){
+    html += '<div class="brain-fact">OPEN GAPS — suggested research topics:</div>';
+    html += gaps.map(function(g){ return '<div class="brain-fact">· '+escHtml(g.question)+' ('+g.count+')</div>'; }).join('');
+  }
+  if(misses.length){
+    html += '<div class="brain-fact">MISSED CETI QUESTIONS — suggested research tasks:</div>';
+    html += misses.map(function(m){ return '<div class="brain-fact">· '+escHtml(m.query)+'</div>'; }).join('');
+  }
+  $('console-suggestions').innerHTML = html || '<div>No suggestions yet — gaps and missed CETI questions will appear here.</div>';
+}
+async function loadConsoleGraph(){
+  const el=$('console-graph');
+  try{
+    const r=await fetch('/api/sessions'); const j=await r.json();
+    const sessions=(j.sessions||[]).filter(function(s){ return (s.type||'')==='CETI SESSION'; });
+    let items=[];
+    sessions.forEach(function(s){
+      const msgs=s.messages||[];
+      for(let i=0;i<msgs.length;i++){
+        if(msgs[i].role==='assistant' && msgs[i].ceti_tier){
+          const q = i>0 && msgs[i-1].role==='user' ? msgs[i-1].content : '';
+          items.push({q:q, m:msgs[i]});
+        }
+      }
+    });
+    items = items.slice(-10);
+    $('console-graph-val').textContent = items.length+' answers';
+    if(!items.length){ el.innerHTML = '<div>No CETI answers yet — ask in a CETI chat session or in the console box above.</div>'; return; }
+    el.innerHTML='';
+    items.forEach(function(it){
+      const box=document.createElement('div');
+      box.className='brain-card';
+      const q=document.createElement('div');
+      q.textContent = 'Q: '+String(it.q).slice(0,160);
+      box.appendChild(q);
+      const t=document.createElement('div');
+      t.textContent = 'tier: '+it.m.ceti_tier + (it.m.ceti_evidence ? ' · '+String(it.m.ceti_evidence).slice(0,160) : '');
+      box.appendChild(t);
+      if(it.m.ceti_memories && it.m.ceti_memories.length){
+        const nodes=document.createElement('div');
+        renderCetiNodes(nodes, it.m.ceti_memories, 'NODES USED');
+        box.appendChild(nodes);
+      }
+      el.appendChild(box);
+    });
+  }catch(e){ el.innerHTML = '<div class="brain-err">graph unreachable</div>'; }
+}
+async function askDebugConsole(){
+  const inp=$('brainQuery'); const q=inp.value.trim(); if(!q) return;
+  const box=$('brain-console-answer');
+  box.textContent='Asking…';
+  try{
+    const r=await fetch('/api/ceti/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const j=await r.json();
+    box.textContent='';
+    const ans=document.createElement('div');
+    ans.className='brain-card';
+    if(j.thinking){
+      const think=buildThink();
+      think.querySelector('.thinkText').textContent = j.thinking;
+      const lbl=think.querySelector('.think-label');
+      if(lbl) lbl.textContent = 'Reasoning — done · click to expand';
+      const tm=think.querySelector('.thinkTime');
+      if(tm) tm.textContent = '';
+      ans.appendChild(think);
+    }
+    const p=document.createElement('p');
+    p.textContent = j.answer||('[error] '+(j.error||'unknown'));
+    ans.appendChild(p);
+    if(j.tier){
+      const t=document.createElement('div');
+      t.textContent = 'tier: '+j.tier + (j.evidence ? ' · '+String(j.evidence).slice(0,200) : '')
+        + (j.ledger && j.ledger.ok ? ' · ledger ✓ '+String(j.ledger.event_hash).slice(0,12) : '');
+      ans.appendChild(t);
+    }
+    if(j.memories && j.memories.length){
+      const nodes=document.createElement('div');
+      renderCetiNodes(nodes, j.memories, 'IN CURRENT CONTEXT');
+      ans.appendChild(nodes);
+    }
+    box.appendChild(ans);
+    loadDebugConsole();
+  }catch(e){ box.textContent='[error] '+e.message; }
+}
+async function askFactConsole(){
+  const inp=$('factQuery'); const q=inp.value.trim(); if(!q) return;
+  const el=$('console-facts');
+  el.textContent='Looking up…';
+  try{
+    const r=await fetch('/api/brain/fact-search?q='+encodeURIComponent(q));
+    const j=await r.json();
+    const ms=j.matches||[];
+    el.innerHTML = ms.length
+      ? ms.map(function(m){ return '<div class="brain-fact">'+escHtml(m.subject)+' — '+escHtml(m.predicate)+': '+escHtml(m.object)+' <small>('+escHtml(m.source)+')</small></div>'; }).join('')
+      : '<div>No facts match that question.</div>';
+  }catch(e){ el.textContent='Lookup failed.'; }
+}
 async function doSend(text, isRegen){
   const model = provider==='local' ? 'local uncensored' : $('cloudModel').value;
   if(!isRegen){ messages.push({role:'user',content:text,ts:Date.now()}); addMsg('user',text,undefined,{ts:Date.now()}); }
@@ -2009,6 +2368,7 @@ async function doSend(text, isRegen){
   // mailbox text job instead of a local/cloud generation.
   const peerTo = $('peerBackend') ? $('peerBackend').value : '';
   if(peerTo){ await peerSendChat(text, peerTo); return; }
+  if(currentType==='CETI SESSION'){ await cetiSendChat(text); return; }
   const showThinking = thinkOn();
   const think = buildThink();
   if(showThinking){ $('msgs').appendChild(think); think.scrollIntoView(); }
@@ -3387,6 +3747,8 @@ if($('nodeLobbyText')) $('nodeLobbyText').addEventListener('keydown', function(e
 if($('nodeChatText')) $('nodeChatText').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); sendNodeChat(); } });
 showWelcome(); loadStatus(); loadSessions({openChat:true}); loadStories();
 showTab('chat'); // Refresh always lands on Chat, the default page. Node is one click away.
+// Brain pane: AIML + memory + research + BIOS, left of Chat. Read-only;
+// the pane never writes to the brain, it only shows what is on disk.
 // Live clock + page uptime (real, local only)
 const _t0 = Date.now();
 setInterval(function(){

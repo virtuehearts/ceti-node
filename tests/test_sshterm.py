@@ -235,6 +235,29 @@ class EndpointTest(unittest.TestCase):
         # constructor as FitAddon.FitAddon, not FitAddon.
         self.assertIn("FitAddon.FitAddon", html)
 
+    def test_ui_init_ssh_term_before_connect(self):
+        # 0.0.1u: the terminal is mounted and fitted BEFORE
+        # connect, and connect carries the measured size.
+        # sshAttach must reuse that terminal, not dispose and
+        # recreate it, and a failed attach must disconnect
+        # the server session instead of orphaning it.
+        req = urllib.request.Request("http://127.0.0.1:%d/" % self.port)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            html = r.read().decode("utf-8")
+        self.assertIn("async function initSshTerm", html)
+        self.assertIn("function sshCreateTerm", html)
+        connect = html[html.index("async function sshConnect"):
+                       html.index("async function sshDisconnect")]
+        self.assertIn("await initSshTerm()", connect)
+        self.assertIn("cols:dims.cols", connect)
+        self.assertIn("rows:dims.rows", connect)
+        self.assertNotIn("cols:80", connect)
+        self.assertIn("/api/ssh/disconnect", connect)
+        attach = html[html.index("async function sshAttach"):
+                      html.index("async function sshConnect")]
+        self.assertIn("initSshTerm", attach)
+        self.assertNotIn("dispose", attach)
+
     def test_addon_fit_constructs_via_namespace(self):
         # 0.0.1p regression: `new window.FitAddon()` threw
         # "window.FitAddon is not a constructor" on the laptop
@@ -435,6 +458,135 @@ class PipeSessionTest(unittest.TestCase):
         self.assertIsInstance(st["pid"], int)
         self.assertGreater(st["pid"], 0)
         self.assertGreater(st["buffered"], 0)
+
+
+class ConPtyFirstTest(unittest.TestCase):
+    """0.0.1u: ConPTY first on Windows with a pipe fallback,
+    and a size clamp so a measured 0x0 can never reach a
+    session. The ConPTY branch itself is win32-only and
+    cannot run on Linux, so these tests drive the factory
+    through monkeypatched session classes plus the real
+    clamp — they prove the ordering and the fallback, not
+    that a Windows pseudo console starts headlessly. That
+    proof is tools/conpty_selftest.py on the laptop."""
+
+    def _patch(self, name, value):
+        old = getattr(sshterm, name, None)
+        had = hasattr(sshterm, name)
+        setattr(sshterm, name, value)
+        return old, had
+
+    def _restore(self, name, old, had):
+        if had:
+            setattr(sshterm, name, old)
+        else:
+            try:
+                delattr(sshterm, name)
+            except AttributeError:
+                pass
+
+    def test_clamp_size(self):
+        self.assertEqual(sshterm._clamp_size(0, 0), (80, 24))
+        self.assertEqual(sshterm._clamp_size(1, 1), (10, 5))
+        self.assertEqual(sshterm._clamp_size(120, 40), (120, 40))
+        self.assertEqual(sshterm._clamp_size(9999, 999), (500, 200))
+        self.assertEqual(sshterm._clamp_size("bad", None), (80, 24))
+        self.assertEqual(sshterm._clamp_size(-5, -5), (80, 24))
+
+    def test_conpty_first_and_clamped(self):
+        seen = {}
+
+        class FakeConPty:
+            session_type = "conpty"
+
+            def __init__(self, sid, argv, cols, rows):
+                seen.update(sid=sid, argv=argv, cols=cols, rows=rows)
+
+        old, had = self._patch("_ConPtySession", FakeConPty)
+        try:
+            sess = sshterm._make_windows_session("s1", ["cat"], 0, 0)
+        finally:
+            self._restore("_ConPtySession", old, had)
+        self.assertIsInstance(sess, FakeConPty)
+        # 0x0 in, clamped 80x24 out — never a 0-size console.
+        self.assertEqual((seen["cols"], seen["rows"]), (80, 24))
+
+    def test_fallback_on_conpty_failure(self):
+        class FailingConPty:
+            def __init__(self, *a):
+                raise RuntimeError("ConPTY unavailable")
+
+        class FakePipe:
+            session_type = "pipe"
+
+            def __init__(self, sid, argv, cols, rows):
+                self.cols, self.rows = cols, rows
+
+        old_c, had_c = self._patch("_ConPtySession", FailingConPty)
+        old_p, had_p = self._patch("_PipeSession", FakePipe)
+        try:
+            sess = sshterm._make_windows_session("s2", ["cat"], 100, 30)
+        finally:
+            self._restore("_ConPtySession", old_c, had_c)
+            self._restore("_PipeSession", old_p, had_p)
+        self.assertIsInstance(sess, FakePipe)
+        self.assertEqual((sess.cols, sess.rows), (100, 30))
+
+    def test_manager_connect_and_resize_clamp(self):
+        tmp = tempfile.TemporaryDirectory()
+        try:
+            mgr = SshManager(tmp.name,
+                             command_builder=lambda *a: ["cat"])
+            try:
+                sid = mgr.connect("example.com", cols=0, rows=0)
+                st = mgr.status(sid)
+                self.assertEqual((st["cols"], st["rows"]), (80, 24))
+                mgr.resize(sid, 0, 0)
+                st = mgr.status(sid)
+                self.assertEqual((st["cols"], st["rows"]), (80, 24))
+                mgr.resize(sid, 9999, 999)
+                st = mgr.status(sid)
+                self.assertEqual((st["cols"], st["rows"]), (500, 200))
+            finally:
+                mgr.shutdown()
+        finally:
+            tmp.cleanup()
+
+    def test_headless_flags_in_source(self):
+        root = os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))
+        with open(os.path.join(root, "hub", "sshterm.py"),
+                  encoding="utf-8") as f:
+            src = f.read()
+        self.assertIn("_STARTF_USESHOWWINDOW = 0x00000001", src)
+        self.assertIn("_SW_HIDE = 0", src)
+        self.assertIn("dwFlags = _STARTF_USESHOWWINDOW", src)
+        self.assertIn("wShowWindow = _SW_HIDE", src)
+        # 0.0.1v: the ConPTY CreateProcessW call must NOT
+        # carry CREATE_NO_WINDOW — u showed that it gives
+        # a conpty pid with empty pipes, because the
+        # reserved no-window ConsoleHandle overrides the
+        # pseudo-console reference. The pipe session (a
+        # different call site) still uses it legitimately,
+        # so scope the check to the ConPTY call: the text
+        # between "class _ConPtySession" and "_make_windows_session".
+        conpty = src[src.index("class _ConPtySession"):
+                      src.index("def _make_windows_session")]
+        self.assertNotIn("_CREATE_NO_WINDOW", conpty)
+        # v also matches Microsoft's sample in two more
+        # ways u did not: bInheritHandles=True, and a
+        # mutable command-line buffer for CreateProcessW.
+        self.assertIn("None, cmdline, None, None, True,", conpty)
+        self.assertIn("create_unicode_buffer", conpty)
+        # And the parent closes the console-owned pipe
+        # ends after CreateProcessW, as the sample does.
+        self.assertIn("for _fd in (in_r, out_w):", conpty)
+        # SSE client disconnects must not print a
+        # traceback: WinError 10053 is ConnectionAbortedError.
+        with open(os.path.join(root, "hub", "web.py"),
+                  encoding="utf-8") as f:
+            web_src = f.read()
+        self.assertIn("ConnectionAbortedError", web_src)
 
 
 class WindowsImportSafetyTest(unittest.TestCase):

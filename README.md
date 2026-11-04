@@ -281,10 +281,85 @@ same ledger, same rule: nothing counts until it is signed.
 
 ## Status
 
-- **Version:** 0.0.1t. (Lettered builds
-  mark exactly which 0.0.1 is in hand; t is this one.)
-- **Tests:** 337 checks green at this build (Hub 118, node 81,
-  nodeapi 101, transfers/serving 14, SSH terminal 23).
+- **Version:** 0.0.1x. (Lettered builds
+  mark exactly which 0.0.1 is in hand; x is this one.)
+- **Tests:** 360 checks green at this build (unit 164: Hub 118,
+  Brain 5, CETI 12, SSH terminal 29; script suites 196:
+  nodeapi 101, community 16, image 13, node_client 12,
+  text_handler 8, transfer 13, transfers/serving 14,
+  tunnel 19).
+- **New in 0.0.1x:** the CETI session, the Brain console as a
+  Debug tab, and ledgered CETI output. The picker now offers a
+  CETI session that loads and behaves like regular chat; every
+  answer carries its ladder trace (FACTS, AIML, VECTOR MEMORY,
+  LOCAL MODEL, CLOUD) in the chat Reasoning panel, saved with
+  the message so reloads keep it. Every CETI answer is also
+  appended to the regula ledger as its own signed event (kind
+  ceti.answer, hash of the answer text, tier in the detail) and
+  the answer foot shows `ledger ✓` plus the event hash. The old
+  left-column Brain pane is replaced by a top-level Debug tab
+  (CETI Debug): console query box, BIOS, fact-engine lookup
+  (`GET /api/brain/fact-search`), AIML shelf, memory layers,
+  library & knowledge counts, graph nodes behind the last 10
+  CETI answers, and research suggestions (open gaps plus missed
+  CETI questions, recorded operator-locally). Fixes a real bug:
+  CETI sessions used to save as plain CHAT and lose their type
+  on reload, because `ceti` was missing from the server's
+  session-type table; the retired CETI CHAT tag maps forward to
+  CETI SESSION. Carries the 0.0.1w Brain code (now the Debug
+  tab) and the 0.0.1v ConPTY fix unchanged.
+- **New in 0.0.1v:** the ConPTY attachment fix, after u
+  failed on the laptop exactly as q did: a conpty pid
+  with "no output yet" and a blank pane. u's new flag
+  is the prime suspect and is removed: CREATE_NO_WINDOW
+  sets the child's ConsoleHandle to a reserved no-window
+  value, which can override the pseudo-console reference
+  in the attribute list. v also aligns the ConPTY call
+  with Microsoft's sample in three ways u did not:
+  bInheritHandles=True (the sample uses TRUE, u used
+  FALSE), a mutable command-line buffer for
+  CreateProcessW (which modifies its command line in
+  place), and closing the console-owned pipe ends
+  (in_r, out_w) in the parent after CreateProcessW.
+  SW_HIDE is kept, so no window should appear. The
+  SSE stream also stops printing a traceback when the
+  browser closes it (WinError 10053 /
+  ConnectionAbortedError, which u's screenshot showed
+  as "SSH failed" — that traceback was a disconnected
+  client, not the cause of the blank pane, but it
+  looked like one). **Laptop gate, selftest first:**
+  run `tools\conpty_selftest.py` before touching the
+  UI — if it still shows empty pipes, the attachment
+  is still broken and v has not fixed it, whatever the
+  UI does. Only if the selftest passes with
+  session_type conpty and no window, then try HF chat
+  for a full-width input box, a pane resize reflowing
+  it, and Enter sending. If ConPTY still feeds empty
+  pipes, fall back to the t snapshot, whose pipe
+  session at least connected and showed output.
+- **New in 0.0.1u:** the pane-size fix, with the ConPTY
+  return gated. The terminal is now mounted and fitted
+  BEFORE connecting (`initSshTerm()`), so the connect
+  request carries the browser pane's measured size instead
+  of hardcoded 80x24, and `sshAttach()` reuses that
+  terminal instead of destroying and recreating it. Sizes
+  are clamped on both ends (frontend and backend): a
+  hidden pane's 0x0 falls back to 80x24, never to a
+  10x5 TUI, and absurd sizes are clamped. Windows tries
+  ConPTY first again — now with STARTF_USESHOWWINDOW /
+  SW_HIDE plus CREATE_NO_WINDOW so no external console
+  window appears, and with real resize via
+  ResizePseudoConsole — falling back to the pipe session
+  (with its 0.0.1t console-inherit behaviour) only if
+  ConPTY creation fails. That fallback cannot rescue a
+  ConPTY child that starts but pops a window or feeds
+  empty pipes (the n–q failure), so the laptop gate
+  stands: `tools/conpty_selftest.py` must pass with
+  session_type conpty and no window before this build
+  is trusted, then HF chat must show a full-width input
+  box, a pane resize must reflow it, and Enter must
+  send. Until that laptop run, u is unproven on Windows
+  in exactly the way the sandbox cannot prove.
 - **New in 0.0.1t:** the remote-size fix. s connected, but the
   HF TUI laid its input out one char per line while a normal
   console connection renders standard size: with

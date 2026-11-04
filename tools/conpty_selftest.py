@@ -11,7 +11,11 @@ headless on a pseudo console. If a console window pops up, or no
 output arrives, the ConPTY attachment itself is broken on this
 machine — that is the difference between "the terminal works but
 lands in the wrong window" and "the browser pane never receives
-anything". Exits 0 on PASS, 1 on FAIL, 2 when not run on Windows.
+anything". Since 0.0.1u this test FAILS if the session silently
+fell back to the pipe session: a pipe pass would prove nothing
+about ConPTY, and the laptop gate for the ConPTY-first default
+is exactly "conpty, headless, output on the pipe". Exits 0 on
+PASS, 1 on FAIL, 2 when not run on Windows.
 """
 
 import os
@@ -45,6 +49,11 @@ while time.time() < deadline:
         break
     time.sleep(0.2)
 mgr.disconnect(sid)
+if st["session_type"] != "conpty":
+    print("FAIL: session fell back to %s, not conpty — the "
+          "ConPTY-first gate is not met, even if output arrived."
+          % st["session_type"])
+    sys.exit(1)
 if b"CONPTY-PROOF" in data:
     print("PASS: ConPTY carried output to the pipe buffer.")
 else:
