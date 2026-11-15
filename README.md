@@ -67,7 +67,7 @@ That's it — no installs to babysit, no accounts to create.
 
 1. Install the newest Python from
    [python.org](https://www.python.org/downloads/).
-2. Download [`laptop-uncensored-node-0.0.1-beta3.zip`](https://drive.google.com/uc?id=1wg3Nie3zYAUEVF9SkwmkUIR9CqAEnQO1&export=download) (47 MB) and unzip it.
+2. Download [`laptop-uncensored-node-0.0.1-beta4.zip`](https://drive.google.com/uc?id=1iuYwK6cH3cUQM65Sj5T0JiD-2-qt14TL&export=download) (47 MB) and unzip it.
 3. Run `autorun.bat` (Windows) or `autorun.sh` (Linux). It checks
    the setup, downloads the models, starts the servers, and opens
    the web UI.
@@ -203,9 +203,8 @@ Gmail account** — same address to ask.
 
 ## Status
 
-- **Version:** 0.0.1-beta3. (Beta3 follows beta2 overnight,
-  2026-11-15: the CETI Tier 5b fix below. The lettered line
-  ended at n.)
+- **Version:** 0.0.1-beta4. (Beta4 follows beta3 the same morning,
+  2026-11-15: the all-layers-reason redesign below.)
 - **Tests:** 619 checks green at this build (unit 331: Hub 124,
   Brain 6, CETI 33, SSH terminal 37, Research 42, Sessions 5,
   Local models 8, Code agent 9, Workspace 6, TTS bundle 11,
@@ -214,6 +213,27 @@ Gmail account** — same address to ask.
   nodeapi 101, community 16, image 13, node_client 12,
   text_handler 8, transfer 13, transfers/serving 14, tunnel 19,
   two_nodes 36, edge_cases 35, presence 21).
+- **New in 0.0.1-beta4:** **All layers reason — the local model
+  constructs every answer.** No layer returns its hit directly
+  any more. Every tier outputs what it found — math result
+  (computed in Python, never by the model), facts, AIML templates,
+  lexicon definitions, vector memories — and the local model
+  builds the answer from all of it, every time, under the
+  grounded-only prompt with the numbers guard. "What is the
+  currency of Japan?" now answers as a constructed sentence
+  ("Japan's currency is the Japanese Yen, code JPY") instead of
+  the bare fact line, and "17 * 23 + 41" comes back as "According
+  to the local math computation provided, 17 × 23 + 41 = 432".
+  Tier 1b arbitration and Tier 1c elaboration are gone — the
+  construct call does both, for every question. Deliberately
+  unchanged: when the model is down, the best direct hit answers
+  instead of failing the question; when there is no local context
+  at all, the model is still never called (the cloud suggestion
+  stands); ungrounded answers are never written into vector
+  memory. Verified live on the Hub. The trade-off Jero chose:
+  every question now costs one model call (about 26–28s on the
+  small CPU model; much faster on a GPU model), so the old
+  zero-model-tokens-at-serve-time goal gives way to this.
 - **New in 0.0.1-beta3:** **CETI Tier 5b — the loaded model
   answers when local knowledge has no hit.** "Please tell me the
   best way to setup a bbs" used to come back "I don't know from

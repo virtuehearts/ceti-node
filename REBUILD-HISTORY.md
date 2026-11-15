@@ -10,6 +10,57 @@ stdlib only) and one Android build (Kotlin), versioned together.
 It supersedes the 0.0.2–0.0.6 testing line — same code, clean
 version. The 0.0.2–0.0.6 zips stay in Drive as superseded builds.
 
+## 0.0.1-beta4 — 2026-11-15
+
+What changed since 0.0.1-beta3: the CETI ladder redesign, from
+Jero's call the same morning ("i honestly want all layers to
+reason, and output the facts and knowledge, so the local model
+can elaberate and make a construct of the answer").
+
+- **All-layers-reason** (`hub/reasoning.py`, `hub/ceti_chat.py`,
+  `tests/test_ceti_chat.py`): every layer outputs what it found
+  and the local model constructs the answer from all of it.
+  Tier 0 math is still computed in Python and fed in as a
+  context fact ("- 17 * 23 + 41 = 432 (computed in Python)").
+  Tier 1 facts (predicate-aware hit, competing candidates,
+  two-hop composition) all become a FACTS section. Tier 2 AIML
+  exact matches become AIML CONTEXT — with the RENDERED answer
+  (star substituted), not the raw template, so "hello there
+  friend" still carries "THERE FRIEND" into the model. Tier 3
+  lexicon, Tier 4 vector, session files as before. The construct
+  call (Tier 5, grounded-only prompt rewritten for construction,
+  numbers guard) runs for EVERY question; the trace shows a
+  CONSTRUCT line naming the sections handed to the model.
+  Deleted: `_arbitrate_tier` / `_ARBITRATE_SYSTEM` (Tier 1b)
+  and `_elaborate_tier` / `_wants_elaboration` /
+  `_ELABORATE_SYSTEM` (Tier 1c) — the construct call does both
+  for every question, so the separate selection and elaboration
+  steps no longer exist.
+- **Fallbacks, deliberately unchanged:** model down or empty
+  answer -> `_direct_fallback` returns the best direct hit in
+  old ladder priority (math, composition, fact, AIML template,
+  first competing fact); no context at all -> cloud-suggested,
+  model never called; ungrounded answers never recorded into
+  vector memory.
+- **Tests:** 41 CETI tests rewritten for the new ladder (the
+  default model stand-in in setUp returns the assembled context
+  as the answer, so tests assert on what the ladder fed the
+  model without a live server; fallback paths get their own
+  tests). Full suite 619 checks green (unit 331 + script 288).
+- **Live verified 2026-11-15 on the Hub** (restarted, :8900):
+  "What is the currency of Japan?" -> tier local-model, "Japan's
+  currency is the Japanese Yen (symbol: ¥, code: JPY)" in 26s,
+  trace shows FACTS (8 Japan facts), LEXICON, VECTOR MEMORY
+  (5 nodes), AIML CONTEXT (1 template), CONSTRUCT (4 sections),
+  numbers guard passed. "What is 17 * 23 + 41?" -> local-model,
+  "According to the local math computation provided, 17 × 23 +
+  41 = 432" in 28s. "Who won the 2026 World Cup?" -> Tier 5b
+  local-model-ungrounded (live stores hold World Cup context,
+  so the grounded call ran and refused, then the ungrounded
+  call answered from the model's own knowledge — stale, it
+  says the tournament "has not taken place yet", which is the
+  small model's knowledge, honestly labelled UNGROUNDED).
+
 ## 0.0.1-beta3 — 2026-11-15
 
 What changed since 0.0.1-beta2: one CETI ladder fix, from Jero's
