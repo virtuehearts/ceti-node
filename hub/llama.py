@@ -12,6 +12,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import urllib.request
 import zipfile
 
@@ -47,9 +48,18 @@ because install only ran when no binary was found at all."""
 def server_build(server: str):
     """Return the llama.cpp build number of a server binary, or None
     if it cannot be determined. `llama-server --version` and
-    `llama --version` both print e.g. 'version: 0.7.0-dev (build 11941, ...)'."""
+    `llama --version` both print e.g. 'version: 0.7.0-dev (build 11941, ...)'.
+    Note: llama-server prints its version to stderr, not stdout —
+    both streams are read, or a perfectly good binary reports
+    'unknown build' and find_server() skips it (the fail-closed
+    gate), which is exactly the 0.0.1xa laptop failure after the
+    download itself was fixed."""
     import re
-    out = _run([server, "--version"])
+    try:
+        r = subprocess.run([server, "--version"], capture_output=True, text=True, timeout=15)
+        out = (r.stdout or "") + (r.stderr or "")
+    except Exception:
+        return None
     if not out:
         return None
     m = re.search(r"build\s+(\d+)", out)
@@ -117,27 +127,66 @@ def _github_json(url):
 
 
 def _pick_asset(assets, is_win, arch=None):
-    """Pick a llama-server zip from a release's assets, or None.
+    """Pick a llama-server package from a release's assets, or None.
     Preference: Vulkan, then CUDA, then CPU; x64 on x64 machines,
     arm64 on ARM machines. Only packages named llama-* count — the
     cudart-*.zip DLL bundles match a naive 'cuda'+'win' test but
-    contain no server binary, so they must never win."""
+    contain no server binary, so they must never win.
+    Extensions: Windows ships .zip; Linux/macOS ship .tar.gz
+    (llama.cpp switched the Unix packages from .zip to .tar.gz —
+    the old .zip-only filter silently rejected every Linux asset,
+    so the installer failed on WSL/Linux with "could not discover
+    a llama.cpp release asset"). Both extensions are accepted so
+    older releases still work. The plain CPU build has no 'cpu' in
+    its name (llama-*-bin-ubuntu-x64.tar.gz), so 'cpu' matches a
+    package with no accelerator keyword at all."""
     if arch is None:
         machine = platform.machine().lower()
         arch = "arm64" if "arm" in machine or "aarch" in machine else "x64"
+    exts = (".zip",) if is_win else (".tar.gz", ".tgz", ".zip")
     if is_win:
         want = [("vulkan", "win"), ("cuda", "win"), ("cpu", "win")]
     else:
-        want = [("vulkan", "ubuntu"), ("vulkan", "linux"), ("cpu", "ubuntu"), ("cpu", "linux")]
+        want = [("vulkan", "ubuntu"), ("vulkan", "linux"),
+                ("cuda", "ubuntu"), ("cuda", "linux"),
+                ("cpu", "ubuntu"), ("cpu", "linux"), ("cpu", "macos")]
+    accel = ("vulkan", "cuda", "rocm", "sycl", "openvino", "opencl", "zdnn", "snapdragon")
     for kind, plat in want:
         for a in assets or []:
             name = (a.get("name") or "").lower()
-            if not name.startswith("llama-") or not name.endswith(".zip"):
+            if not name.startswith("llama-") or not name.endswith(exts):
                 continue
-            if kind not in name or plat not in name or arch not in name:
+            if plat not in name or arch not in name:
+                continue
+            if kind == "cpu":
+                if any(k in name for k in accel):
+                    continue
+            elif kind not in name:
                 continue
             return a
     return None
+
+
+def _flatten_server_dir():
+    """Move a server binary (and its .so/.dll libs) out of a release
+    subfolder into bin/ directly. The .tar.gz packages extract to
+    bin/llama-bXXXX/ (binary + libs inside); the .zip packages
+    extract flat. The binary's RUNPATH is $ORIGIN, so its libs must
+    sit next to it — flattening keeps them together in bin/ either
+    way. No-op when the binary is already at the top of bin/."""
+    names = ("llama-server", "llama-server.exe", "llama", "llama.exe")
+    for entry in sorted(os.listdir(bin_dir())):
+        sub = os.path.join(bin_dir(), entry)
+        if not os.path.isdir(sub):
+            continue
+        if any(os.path.isfile(os.path.join(sub, n)) for n in names):
+            for item in os.listdir(sub):
+                shutil.move(os.path.join(sub, item), os.path.join(bin_dir(), item))
+            try:
+                os.rmdir(sub)
+            except OSError:
+                pass
+            return
 
 
 def install_server():
@@ -166,11 +215,17 @@ def install_server():
     if not chosen:
         raise RuntimeError("could not discover a llama.cpp release asset; download one manually from https://github.com/ggml-org/llama.cpp/releases")
     print(f"downloading {chosen['name']} ...")
-    dest = os.path.join(bin_dir(), "llama.zip")
+    is_tar = chosen["name"].lower().endswith((".tar.gz", ".tgz"))
+    dest = os.path.join(bin_dir(), "llama.tar.gz" if is_tar else "llama.zip")
     urllib.request.urlretrieve(chosen["browser_download_url"], dest)
-    with zipfile.ZipFile(dest) as z:
-        z.extractall(bin_dir())
+    if is_tar:
+        with tarfile.open(dest, "r:gz") as t:
+            t.extractall(bin_dir())
+    else:
+        with zipfile.ZipFile(dest) as z:
+            z.extractall(bin_dir())
     os.remove(dest)
+    _flatten_server_dir()
     # Return the bin/ binary explicitly, not find_server(): a stale
     # binary on PATH must not shadow the fresh download we just made.
     server = None

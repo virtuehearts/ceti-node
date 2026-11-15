@@ -60,5 +60,38 @@ class FindServerTest(unittest.TestCase):
         self.assertEqual(llama_mod.find_server(), "edge-server")
 
 
+class ServerBuildTest(unittest.TestCase):
+    def test_version_on_stderr_is_read(self):
+        # 0.0.1xa laptop failure (second half): llama-server prints
+        # its version to stderr, not stdout. A stdout-only read
+        # reports 'unknown build' and the fail-closed gate skips a
+        # perfectly good binary, so the server is never found.
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "llama-server")
+            with open(p, "w") as f:
+                f.write("#!/bin/sh\necho 'version: 0.9.0-dev (build 12192, commit 9f0e5098a)' >&2\n")
+            os.chmod(p, 0o755)
+            self.assertEqual(llama_mod.server_build(p), 12192)
+
+    def test_version_on_stdout_still_works(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "llama-server")
+            with open(p, "w") as f:
+                f.write("#!/bin/sh\necho 'version: 0.7.0-dev (build 11941, commit x)'\n")
+            os.chmod(p, 0o755)
+            self.assertEqual(llama_mod.server_build(p), 11941)
+
+    def test_no_version_output_is_none(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "llama-server")
+            with open(p, "w") as f:
+                f.write("#!/bin/sh\nexit 0\n")
+            os.chmod(p, 0o755)
+            self.assertIsNone(llama_mod.server_build(p))
+
+
 if __name__ == "__main__":
     unittest.main()

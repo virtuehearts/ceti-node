@@ -28,6 +28,10 @@ Endpoints (JSON unless noted):
   GET  /api/blocks/<sha256>  -> one 50MB chunk's raw bytes, or 404
   POST /api/chat-images/save -> store a peer image reply's PNG for reloads
   GET  /api/chat-images/<name> -> one stored chat image, or 404
+  POST /api/chat-voice/save   -> store a generated voice MP3 for reloads
+  GET  /api/chat-voice/<name> -> one stored voice MP3, or 404
+  POST /api/chat-attachments/save -> store a chat attachment + embed its text into vector memory for the session
+  GET  /api/chat-attachments/<name> -> one stored attachment, or 404
   GET  /api/hf/collection?slug=owner/name -> models in an HF collection (token in X-HF-Token header)
   GET  /api/hf/model?repo=owner/name -> one repo's GGUF files + metadata
   GET  /api/hf/local -> GGUF files already in models/
@@ -95,6 +99,7 @@ import json
 import os
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
 
@@ -105,7 +110,7 @@ from . import nodeapi
 
 
 def _read_build():
-    """Release letter from the tree README (e.g. 0.0.1r), so the
+    """Release version from the tree README (e.g. 0.0.1a2), so the
     UI can show which build is actually running and end the
     'did you install the latest?' ambiguity. Falls back quietly."""
     try:
@@ -113,7 +118,12 @@ def _read_build():
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         with open(os.path.join(here, "README.md"),
                   encoding="utf-8") as f:
-            m = _re.search(r"Version:\*\* (0\.0\.1\w)", f.read())
+            # 0.0.1-beta2: the version line carries a hyphenated
+            # suffix now ("0.0.1-beta2"), and the old \w+ regex
+            # stopped matching at the hyphen, so the UI showed
+            # a bare "0.0.1" for the whole beta line — exactly
+            # the version confusion this display exists to end.
+            m = _re.search(r"Version:\*\* (0\.0\.1[\w-]+)", f.read())
         return m.group(1) if m else "0.0.1"
     except Exception:
         return "0.0.1"
@@ -125,13 +135,14 @@ from . import sshterm
 from .config import chat_port, embed_port, data_dir, models_dir, load_catalog, default_model, effective_chat_model, select_local_model
 from .identity import ensure_identity
 from .package import create_package, verify_package
-from .servers import _health, stream_chat, stream_chat_events, chat_complete, embed_text, ensure_servers, _stop, _pid_path, poller_running, poller_start, poller_stop, poller_log_tail
+from .servers import _health, stream_chat, stream_chat_events, chat_complete, embed_text, ensure_servers, _stop, _pid_path, poller_running, poller_start, poller_stop, poller_log_tail, tts_health, tts_start, tts_stop, tts_voices, tts_port, tts_log_tail, tts_starting
 from .story import StoryWriter
 from .samples import ingest_folder, sample_counts, samples_dir
 
 WEB_PORT = int(os.environ.get("HUB_WEB_PORT", "8900"))
 _setup_log = []
 _setup_lock = threading.Lock()
+_code_agent_jobs = {}  # job_id -> {status, log, result, error, session}
 _bench_lock = threading.Lock()
 _bench_running = False
 _setup_running = False
@@ -422,6 +433,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/cloud/models":
             self._cloud_models(parsed)
             return
+        if path.startswith("/api/code/agent/"):
+            self._code_agent_status(path[len("/api/code/agent/"):].strip("/"))
+            return
+        if path == "/api/code/files":
+            self._code_files(parsed)
+            return
+        if path == "/api/code/file":
+            self._code_file_get(parsed)
+            return
         if path == "/api/servers/status":
             self._servers_status()
             return
@@ -532,6 +552,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"running": poller_running(),
                              "log": poller_log_tail()})
             return
+        if path == "/api/tts/status":
+            # TTS SERVER row + voice panel (System view): running?,
+            # voices the bridge knows, and the saved default voice.
+            # "starting" + "log_tail" let the UI tell a slow
+            # first-run install apart from a dead start: before this
+            # the row only ever said DOWN with a static "starting…".
+            serving = nodeapi.get_serving()
+            self._send_json({"running": tts_health(), "port": tts_port(),
+                             "starting": tts_starting(),
+                             "log_tail": tts_log_tail(),
+                             "voices": tts_voices(),
+                             "default_voice": serving.get("tts_voice") or "mya-03"})
+            return
         if path == "/api/node/jobs":
             self._send_json(nodeapi.mailbox_poll())
             return
@@ -557,6 +590,14 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/chat-images/"):
             name = unquote(path[len("/api/chat-images/"):].strip("/"))
             self._chat_image_get(name)
+            return
+        if path.startswith("/api/chat-voice/"):
+            name = unquote(path[len("/api/chat-voice/"):].strip("/"))
+            self._chat_voice_get(name)
+            return
+        if path.startswith("/api/chat-attachments/"):
+            name = unquote(path[len("/api/chat-attachments/"):].strip("/"))
+            self._chat_attachments_get(name)
             return
         if path == "/api/ssh/hosts":
             self._ssh_hosts()
@@ -634,6 +675,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/chat-images/save":
             self._chat_image_save(body)
             return
+        if path == "/api/chat-voice/save":
+            self._chat_voice_save(body)
+            return
+        if path == "/api/chat-attachments/save":
+            self._chat_attachments_save(body)
+            return
         if path == "/api/voice/publish":
             self._voice_publish(body)
             return
@@ -691,6 +738,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/code":
             self._code(body)
             return
+        if path == "/api/code/agent":
+            self._code_agent_start(body)
+            return
+        if path == "/api/code/file":
+            self._code_file_post(body)
+            return
+        if path == "/api/code/check":
+            self._code_check(body)
+            return
         if path == "/api/search":
             self._search(body)
             return
@@ -731,6 +787,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/node/poller/stop":
             self._send_json({"ok": True, "stopped": poller_stop()})
             return
+        if path == "/api/tts/start":
+            # Background start: first run builds a venv + downloads
+            # the model (minutes), so the UI polls /api/tts/status.
+            ok = tts_start()
+            self._send_json({"ok": ok, "running": tts_health(),
+                             "note": "starting in background — poll /api/tts/status" if ok else "tts/ not present or launch failed"})
+            return
+        if path == "/api/tts/stop":
+            stopped = tts_stop()
+            self._send_json({"ok": stopped, "running": tts_health(),
+                             "note": "" if stopped else "no recorded TTS process — restart the Hub to stop it"})
+            return
+        if path == "/api/tts/default-voice":
+            self._send_json(nodeapi.set_default_voice(body.get("voice", "")))
+            return
         if path == "/api/node/job/send":
             cap = body.get("capability", "text") or "text"
             payload = {}
@@ -744,6 +815,10 @@ class Handler(BaseHTTPRequestHandler):
                     if body.get(key) not in (None, ""):
                         payload[key] = body.get(key)
             self._send_json(nodeapi.send_job(body.get("to_pubkey", ""), cap, payload))
+            return
+        if path == "/api/voice/local":
+            self._send_json(nodeapi.voice_local(body.get("text", ""),
+                                                body.get("voice", "")))
             return
         if path == "/api/node/transfers/resend":
             self._send_json(nodeapi.resend_transfer(body.get("job_id", "")))
@@ -912,7 +987,9 @@ class Handler(BaseHTTPRequestHandler):
 
         def run():
             try:
-                research.run_task(dd, ident_hash, tid, cloud=cloud)
+                # Explicit re-run from the Research tab: force-claim
+                # a task stuck in 'running' (see claim_task).
+                research.run_task(dd, ident_hash, tid, cloud=cloud, force=True)
             except Exception:
                 pass
         threading.Thread(target=run, daemon=True).start()
@@ -1128,7 +1205,8 @@ class Handler(BaseHTTPRequestHandler):
             ident_hash = self._ident().hash
         except Exception:
             ident_hash = None
-        result = ceti_chat.answer(query, ident_hash=ident_hash)
+        result = ceti_chat.answer(query, ident_hash=ident_hash,
+                                  session_id=body.get("session"))
         if result.get("cloud_suggested"):
             try:
                 ceti_chat.record_miss(data_dir(), query)
@@ -1171,27 +1249,93 @@ class Handler(BaseHTTPRequestHandler):
         max_tokens = int(body.get("max_tokens", 2048))
         temperature = float(body.get("temperature", 0.7))
         use_memory = body.get("use_memory", True)
+        # 2026-11-07: the Thinking toggle. The UI sends thinking=false
+        # when the user turns it off; the local provider passes it to
+        # the llama-server as chat_template_kwargs enable_thinking=false
+        # so the model answers directly instead of burning its output
+        # budget thinking. Default True preserves current behaviour.
+        # Cloud providers are OpenAI-compatible and do not support the
+        # llama.cpp per-request reasoning control, so the flag is ignored
+        # there (and the UI greys the toggle out for known cloud
+        # reasoning models, which cannot have reasoning turned off).
+        thinking = body.get("thinking", True)
+        if not isinstance(thinking, bool):
+            thinking = str(thinking).strip().lower() in {"1", "true", "yes", "on"}
         sample_sources = body.get("sample_sources") or None
         model_label = self._active_model_label(provider, body)
         # Embed by default: retrieve relevant memories/samples, prepend as context.
         memories_used = 0
         used_memories = []
-        if provider == "local" and use_memory and messages:
+        if use_memory and messages:
+            # 2026-11-07: the vector-memory context stays local-only
+            # (the long-term store never goes to a cloud provider),
+            # but the SESSION FILES — the user's own attachments for
+            # this session — go to both. Cloud models take 128k+ of
+            # context, so they get a 30000-char budget; local keeps
+            # the 3000-char budget for its 2048-token context.
             try:
                 ident = self._ident()
                 last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
                 emb = embed_text(last_user) if last_user else None
                 if emb is not None:
                     conn = memory.connect(data_dir())
-                    hits = memory.search(conn, ident.hash, emb, top_k=3, sources=sample_sources)
-                    hits = [h for h in hits if h[0] > 0.5]
-                    memories_used = len(hits)
-                    used_memories = [{"id": rid, "text": txt[:300], "source": src,
-                                      "model": mdl, "score": round(s, 3)}
-                                     for s, txt, src, rid, mdl in hits]
-                    if hits:
-                        ctx = "Relevant memories / sample texts for this identity (use them if they help, ignore them if not; sample texts are style/fact inspiration, never copy them verbatim unless they are facts you are asked to use):\n" + "\n".join(f"- {txt}" for _s, txt, _src, _id, _mdl in hits)
-                        messages = [{"role": "system", "content": ctx}] + messages
+                    if provider == "local":
+                        hits = memory.search(conn, ident.hash, emb, top_k=3, sources=sample_sources)
+                        hits = [h for h in hits if h[0] > 0.5]
+                        memories_used = len(hits)
+                        used_memories = [{"id": rid, "text": txt[:300], "source": src,
+                                          "model": mdl, "score": round(s, 3)}
+                                         for s, txt, src, rid, mdl in hits]
+                        if hits:
+                            ctx = "Relevant memories / sample texts for this identity (use them if they help, ignore them if not; sample texts are style/fact inspiration, never copy them verbatim unless they are facts you are asked to use):\n" + "\n".join(f"- {txt}" for _s, txt, _src, _id, _mdl in hits)
+                            messages = [{"role": "system", "content": ctx}] + messages
+                    # Session files: this session's attachments, embedded
+                    # at upload time, retrieved by the same bar (>0.5).
+                    sess_id = (body.get("session") or "").strip()
+                    if sess_id:
+                        try:
+                            sources = memory.attachment_sources(
+                                conn, ident.hash, sess_id)
+                        except Exception:
+                            sources = []
+                        if sources:
+                            # Cloud models take 128k+ context: top 10
+                            # chunks, 30000-char budget. Local keeps
+                            # top 5 / 3000 for its 2048-token context.
+                            if provider == "local":
+                                sess_top_k, sess_budget = 5, 3000
+                            else:
+                                sess_top_k, sess_budget = 10, 30000
+                            shits = memory.search(
+                                conn, ident.hash, emb, top_k=sess_top_k,
+                                sources=sources)
+                            shits = [h for h in shits if h[0] > 0.5]
+                            if shits:
+                                # 2026-11-07: the session context used to
+                                # be 5 chunks x 1500 chars with no total
+                                # cap (~5754 chars for the rebrand
+                                # session). On a 2048-token local context
+                                # that starves the model of room to think
+                                # and llama-server drops the request —
+                                # the chat returned an empty 200 with no
+                                # error. Accumulate whole chunks by score
+                                # until the budget is spent, slicing only
+                                # the last one to fit. The budget is
+                                # provider-sized: 3000 local, 30000 cloud.
+                                budget = sess_budget
+                                parts = []
+                                for _s, txt, src, _id, _m in shits:
+                                    if budget <= 0:
+                                        break
+                                    piece = txt[:budget]
+                                    parts.append("- %s: %s" % (src, piece))
+                                    budget -= len(piece)
+                                sess_ctx = ("Files attached to this session "
+                                            "(use them as context; they are "
+                                            "the user's own files):\n" +
+                                            "\n".join(parts))
+                                messages = [{"role": "system", "content": sess_ctx}] + messages
+                                memories_used += len(shits)
             except Exception:
                 pass
         # Long-output prompt: tell the model its budget, or it will
@@ -1200,17 +1344,44 @@ class Handler(BaseHTTPRequestHandler):
         # using the original messages, so the note is never stored.
         gen_messages = _apply_output_budget(messages, max_tokens)
         if provider == "local":
+            # 2026-11-07: the local chat server runs at 4096 tokens of
+            # context with --reasoning-budget 512. A big injected prompt
+            # plus a big max_tokens asks for more context than exists,
+            # and llama-server drops the request — which used to surface
+            # as an empty 200 with no error at all. Cap the output
+            # budget to what fits (chars/4 is the estimate). The
+            # reasoning tokens count towards max_tokens, so when
+            # thinking is on the thinking budget (512) is added on top
+            # of the user's answer budget instead of eating it: the
+            # user's max_tokens is the answer, the thinking is extra.
+            # When thinking is off the model needs no thinking room
+            # at all.
+            prompt_chars = sum(len(m.get("content", "")) for m in gen_messages)
+            think_room = 512 if thinking else 0
+            fit_budget = max(256, 4096 - prompt_chars // 4 - 128 - think_room)
+            eff_max_tokens = min(max_tokens, fit_budget)
+            server_max_tokens = eff_max_tokens + think_room
+
             def gen():
                 full = []
                 t_start = time.time()
-                for kind, chunk in stream_chat_events(gen_messages, max_tokens=max_tokens, temperature=temperature):
-                    if kind == "text":
-                        full.append(chunk)
-                        yield {"kind": kind, "text": chunk}
-                    elif kind == "usage":
-                        yield {"kind": "usage", "tokens": chunk.get("tokens", 0)}
-                    else:
-                        yield {"kind": kind, "text": chunk}
+                try:
+                    stream = stream_chat_events(gen_messages, max_tokens=server_max_tokens, temperature=temperature, reasoning=thinking)
+                except Exception as e:
+                    yield {"kind": "error", "text": f"local model error: {e}"}
+                    return
+                try:
+                    for kind, chunk in stream:
+                        if kind == "text":
+                            full.append(chunk)
+                            yield {"kind": kind, "text": chunk}
+                        elif kind == "usage":
+                            yield {"kind": "usage", "tokens": chunk.get("tokens", 0)}
+                        else:
+                            yield {"kind": kind, "text": chunk}
+                except Exception as e:
+                    yield {"kind": "error", "text": f"local model error: {e}"}
+                    return
                 gen_seconds = time.time() - t_start
                 # Save the exchange to vector memory (embed by default).
                 if use_memory:
@@ -1430,6 +1601,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _ssh_connect(self, body):
         mgr = _ssh_manager()
+        # 0.0.1-beta2: ConPTY is opt-in (checkbox in the SSH
+        # pane). The Windows default is the pipe session, which
+        # rendered the HF TUI in r–t; ConPTY was the default
+        # from u through beta and never delivered a byte on the
+        # laptop. A truthy value of any shape (true/"true"/1)
+        # opts in.
+        use_conpty = body.get("use_conpty", False) in (
+            True, 1, "true", "True", "1", "yes", "on")
         try:
             cols = int(body.get("cols", 80) or 80)
             rows = int(body.get("rows", 24) or 24)
@@ -1441,12 +1620,13 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 sid = mgr.connect(host["host"], host["port"],
                                   host["username"], host["key_id"],
-                                  cols, rows)
+                                  cols, rows, use_conpty=use_conpty)
             else:
                 sid = mgr.connect(body.get("host", ""),
                                   body.get("port", 22),
                                   body.get("username", ""),
-                                  body.get("key_id", ""), cols, rows)
+                                  body.get("key_id", ""), cols, rows,
+                                  use_conpty=use_conpty)
         except (ValueError, RuntimeError) as e:
             self._send_json({"error": str(e)}, status=400)
             return
@@ -1919,6 +2099,143 @@ class Handler(BaseHTTPRequestHandler):
             data = f.read()
         self.send_response(200)
         self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _chat_voice_save(self, body):
+        """POST /api/chat-voice/save — store a generated voice MP3
+        under data/chat-voice/ so a voice render survives reloads
+        and session switches. Sessions store the filename, not
+        base64 bytes — the same pattern as chat images. MP3 only
+        (ID3 header or MPEG frame sync), 20MB cap, basename-
+        sanitized, collision gets a timestamp suffix."""
+        import base64
+        raw = (body.get("data") or "").strip()
+        if not raw:
+            self._send_json({"error": "voice data required"}, status=400)
+            return
+        try:
+            data = base64.b64decode(raw, validate=True)
+        except Exception:
+            self._send_json({"error": "data must be base64"}, status=400)
+            return
+        is_mp3 = data.startswith(b"ID3") or (
+            len(data) > 1 and data[0] == 0xFF and (data[1] & 0xE0) == 0xE0)
+        if not is_mp3 or len(data) > 20 * 1024 * 1024:
+            self._send_json({"error": "MP3 under 20MB required"}, status=400)
+            return
+        d = os.path.join(data_dir(), "chat-voice")
+        os.makedirs(d, exist_ok=True)
+        name = os.path.basename((body.get("filename") or "voice").strip()) or "voice"
+        if not name.endswith(".mp3"):
+            name += ".mp3"
+        pth = os.path.join(d, name)
+        if os.path.exists(pth):
+            stem = name[:-4]
+            name = "%s-%d.mp3" % (stem, int(time.time()))
+            pth = os.path.join(d, name)
+        with open(pth, "wb") as f:
+            f.write(data)
+        self._send_json({"ok": True, "filename": name, "size": len(data)})
+
+    def _chat_voice_get(self, name):
+        """GET /api/chat-voice/<name> — one stored voice MP3, or 404."""
+        name = os.path.basename(unquote(name))
+        pth = os.path.join(data_dir(), "chat-voice", name)
+        if not name.endswith(".mp3") or not os.path.isfile(pth):
+            self._send_json({"error": "no such voice"}, status=404)
+            return
+        with open(pth, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", "audio/mpeg")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _chat_attachments_save(self, body):
+        """POST /api/chat-attachments/save — store a chat attachment
+        under data/chat-attachments/ and embed its text into vector
+        memory tagged with the session, so the session's brain layer
+        can use it as context. Text/code/markdown/HTML/JSON/CSV and
+        PDF are extracted; images are stored and shown (a vision
+        model reads them directly). 10MB cap, basename-sanitized,
+        collision gets a timestamp suffix. The embed step is
+        fail-soft: a file is still stored and returned when the
+        embed server is down (embedded: 0)."""
+        import base64
+        from . import attachments as _att
+        raw = (body.get("data") or "").strip()
+        filename = os.path.basename((body.get("filename") or "file").strip()) or "file"
+        session = "".join(c for c in (body.get("session") or "default").strip()
+                          if c.isalnum() or c in "-_") or "default"
+        if not raw:
+            self._send_json({"error": "file data required"}, status=400)
+            return
+        try:
+            data = base64.b64decode(raw, validate=True)
+        except Exception:
+            self._send_json({"error": "data must be base64"}, status=400)
+            return
+        kind = _att.kind_for(filename)
+        if kind is None or len(data) > _att.MAX_BYTES:
+            self._send_json({"error": "unsupported file type, or over 10MB"},
+                            status=400)
+            return
+        d = os.path.join(data_dir(), "chat-attachments")
+        os.makedirs(d, exist_ok=True)
+        name = filename
+        pth = os.path.join(d, name)
+        if os.path.exists(pth):
+            stem, ext = os.path.splitext(name)
+            name = "%s-%d%s" % (stem, int(time.time()), ext)
+            pth = os.path.join(d, name)
+        with open(pth, "wb") as f:
+            f.write(data)
+        kind, text = _att.extract_text(name, data, stored_path=pth)
+        chunks = _att.chunk_text(text)
+        embedded = 0
+        if chunks:
+            try:
+                ident_hash = self._ident().hash
+                from .servers import embed_text
+                from . import memory
+                conn = memory.connect(data_dir())
+                try:
+                    for ch in chunks:
+                        emb = embed_text(ch)
+                        if emb is None:
+                            break
+                        memory.add(conn, ident_hash, ch, emb,
+                                   source="attachment:%s:%s" % (session, name),
+                                   tags="session:%s" % session,
+                                   model="attachment")
+                        embedded += 1
+                finally:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        self._send_json({"ok": True, "filename": name, "kind": kind,
+                         "size": len(data), "chunks": len(chunks),
+                         "embedded": embedded})
+
+    def _chat_attachments_get(self, name):
+        """GET /api/chat-attachments/<name> — one stored attachment, or 404."""
+        import mimetypes
+        name = os.path.basename(unquote(name))
+        pth = os.path.join(data_dir(), "chat-attachments", name)
+        if not name or not os.path.isfile(pth):
+            self._send_json({"error": "no such attachment"}, status=404)
+            return
+        ctype, _ = mimetypes.guess_type(name)
+        with open(pth, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype or "application/octet-stream")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -2447,6 +2764,99 @@ class Handler(BaseHTTPRequestHandler):
                 memory.add(conn, ident.hash, content, emb, source=f"code:{body['file']}", tags="code",
                            model=self._active_model_label("local", {}))
         self._send_json({"code": content, "saved": saved, "ledger": ledger})
+
+    def _code_agent_start(self, body):
+        provider = body.get("provider") or "openrouter"
+        model = (body.get("model") or "").strip()
+        prompt = (body.get("prompt") or "").strip()
+        api_key = body.get("api_key") or ""
+        if provider not in ("orcarouter", "openrouter", "nvidia"):
+            self._send_json({"error": "provider must be orcarouter, openrouter or nvidia"}, status=400)
+            return
+        if not model:
+            self._send_json({"error": "pick a model first"}, status=400)
+            return
+        if not prompt:
+            self._send_json({"error": "describe the task first"}, status=400)
+            return
+        if not api_key:
+            from .cloud import key_for
+            api_key = key_for(provider)
+        if not api_key:
+            self._send_json({"error": "add your %s key in Settings first" % provider}, status=400)
+            return
+        job = uuid.uuid4().hex[:12]
+        session = (body.get("session") or "").strip() or uuid.uuid4().hex[:12]
+        _code_agent_jobs[job] = {"status": "running", "log": [],
+                                 "result": None, "error": None,
+                                 "session": session}
+        seed_files = body.get("seed_files") or []
+
+        def run():
+            try:
+                from .codeagent import run_agent
+                res = run_agent(prompt, provider, model, api_key,
+                                session=session, seed_files=seed_files,
+                                log=_code_agent_jobs[job]["log"])
+                _code_agent_jobs[job]["result"] = res
+                _code_agent_jobs[job]["status"] = "done"
+            except Exception as e:
+                _code_agent_jobs[job]["error"] = str(e)
+                _code_agent_jobs[job]["status"] = "failed"
+                _code_agent_jobs[job]["log"].append("failed: %s" % e)
+        threading.Thread(target=run, daemon=True).start()
+        self._send_json({"ok": True, "job": job, "session": session})
+
+    def _code_agent_status(self, job):
+        rec = _code_agent_jobs.get(job)
+        if rec is None:
+            self._send_json({"error": "unknown job"}, status=404)
+            return
+        self._send_json(rec)
+
+    def _ws_folder(self, session):
+        """A WorkFolder for a workspace session id (no seeds — the
+        folder already exists after an agent run)."""
+        from .codeagent import WorkFolder
+        if not session or not isinstance(session, str):
+            raise ValueError("missing session")
+        if len(session) > 64 or not session.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("bad session id")
+        return WorkFolder(session)
+
+    def _code_files(self, parsed):
+        try:
+            wf = self._ws_folder(parse_qs(parsed.query).get("session", [""])[0])
+            self._send_json({"files": wf.list_files().split("\n")})
+        except Exception as e:
+            self._send_json({"error": str(e)}, status=400)
+
+    def _code_file_get(self, parsed):
+        try:
+            q = parse_qs(parsed.query)
+            wf = self._ws_folder(q.get("session", [""])[0])
+            path = q.get("path", [""])[0]
+            self._send_json({"path": path, "content": wf.read_full(path)})
+        except Exception as e:
+            self._send_json({"error": str(e)}, status=400)
+
+    def _code_file_post(self, body):
+        try:
+            wf = self._ws_folder(body.get("session") or "")
+            res = wf.write_file(body.get("path") or "",
+                                body.get("content") or "")
+            self._send_json({"ok": True, "result": res})
+        except Exception as e:
+            self._send_json({"error": str(e)}, status=400)
+
+    def _code_check(self, body):
+        try:
+            wf = self._ws_folder(body.get("session") or "")
+            result = wf.run_check(body.get("path") or "")
+            self._send_json({"ok": result.startswith("OK"),
+                             "result": result})
+        except Exception as e:
+            self._send_json({"error": str(e)}, status=400)
 
     def _search(self, body):
         """Unified vector library search: chat, stories, ezines, code,

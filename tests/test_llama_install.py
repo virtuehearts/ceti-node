@@ -57,10 +57,40 @@ class PickAssetTest(unittest.TestCase):
         self.assertIsNone(llama_mod._pick_asset([], True, "x64"))
 
     def test_linux_prefers_ubuntu_vulkan(self):
-        assets = [_asset("llama-b12012-bin-linux-cpu-x64.zip"),
-                  _asset("llama-b12012-bin-ubuntu-vulkan-x64.zip")]
+        # Current release format: Linux packages are .tar.gz, not .zip.
+        assets = [_asset("llama-b12192-bin-linux-cpu-x64.tar.gz"),
+                  _asset("llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")]
         self.assertEqual(llama_mod._pick_asset(assets, False, "x64")["name"],
-                         "llama-b12012-bin-ubuntu-vulkan-x64.zip")
+                         "llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")
+
+    def test_linux_tarball_accepted_and_zip_still_works(self):
+        # Old releases shipped Linux as .zip; both must be accepted.
+        self.assertEqual(
+            llama_mod._pick_asset([_asset("llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")], False, "x64")["name"],
+            "llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")
+        self.assertEqual(
+            llama_mod._pick_asset([_asset("llama-b12012-bin-ubuntu-vulkan-x64.zip")], False, "x64")["name"],
+            "llama-b12012-bin-ubuntu-vulkan-x64.zip")
+
+    def test_linux_plain_ubuntu_is_the_cpu_build(self):
+        # The plain Ubuntu package has no 'cpu' in its name
+        # (llama-*-bin-ubuntu-x64.tar.gz) — it must still match the
+        # cpu fallback, while accelerated builds must not.
+        assets = [_asset("llama-b12192-bin-ubuntu-x64.tar.gz")]
+        self.assertEqual(llama_mod._pick_asset(assets, False, "x64")["name"],
+                         "llama-b12192-bin-ubuntu-x64.tar.gz")
+        accel = [_asset("llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")]
+        self.assertEqual(llama_mod._pick_asset(accel, False, "x64")["name"],
+                         "llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")
+
+    def test_linux_cpu_fallback_skips_accelerated_builds(self):
+        # When only accelerated builds exist, the cpu fallback must
+        # not grab one (it has an accelerator keyword) — the vulkan
+        # preference above it wins instead.
+        assets = [_asset("llama-b12192-bin-ubuntu-cuda-13.5-x64.tar.gz"),
+                  _asset("llama-b12192-bin-ubuntu-rocm-10.0-x64.tar.gz")]
+        self.assertEqual(llama_mod._pick_asset(assets, False, "x64")["name"],
+                         "llama-b12192-bin-ubuntu-cuda-13.5-x64.tar.gz")
 
 
 class InstallServerTest(unittest.TestCase):
@@ -82,6 +112,23 @@ class InstallServerTest(unittest.TestCase):
         self.downloaded.append(url)
         with zipfile.ZipFile(dest, "w") as z:
             z.writestr("llama-server", "#!/bin/sh\necho fake\n")
+
+    def _fake_tar_download(self, url, dest):
+        # A real .tar.gz in the current llama.cpp layout: the binary
+        # (and its .so libs) live inside a llama-bXXXX/ subfolder,
+        # not at the top level. install_server must flatten it.
+        import tarfile
+        import io
+        self.downloaded.append(url)
+        data = b"#!/bin/sh\necho fake\n"
+        lib = b"fake lib\n"
+        with tarfile.open(dest, "w:gz") as t:
+            for name, blob in (("llama-b99999/llama-server", data),
+                               ("llama-b99999/libllama.so", lib)):
+                info = tarfile.TarInfo(name)
+                info.size = len(blob)
+                info.mode = 0o755
+                t.addfile(info, io.BytesIO(blob))
 
     def _run_install(self, latest_assets, list_releases):
         import urllib.request
@@ -121,6 +168,25 @@ class InstallServerTest(unittest.TestCase):
     def test_nothing_anywhere_raises(self):
         with self.assertRaises(RuntimeError):
             self._run_install([_asset("nightly-tag.txt")], [{"tag_name": "b12012", "assets": []}])
+
+    def test_tarball_install_flattens_subfolder(self):
+        # 0.0.1xa laptop crash: the Linux .tar.gz extracts to
+        # bin/llama-bXXXX/ (binary + libs inside), not flat. The
+        # binary must end up at bin/llama-server with its libs
+        # beside it, or find_server() never sees it.
+        import urllib.request
+        llama_mod._github_json = lambda url: {"tag_name": "b12192", "assets": [
+            _asset("llama-b12192-bin-ubuntu-vulkan-x64.tar.gz")]}
+        old_retrieve = urllib.request.urlretrieve
+        urllib.request.urlretrieve = self._fake_tar_download
+        try:
+            server = llama_mod.install_server()
+        finally:
+            urllib.request.urlretrieve = old_retrieve
+        self.assertTrue(server.endswith("llama-server"))
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp.name, "llama-server")))
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp.name, "libllama.so")))
+        self.assertFalse(os.path.isdir(os.path.join(self.tmp.name, "llama-b99999")))
 
 
 class EnsureServersTest(unittest.TestCase):

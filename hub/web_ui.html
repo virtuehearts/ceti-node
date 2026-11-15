@@ -168,6 +168,26 @@ button.chan .label{color:var(--dim)}
 .msg .body p{margin:0 0 8px}
 .msg .body p:last-child{margin-bottom:0}
 .msg .body code{color:var(--amber);font-size:12.5px}
+/* Expandable code box: fenced ``` blocks in chat render as a
+   collapsed box (header always visible, body capped) that expands
+   to full height on click. Copy copies the raw code. */
+.codebox{border:1px solid #173f4d;background:#0a1418;margin:8px 0;border-radius:6px;overflow:hidden}
+.codebox-head{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0e1e24;cursor:pointer;user-select:none}
+.codebox-head .lang{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--phos);font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.codebox-head button{font-size:11px;padding:2px 8px;cursor:pointer}
+.codebox pre{margin:0;padding:10px 12px;max-height:170px;overflow:hidden;white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.5;color:var(--ink);position:relative}
+.codebox pre::after{content:'';position:absolute;left:0;right:0;bottom:0;height:28px;background:linear-gradient(transparent,#0a1418)}
+.codebox.open pre{max-height:none;overflow:visible}
+.codebox.open pre::after{display:none}
+.codebox .toggle{color:var(--dim);font-size:11px}
+/* Attachment tray above the composer + paperclip button. */
+.attach-tray{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.attach-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid #173f4d;background:#0e1e24;border-radius:12px;padding:3px 6px 3px 10px;font-size:12px;color:var(--ink)}
+.attach-chip button{font-size:11px;padding:1px 6px;cursor:pointer}
+.attach-chip .kind{color:var(--dim);font-size:11px}
+.attach-link{display:inline-block;border:1px solid #173f4d;border-radius:6px;padding:4px 8px;margin:4px 0;font-size:12.5px;color:var(--phos);text-decoration:none}
+.attach-img{max-width:100%;border-radius:6px;margin:6px 0}
+.clip-btn{flex:0 0 auto}
 .msg .foot{display:flex;gap:14px;flex-wrap:wrap;margin-top:5px;font-size:11px;color:var(--faint);align-items:center}
 .msg .foot .tps{color:var(--phos)}
 .msg .foot button{
@@ -276,6 +296,8 @@ button.chan .label{color:var(--dim)}
 }
 .switch[aria-pressed="true"]{border-color:var(--phos-dim)}
 .switch[aria-pressed="true"]::after{left:20px;background:var(--phos)}
+.switch:disabled{opacity:.35;cursor:not-allowed}
+.switch:disabled + .switch-state{color:var(--faint)}
 .switch-state{font-size:10.5px;color:var(--faint);min-width:24px;text-transform:uppercase;letter-spacing:.08em}
 .switch[aria-pressed="true"] + .switch-state{color:var(--phos)}
 .controls .live{margin-left:auto;font-size:11px;color:var(--dim);display:flex;gap:14px;align-items:center}
@@ -386,11 +408,11 @@ button.chan .label{color:var(--dim)}
 .irc-roster{width:210px;flex:none;border-left:1px solid var(--line);padding-left:12px}
 .presence-user{margin-bottom:10px}
 .presence-nodeid{display:block;font-size:11px;color:var(--phos);word-break:break-all}
-@media (max-width:700px){.irc-row{flex-direction:column}.irc-roster{width:auto;border-left:none;padding-left:0}}
+@media (max-width:720px){.irc-row{flex-direction:column}.irc-roster{width:auto;border-left:none;padding-left:0}}
 .console-cursor{display:inline-block;width:9px;height:16px;background:var(--phos);margin-left:6px;vertical-align:middle;animation:consoleBlink 1s steps(1) infinite}
 @keyframes consoleBlink{50%{opacity:0}}
 #nodeCard{border:1px solid var(--phos-dim);padding:12px;margin:10px 0;background:#000}
-@media (max-width:700px){
+@media (max-width:720px){
   .node-layout{flex-direction:column}
   .node-menu{flex:0 0 auto;flex-direction:row;flex-wrap:wrap}
 }
@@ -530,10 +552,15 @@ button.chan .label{color:var(--dim)}
 .chat-scroll,.tele,.system-view,.log,.chan-list,.tabview{overscroll-behavior:contain}
 
 /* ---------- Responsive ---------- */
+.img-toggle{display:none}
 @media (max-width:720px){
   .deck{display:flex;flex-direction:column}
   .gadgets{display:none}
-  .titlebar .name{font-size:11px;letter-spacing:.1em;padding:4px 10px}
+  /* Phone: the long wordmark + 5 tabs + clock never fit 412px together.
+     Keep the logo, drop the wordmark, let the tabs scroll if needed. */
+  .titlebar .name{display:none}
+  .view-tabs{overflow-x:auto;flex:1 1 auto;min-width:0;-webkit-overflow-scrolling:touch}
+  .view-tab{flex:0 0 auto}
   .titlebar .readout{padding:4px 10px;gap:8px;font-size:11px}
   .titlebar .readout .hideable{display:none}
   .node-mark{margin-left:8px}
@@ -567,10 +594,10 @@ button.chan .label{color:var(--dim)}
   .msg .foot button{min-height:44px;padding:10px 6px;display:inline-flex;align-items:center}
   /* Composer: pinned at the bottom, 44px+ touch targets */
   .composer{padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
-  .prompt-wrap{min-height:48px;padding:0 10px}
+  .prompt-wrap{min-height:48px;padding:0 10px;min-width:0}
   #chatInput{font-size:16px;padding:13px 0}
-  .send{min-height:48px;padding:0 18px}
-  .controls{flex-wrap:nowrap;gap:8px;margin-top:6px}
+  .send{min-height:48px;padding:0 18px;flex:0 0 auto}
+  .controls{flex-wrap:wrap;gap:8px;margin-top:6px}
   .ctl{min-height:30px;gap:6px}
   .ctl label,.ctl .ctl-label{font-size:10px}
   .ctl label[for="outMult"]{display:none}
@@ -590,6 +617,26 @@ button.chan .label{color:var(--dim)}
   .think-head{min-height:44px}
   .log div{white-space:normal}
   .panel{padding:14px}
+  /* Chat-first on phones: the conversation is the screen, not the chrome.
+     Sessions stay visible as a sideways-scrolling chip strip — hiding
+     them behind the More-sessions drawer saved a row but hid the
+     workspaces (restored 2026-11-06). The image row hides behind the
+     ▸ Image toggle; the status lines already live in System. */
+  .chan-list{padding:4px 10px}
+  .chan-list .chan{display:flex;min-height:34px;padding:0 10px}
+  .col.chat > .panel-head{padding:8px 10px;gap:8px;min-height:0}
+  #chat-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  #msg-count{display:none}
+  #pkgBtn{white-space:nowrap;min-height:32px;padding:4px 8px;font-size:11px}
+  .provbar{flex-wrap:wrap;padding:5px 10px;gap:8px}
+  .provbar select,.provbar input{flex:1 1 45%;min-width:0}
+  #topStatus{display:none}
+  .composer .controls.img-row{display:none}
+  .composer.show-image .controls.img-row{display:flex}
+  .prompt-row .img-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:36px;flex:0 0 auto;padding:0 8px;font-size:14px}
+  .controls .live{display:none}
+  .outNote{display:none}
+  .statusbar{display:none}
 }
 @media (prefers-reduced-motion:reduce){
   .cursor{animation:none}
@@ -667,7 +714,8 @@ button.chan .label{color:var(--dim)}
         <option value="nvidia">Nvidia (cloud)</option>
       </select>
       <select id="peerBackend" title="Chat via a peer node's text endpoint"><option value="">Peer chat: local model</option></select>
-      <select id="cloudModel" style="display:none;min-width:240px"></select>
+      <select id="cloudModel" style="display:none;min-width:240px" onchange="updateThinkToggle()"></select>
+      <input id="cloudModelCustom" type="text" placeholder="custom model id…" style="display:none;min-width:200px" title="Type any model id — it overrides the list. Saved in this browser." onchange="saveCustomCloudModel();updateThinkToggle()">
       <button type="button" onclick="refreshCloudModels()" id="refreshModelsBtn" style="display:none">List models</button>
       <span class="small" id="topStatus"></span>
     </div>
@@ -682,6 +730,7 @@ button.chan .label{color:var(--dim)}
         <label class="small">Key</label><select id="sshKey" style="min-width:140px"><option value="">no key</option></select>
         <button type="button" id="sshConnectBtn" onclick="sshConnect()">Connect</button>
         <button type="button" id="sshDisconnectBtn" onclick="sshDisconnect()" disabled>Disconnect</button>
+        <label class="small" title="ConPTY enables live resize, but it never delivered a byte on this laptop (u–beta). Leave it off unless tools\conpty_selftest.py passes."><input type="checkbox" id="sshConpty"> ConPTY (experimental)</label>
         <button type="button" onclick="sshSaveHost()">Save host</button>
         <button type="button" onclick="sshDeleteHost()">Delete saved host</button>
         <span class="small" id="sshStatus"></span>
@@ -766,14 +815,18 @@ button.chan .label{color:var(--dim)}
 <!-- ===== Composer ===== -->
 <div class="composer">
   <div class="composer-inner">
+    <div class="attach-tray" id="attachTray" style="display:none"></div>
     <form class="prompt-row" id="prompt-form">
+      <button type="button" class="img-toggle" onclick="this.textContent=document.querySelector('.composer').classList.toggle('show-image')?'▾':'▸'" aria-label="Toggle image controls" title="Image controls">▸</button>
       <div class="prompt-wrap">
         <span class="sigil" aria-hidden="true">&gt;</span>
         <textarea id="chatInput" rows="1" autocomplete="off" placeholder="Message the deck — it answers locally…" aria-label="Message"></textarea>
       </div>
+      <button type="button" class="clip-btn" id="attachBtn" title="Attach photo, file or code" aria-label="Attach file">📎</button>
+      <input type="file" id="attachInput" multiple hidden>
       <button class="send" id="send-btn" type="submit">Send</button>
     </form>
-    <div class="controls" style="margin-top:6px">
+    <div class="controls img-row" style="margin-top:6px">
       <div class="ctl">
         <label for="peerImageBackend">Image peer</label>
         <select id="peerImageBackend"><option value="">no image peer selected</option></select>
@@ -856,9 +909,35 @@ button.chan .label{color:var(--dim)}
             <button class="srv-btn" type="button" onclick="pollerControl('stop')">Stop</button>
           </div>
         </div>
+        <div class="srv">
+          <div>
+            <div class="srv-name">TTS SERVER</div>
+            <div class="srv-sub">PocketTTS · 127.0.0.1:8000 · local voices</div>
+          </div>
+          <span class="srv-status" id="srv-tts-status">—</span>
+          <div class="srv-actions">
+            <button class="srv-btn" type="button" onclick="ttsControl('start')">Start</button>
+            <button class="srv-btn" type="button" onclick="ttsControl('stop')">Stop</button>
+          </div>
+        </div>
         <div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" onclick="restartServer('both')">Restart both</button>
           <button type="button" onclick="loadServers()">Refresh servers</button>
+        </div>
+        <div style="padding:0 12px 10px">
+          <div class="panel-head"><span>Voice — pick, test, set default</span><span class="val" id="tts-default-val">DEFAULT mya-03</span></div>
+          <p class="small">The container's old voice panel, in the Hub: the voices the local bridge knows, a test line spoken in the selected voice, and the default voice for jobs and Generate voice.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+            <label class="small">Voice</label>
+            <select id="ttsVoiceSelect" style="min-width:180px"></select>
+            <button type="button" onclick="setDefaultTTSVoice()">Set as default</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="ttsTestText" placeholder="Test text…" value="Hello, this is a test of the local voice." style="flex:1;min-width:220px">
+            <button type="button" onclick="testTTSVoice()">Test voice</button>
+          </div>
+          <div id="ttsTestOut" style="margin-top:8px;font-size:11px;color:var(--dim)"></div>
+          <div id="ttsLog" style="margin-top:8px;font-size:11px;color:var(--dim);white-space:pre-wrap;max-height:120px;overflow:auto"></div>
         </div>
         <div id="serverOut" style="padding:0 12px 10px;font-size:11px;color:var(--dim)">Loading servers…</div>
         <div class="sys-card">
@@ -1217,7 +1296,27 @@ button.chan .label{color:var(--dim)}
 <label>What should the code do?</label><textarea id="codePrompt" placeholder="Write a Python function that…"></textarea>
 <label>Save as (optional, e.g. helper.py)</label><input id="codeFile" placeholder="helper.py">
 <button type="button" onclick="askCode()">Generate code</button>
+<button type="button" onclick="copyCode()" style="margin-left:8px">Copy code</button>
+<button type="button" onclick="$('codeOut').textContent=''" style="margin-left:8px">Clear</button>
 <pre id="codeOut" style="white-space:pre-wrap"></pre>
+<hr>
+<h3>Code agent — tools in a work folder</h3>
+<p class="small">Give the agent a task. It reads, edits and syntax-checks files in a work folder (<code>data/code-work/</code>) with the cloud model you pick — the model never sees your key, your data, or anything outside the folder. A copy of <code>hub/web_ui.html</code> is seeded in, so ask it to change this interface and it edits the copy.</p>
+<label>Provider</label><select id="agentProvider" onchange="loadAgentModels()"><option value="openrouter">OpenRouter</option><option value="orcarouter">OrcaRouter</option><option value="nvidia">Nvidia</option></select>
+<label>Model</label><select id="agentModel"></select>
+<label>Task</label><textarea id="agentPrompt" placeholder="Add a Copy button to the code output…"></textarea>
+<button type="button" onclick="runAgent()">Run agent</button>
+<pre id="agentLog" style="white-space:pre-wrap"></pre>
+<div id="agentFiles" class="small"></div>
+<hr>
+<h3>Code workspace - edit in the browser</h3>
+<label for="wsFile">File</label><select id="wsFile"></select>
+<button type="button" id="wsRefresh" onclick="wsRefreshFiles()">Refresh files</button>
+<label for="wsEditor">Editor</label><textarea id="wsEditor" rows="16" style="font-family:monospace"></textarea>
+<button type="button" id="wsLoad" onclick="wsLoadFile()">Load</button>
+<button type="button" id="wsSave" onclick="wsSaveFile()">Save</button>
+<button type="button" id="wsCheck" onclick="wsCheckFile()">Run check</button>
+<div id="wsStatus" class="small" role="status"></div>
 </div></div>
 
 <div id="view-search" class="tabview" hidden><div class="panel">
@@ -1460,6 +1559,7 @@ function showTab(name){
   if(name==='research'){ loadResearch(); startResearchTimer(); } else { stopResearchTimer(); }
   if(name==='samples') loadSamples();
   if(name==='ezines') loadEzines();
+  if(name==='code') loadAgentModels();
   if(name==='chat'){ const inp=$('chatInput'); if(inp) inp.focus(); }
 }
 // Node tab sub-pages (left menu) + IRC-style auto-refresh while the
@@ -1525,6 +1625,44 @@ wireSwitch('sw-mem','sw-mem-state', function(on){
   if(!on) showMemoryDetail('MEMORY OFF','Use memory is off for this session — the constellation stays mounted, but nothing is pulled into context.');
 });
 wireSwitch('sw-samp','sw-samp-state');
+// Reasoning models: the Thinking toggle cannot turn reasoning off
+// for these — they think by design, and the providers give no
+// per-request switch for it. The toggle is greyed out instead.
+// (Local LFM3 is NOT in this list: the toggle works there — the Hub
+// passes thinking=false to the llama-server as chat_template_kwargs
+// enable_thinking=false. Non-reasoning cloud models are not listed
+// either, so the toggle stays live for them; it is simply ignored
+// server-side, since those models do not think.)
+var REASONING_MODELS = [
+  'nvidia/nemotron-3.5-lightning-30b-a3b',
+  'nvidia/nemotron-3-nano-30b-a3b'
+];
+function isReasoningModel(modelId){
+  if(!modelId) return false;
+  var id = String(modelId).toLowerCase();
+  if(id.indexOf('reasoning') !== -1) return true;
+  for(var i=0;i<REASONING_MODELS.length;i++){
+    if(id === REASONING_MODELS[i].toLowerCase()) return true;
+  }
+  return false;
+}
+function updateThinkToggle(){
+  var btn = $('sw-think'), st = $('sw-think-state');
+  if(!btn || !st) return;
+  var locked = provider !== 'local' && isReasoningModel(cloudModelActive());
+  if(locked){
+    // The model will think regardless: show On and lock it.
+    btn.setAttribute('aria-pressed','true');
+    st.textContent = 'On';
+    btn.disabled = true;
+    btn.title = 'Reasoning cannot be turned off for this model';
+    st.title = 'Reasoning cannot be turned off for this model';
+  } else {
+    btn.disabled = false;
+    btn.title = '';
+    st.title = '';
+  }
+}
 // Telemetry window: floating button in the chat area opens it.
 function openTele(){
   const w=$('teleWindow'), s=$('tele-scrim');
@@ -1560,6 +1698,92 @@ function updateCount(){
   // Transcript length, not article count: the welcome sys article is not a message.
   $('msg-count').textContent = messages.length + ' MESSAGES';
 }
+// ---------- Expandable code boxes + attachments ----------
+// Fenced ``` blocks in chat render as a collapsed box (header always
+// visible, body capped at ~170px) that expands to full height on
+// click. Copy copies the raw code. renderRichText replaces a body's
+// single <p> with parsed blocks; plain text keeps one <p>.
+function codeBoxEl(lang, code, label){
+  const box = document.createElement('div');
+  box.className = 'codebox';
+  const head = document.createElement('div');
+  head.className = 'codebox-head';
+  const lg = document.createElement('span'); lg.className = 'lang';
+  lg.textContent = label || (lang || 'code');
+  const tg = document.createElement('span'); tg.className = 'toggle';
+  tg.textContent = 'expand';
+  const cp = document.createElement('button'); cp.type = 'button'; cp.textContent = 'Copy';
+  cp.onclick = function(e){ e.stopPropagation(); navigator.clipboard.writeText(code).then(function(){ cp.textContent = 'Copied'; setTimeout(function(){ cp.textContent = 'Copy'; }, 1200); }); };
+  head.append(lg, tg, cp);
+  head.onclick = function(){ const open = box.classList.toggle('open'); tg.textContent = open ? 'collapse' : 'expand'; };
+  const pre = document.createElement('pre');
+  pre.textContent = code;
+  box.append(head, pre);
+  return box;
+}
+function renderRichText(body, text){
+  body.innerHTML = '';
+  const parts = String(text || '').split(/```(\w*)\n?([\s\S]*?)```/g);
+  let any = false;
+  for(let i = 0; i < parts.length; i += 3){
+    const prose = parts[i];
+    if(prose){
+      const p = document.createElement('p');
+      p.textContent = prose;
+      body.appendChild(p);
+      any = true;
+    }
+    if(i + 2 < parts.length){
+      body.appendChild(codeBoxEl(parts[i+1] || '', parts[i+2] || ''));
+      any = true;
+    }
+  }
+  if(!any){
+    const p = document.createElement('p');
+    p.textContent = text || '';
+    body.appendChild(p);
+  }
+  return body.querySelector('p');
+}
+var pendingAttachments = [];
+function renderAttachTray(){
+  const tray = $('attachTray');
+  if(!tray) return;
+  tray.innerHTML = '';
+  tray.style.display = pendingAttachments.length ? 'flex' : 'none';
+  pendingAttachments.forEach(function(att, idx){
+    const chip = document.createElement('span');
+    chip.className = 'attach-chip';
+    chip.textContent = att.filename;
+    const k = document.createElement('span'); k.className = 'kind';
+    k.textContent = att.kind + (att.embedded ? ' · ' + att.embedded + ' chunks' : '');
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '×';
+    x.onclick = function(){ pendingAttachments.splice(idx, 1); renderAttachTray(); };
+    chip.appendChild(k); chip.appendChild(x);
+    tray.appendChild(chip);
+  });
+}
+async function uploadAttachments(files){
+  for(const f of files){
+    try{
+      const b64 = await new Promise(function(res, rej){
+        const r = new FileReader();
+        r.onload = function(){ res(String(r.result).split(',')[1] || ''); };
+        r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+      const r = await fetch('/api/chat-attachments/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data: b64, filename: f.name, session: currentSid})});
+      const j = await r.json();
+      if(!r.ok || j.error){ alert('Attach failed: ' + (j.error || r.status)); continue; }
+      let text = '';
+      if(j.kind === 'text'){
+        try{ text = (await f.text()).slice(0, 4000); }catch(e){}
+      }
+      pendingAttachments.push({filename: j.filename, kind: j.kind, chunks: j.chunks, embedded: j.embedded, text: text});
+    }catch(e){ alert('Attach failed: ' + e.message); }
+  }
+  renderAttachTray();
+}
 function addMsg(role, text, model, extra){
   const cls = role==='user' ? 'you' : (role==='system' ? 'sys' : 'hub');
   const who = role==='user' ? 'You' : (role==='system' ? 'System' : (model || 'Hub'));
@@ -1572,8 +1796,11 @@ function addMsg(role, text, model, extra){
   meta.append(w, t);
   const body = document.createElement('div');
   body.className = 'body';
-  const p = document.createElement('p'); p.textContent = text;
+  let p = document.createElement('p'); p.textContent = text;
   body.appendChild(p);
+  // Fenced code renders as expandable boxes; the streaming
+  // placeholder ('') has no fences, so its <p> stays live.
+  if((text || '').indexOf('```') >= 0){ p = renderRichText(body, text); }
   art.append(meta, body);
   if(role === 'assistant' && extra && extra.thinking){
     const think = buildThink();
@@ -1597,8 +1824,28 @@ function addMsg(role, text, model, extra){
       regen.onclick = function(){ regenerate(art); };
       foot.appendChild(regen);
       const vb = document.createElement('button'); vb.type='button'; vb.textContent='Generate voice';
-      vb.onclick = function(){ voiceForText(encodeURIComponent(text).replace(/'/g, '%27'), vb); };
+      // Read the article's LIVE text at click time, not the addMsg
+      // parameter: streamed replies are created with '' and filled
+      // in later, so a closure over the parameter always voices ''
+      // ("voice needs text") — the bug that broke Generate voice on
+      // every streamed chat reply, mailbox path and local path alike.
+      vb.onclick = function(){ voiceForText(encodeURIComponent(art.querySelector('.body').textContent).replace(/'/g, '%27'), vb); };
       foot.appendChild(vb);
+      if(role === 'assistant' && extra.ceti_tier === 'cloud-suggested'){
+        // The ladder missed: offer a research job (Wikipedia + Google
+        // web search, human promotion gate). add_task dedupes on
+        // title+pending, so re-clicking a reloaded message is safe.
+        const rb = document.createElement('button'); rb.type = 'button'; rb.textContent = 'Suggest research job';
+        rb.onclick = async function(){
+          rb.disabled = true; rb.textContent = 'Queuing…';
+          try{
+            const r = await fetch('/api/research/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic: extra.ceti_query || text})});
+            const j = await r.json();
+            rb.textContent = j.id ? ('Research job #' + j.id + ' queued') : 'Queued';
+          }catch(e){ rb.textContent = 'Queue failed'; rb.disabled = false; }
+        };
+        foot.appendChild(rb);
+      }
     }
     art.appendChild(foot);
     // Persisted telemetry: reloaded messages render the same footer
@@ -1610,6 +1857,42 @@ function addMsg(role, text, model, extra){
         im.src = '/api/chat-images/' + encodeURIComponent(extra.image);
         im.style.maxWidth = '100%';
         body.appendChild(im);
+      }
+      if(extra.attachments && extra.attachments.length){
+        extra.attachments.forEach(function(att){
+          if(att.kind === 'image'){
+            const im = document.createElement('img');
+            im.className = 'attach-img';
+            im.src = '/api/chat-attachments/' + encodeURIComponent(att.filename);
+            body.appendChild(im);
+          } else if((att.kind === 'text' || att.kind === 'pdf') && att.text){
+            const lbl = document.createElement('div');
+            lbl.className = 'small';
+            lbl.textContent = att.filename + (att.embedded ? ' · ' + att.embedded + ' chunk(s) in session memory' : '');
+            body.appendChild(lbl);
+            body.appendChild(codeBoxEl('', att.text, att.filename));
+            const a = document.createElement('a');
+            a.className = 'attach-link'; a.href = '/api/chat-attachments/' + encodeURIComponent(att.filename);
+            a.textContent = '↓ ' + att.filename; a.download = att.filename;
+            body.appendChild(a);
+          } else {
+            const a = document.createElement('a');
+            a.className = 'attach-link'; a.href = '/api/chat-attachments/' + encodeURIComponent(att.filename);
+            a.textContent = '↓ ' + att.filename; a.download = att.filename;
+            body.appendChild(a);
+          }
+        });
+      }
+      if(role === 'assistant' && extra.voice){
+        // A saved voice renders from its stored file, not base64 —
+        // the player is wired by initWavePlayers() once the article
+        // lands in the DOM (see the end of addMsg).
+        const vd = document.createElement('div');
+        vd.className = 'voice-status';
+        const wid = 'wave-' + (++waveSeq);
+        waveData[wid] = {url: '/api/chat-voice/' + encodeURIComponent(extra.voice), ct: 'audio/mpeg', stamp: String(extra.voice).replace(/\.mp3$/,'')};
+        vd.innerHTML = wavePlayerHtml(wid, escHtml(String(extra.voice)));
+        art.appendChild(vd);
       }
       if(role === 'assistant' && extra.tokens){
         const tps = document.createElement('span'); tps.className='tps';
@@ -1648,6 +1931,7 @@ function addMsg(role, text, model, extra){
     }
   }
   $('msgs').appendChild(art);
+  initWavePlayers();
   art.scrollIntoView();
   updateCount();
   return {art: art, body: body, p: p};
@@ -1742,7 +2026,7 @@ async function saveSession(){
 function switchToSession(s){
   messages=s.messages||[]; currentSid=s.id; currentType=s.type||'CHAT';
   $('msgs').innerHTML='';
-  messages.forEach(function(m){ addMsg(m.role, m.content, m.model || m.via, {ts: m.ts, tokens: m.tokens, tok_s: m.tok_s, memories: m.memories, memories_used: m.memories_used, image: m.image, ceti_tier: m.ceti_tier, ceti_evidence: m.ceti_evidence, ceti_memories: m.ceti_memories, thinking: m.thinking, ceti_ledger: m.ceti_ledger}); });
+  messages.forEach(function(m){ addMsg(m.role, m.content, m.model || m.via, {ts: m.ts, tokens: m.tokens, tok_s: m.tok_s, memories: m.memories, memories_used: m.memories_used, image: m.image, voice: m.voice, ceti_tier: m.ceti_tier, ceti_evidence: m.ceti_evidence, ceti_memories: m.ceti_memories, thinking: m.thinking, ceti_ledger: m.ceti_ledger, attachments: m.attachments, ceti_query: m.ceti_query}); });
   $('chat-title').textContent = dispNum(Math.max(0, sessIndex(s.id))) + ' — ' + (s.title||s.id).toUpperCase();
   document.querySelectorAll('#chan-list .chan[data-sid]').forEach(function(x){
     x.classList.toggle('active', x.dataset.sid===s.id);
@@ -1951,6 +2235,7 @@ async function createWorkspace(typeKey){
 // ---------- SSH terminal (local operator only) ----------
 let sshTerm=null, sshFit=null, sshEs=null, sshSid=null, sshWorkspaceSid=null;
 let sshScripts=null, sshPendingHost=null, sshResizeBound=false;
+let sshStatusTimer=null;
 function ensureXterm(){
   if(sshScripts) return sshScripts;
   sshScripts = new Promise(function(resolve, reject){
@@ -1968,6 +2253,7 @@ function ensureXterm(){
   return sshScripts;
 }
 function sshDetach(){
+  if(sshStatusTimer){ clearInterval(sshStatusTimer); sshStatusTimer=null; }
   if(sshEs){ try{ sshEs.close(); }catch(e){} sshEs=null; }
   if(sshTerm){ try{ sshTerm.dispose(); }catch(e){} sshTerm=null; sshFit=null; }
   const cb=$('sshConnectBtn'), db=$('sshDisconnectBtn');
@@ -2179,7 +2465,8 @@ async function sshConnect(){
     var dims=await initSshTerm();
     const r=await fetch('/api/ssh/connect',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({host:host, port:port, username:username,
-        key_id:keyId, cols:dims.cols, rows:dims.rows})});
+        key_id:keyId, cols:dims.cols, rows:dims.rows,
+        use_conpty: !!($('sshConpty') && $('sshConpty').checked)})});
     const j=await r.json();
     if(j.error) throw new Error(j.error);
     sid=j.session_id; sshSid=sid; sshWorkspaceSid=currentSid;
@@ -2187,17 +2474,34 @@ async function sshConnect(){
     $('sshStatus').textContent='Connected to '+host
       + (j.build ? ' · '+j.build : '')
       + (j.session_type ? ' · '+j.session_type+' pid '+j.pid : '');
-    (function(sid){
-      setTimeout(async function(){
-        if(sshSid!==sid) return;
+    // 0.0.1-beta2: poll status every 2s instead of one check at
+    // 3s, and say WHY a session died. The old line only ever
+    // said "no output yet" — it could not tell an ssh that
+    // exited (exit code, e.g. 255) from a live process whose
+    // PTY never delivered. A dead session with zero bytes now
+    // names the exit code and points at the self-test instead
+    // of leaving the pane blank and silent.
+    (function(sid, base){
+      if(sshStatusTimer) clearInterval(sshStatusTimer);
+      sshStatusTimer=setInterval(async function(){
+        if(sshSid!==sid) { clearInterval(sshStatusTimer); sshStatusTimer=null; return; }
         try{
           const r=await fetch('/api/ssh/status?session_id='+encodeURIComponent(sid));
           const s=await r.json();
           if(sshSid!==sid) return;
-          $('sshStatus').textContent+=' · '+(s.buffered>0 ? s.buffered+' bytes received' : 'no output yet');
+          if(!s.alive){
+            clearInterval(sshStatusTimer); sshStatusTimer=null;
+            const exit=(s.exit_code===null || s.exit_code===undefined) ? '?' : s.exit_code;
+            $('sshStatus').textContent=base+' · session ended'
+              + (s.buffered>0 ? ' · '+s.buffered+' bytes received'
+                : ' · no output, exit '+exit
+                  +' — run tools\\conpty_selftest.py');
+            return;
+          }
+          $('sshStatus').textContent=base+' · '+(s.buffered>0 ? s.buffered+' bytes received' : 'no output yet');
         }catch(e){}
-      }, 3000);
-    })(sshSid);
+      }, 2000);
+    })(sshSid, $('sshStatus').textContent);
     $('sshConnectBtn').disabled=true; $('sshDisconnectBtn').disabled=false;
     // Remember the selected host on the workspace record (type + host only).
     if(currentSid){
@@ -2220,6 +2524,7 @@ async function sshConnect(){
   }
 }
 async function sshDisconnect(){
+  if(sshStatusTimer){ clearInterval(sshStatusTimer); sshStatusTimer=null; }
   if(sshEs){ sshEs.close(); sshEs=null; }
   if(sshSid){
     try{
@@ -2244,11 +2549,45 @@ async function regenerate(wrap){
 }
 function onProvider(){
   provider = $('provider').value;
-  const cm = $('cloudModel'), rb = $('refreshModelsBtn');
+  const cm = $('cloudModel'), rb = $('refreshModelsBtn'), cc = $('cloudModelCustom');
   cm.style.display = provider==='local' ? 'none' : 'block';
   rb.style.display = provider==='local' ? 'none' : 'block';
+  if(cc) cc.style.display = provider==='local' ? 'none' : 'block';
   if(provider!=='local') refreshCloudModels();
   $('teleEngine').textContent = provider;
+  updateThinkToggle();
+}
+/* A typed custom model id beats the list — it is the only way to use a
+   model the provider's /v1/models list does not show, and it survives
+   list refreshes because refreshCloudModels() rebuilds only the select. */
+function cloudModelActive(){
+  const c = $('cloudModelCustom');
+  if(c && c.value.trim()) return c.value.trim();
+  const cm = $('cloudModel');
+  return cm ? cm.value : '';
+}
+function saveCustomCloudModel(){
+  const c = $('cloudModelCustom'); if(!c) return;
+  const v = c.value.trim();
+  if(v) localStorage.setItem('cloud_model_'+provider, v);
+  else localStorage.removeItem('cloud_model_'+provider);
+  const cm = $('cloudModel');
+  if(cm && v){
+    let found=false;
+    Array.from(cm.options).forEach(function(o){ if(o.value===v) found=true; });
+    if(!found){ const o=document.createElement('option'); o.value=v; o.textContent=v; cm.appendChild(o); }
+    cm.value = v;
+  }
+}
+function restoreCustomCloudModel(){
+  const c = $('cloudModelCustom'); if(!c) return;
+  c.value = localStorage.getItem('cloud_model_'+provider) || '';
+  const cm = $('cloudModel'), saved = c.value.trim();
+  if(saved && cm){
+    let found=false;
+    Array.from(cm.options).forEach(function(o){ if(o.value===saved) found=true; });
+    if(found) cm.value = saved;
+  }
 }
 async function refreshCloudModels(){
   const key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='orcarouter' ? localStorage.getItem('orca_key')||'' : localStorage.getItem('nv_key')||'';
@@ -2258,6 +2597,8 @@ async function refreshCloudModels(){
   (j.models||[]).slice(0,100).forEach(function(m){
     const o = document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
   });
+  restoreCustomCloudModel();
+  updateThinkToggle();
 }
 function buildThink(){
   const think = document.createElement('div');
@@ -2301,15 +2642,15 @@ async function toggleCetiNode(btn, id){
 }
 async function cetiSendChat(text){
   try{
-    const r = await fetch('/api/ceti/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:text})});
+    const r = await fetch('/api/ceti/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:text,session:currentSid})});
     const j = await r.json();
     if(j.error){
       messages.push({role:'assistant',content:'[ceti error] '+j.error,ts:Date.now(),model:'CETI'});
       addMsg('assistant','[ceti error] '+j.error,'CETI',{ts:Date.now()});
       saveSession(); return;
     }
-    messages.push({role:'assistant',content:j.answer,ts:Date.now(),model:'CETI',ceti_tier:j.tier,ceti_evidence:j.evidence||'',ceti_memories:j.memories||null,thinking:j.thinking||'',ceti_ledger:j.ledger||null});
-    addMsg('assistant',j.answer,'CETI',{ts:Date.now(),ceti_tier:j.tier,ceti_evidence:j.evidence||'',ceti_memories:j.memories||null,thinking:j.thinking||'',ceti_ledger:j.ledger||null});
+    messages.push({role:'assistant',content:j.answer,ts:Date.now(),model:'CETI',ceti_tier:j.tier,ceti_evidence:j.evidence||'',ceti_memories:j.memories||null,thinking:j.thinking||'',ceti_ledger:j.ledger||null,ceti_query:text});
+    addMsg('assistant',j.answer,'CETI',{ts:Date.now(),ceti_tier:j.tier,ceti_evidence:j.evidence||'',ceti_memories:j.memories||null,thinking:j.thinking||'',ceti_ledger:j.ledger||null,ceti_query:text});
     saveSession();
   }catch(e){
     messages.push({role:'assistant','content':'[ceti error] '+e.message,ts:Date.now(),model:'CETI'});
@@ -2360,6 +2701,12 @@ async function loadSysModels(){
       const n=document.createElement('option'); n.value=o.value; n.textContent=o.textContent; sm.appendChild(n);
     });
     sm.value = cm.value;
+    const saved = localStorage.getItem('cloud_model_'+provider) || '';
+    if(saved){
+      let f=false; Array.from(sm.options).forEach(function(o){ if(o.value===saved) f=true; });
+      if(!f){ const o=document.createElement('option'); o.value=saved; o.textContent=saved; sm.appendChild(o); }
+      sm.value = saved;
+    }
   }
   $('sysKeyOrca').textContent = localStorage.getItem('orca_key') ? 'SET' : 'NOT SET';
   $('sysKeyOR').textContent = localStorage.getItem('or_key') ? 'SET' : 'NOT SET';
@@ -2386,6 +2733,7 @@ async function sysProviderChange(){
     });
     if(cm.options.length) cm.value = cm.options[0].value;
     sm.value = cm.value;
+    restoreCustomCloudModel();
   }catch(e){}
 }
 async function sysModelChange(){
@@ -2412,6 +2760,8 @@ async function sysModelChange(){
     const o=document.createElement('option'); o.value=v; o.textContent=v; cm.appendChild(o);
   }
   cm.value=v;
+  const cc=$('cloudModelCustom');
+  if(cc){ cc.value=v; saveCustomCloudModel(); }
 }
 var researchTimer = null;
 function startResearchTimer(){ stopResearchTimer(); researchTimer = setInterval(loadResearch, 15000); }
@@ -2421,7 +2771,7 @@ function researchCloudBody(){
   if(provider && provider !== 'local'){
     body.provider = provider;
     body.api_key = provider==='openrouter' ? localStorage.getItem('or_key')||'' : provider==='orcarouter' ? localStorage.getItem('orca_key')||'' : localStorage.getItem('nv_key')||'';
-    body.model = $('cloudModel') ? $('cloudModel').value : '';
+    body.model = cloudModelActive();
   }
   return body;
 }
@@ -2700,8 +3050,13 @@ async function askFactConsole(){
   }catch(e){ el.textContent='Lookup failed.'; }
 }
 async function doSend(text, isRegen){
-  const model = provider==='local' ? (localStorage.getItem('local_chat_file') || 'local uncensored') : $('cloudModel').value;
-  if(!isRegen){ messages.push({role:'user',content:text,ts:Date.now()}); addMsg('user',text,undefined,{ts:Date.now()}); }
+  const model = provider==='local' ? (localStorage.getItem('local_chat_file') || 'local uncensored') : cloudModelActive();
+  if(!isRegen){
+    const atts = pendingAttachments.slice();
+    messages.push({role:'user',content:text,ts:Date.now(),attachments:atts});
+    addMsg('user',text,undefined,{ts:Date.now(),attachments:atts});
+    pendingAttachments = []; renderAttachTray();
+  }
   // Peer endpoint: a selected peer backend routes this message as a
   // mailbox text job instead of a local/cloud generation.
   const peerTo = $('peerBackend') ? $('peerBackend').value : '';
@@ -2730,7 +3085,7 @@ async function doSend(text, isRegen){
   const maxTok = Math.min(baseTok*mult, 28000); // configured context minus ~4-5k for prompt + reasoning; 16x of 2048 is capped here
   const on = $('outNote');
   if(on) on.textContent = 'output '+baseTok+' × '+mult+' = '+maxTok+' tokens'+(baseTok*mult>maxTok?' (capped for the configured context)':'')+' — long outputs take minutes, keep the conversation short for 8×/16×';
-  const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:messages,provider:provider,model:provider==='local'?'':model,api_key:key,max_tokens:maxTok,temperature:temp,use_memory:useMemory,sample_sources:sampleSources})});
+  const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:messages,provider:provider,model:provider==='local'?'':model,api_key:key,max_tokens:maxTok,temperature:temp,use_memory:useMemory,sample_sources:sampleSources,session:currentSid,thinking:thinkOn()})});
   if(!r.ok){
     clearInterval(timer); think.remove();
     const j = await r.json().catch(function(){ return {}; });
@@ -2847,6 +3202,9 @@ async function doSend(text, isRegen){
   $('live-status').textContent = 'IDLE';
   $('live-tps').textContent = '— TOK/S';
   if(!showThinking || !gotThinking){ think.remove(); }
+  // Final render: fenced code becomes expandable boxes (streaming
+  // showed plain text; the done text is now parsed once).
+  if(full.indexOf('```') >= 0){ renderRichText(box, full); }
   messages.push({role:'assistant',content:full,ts:doneAt||Date.now(),tokens:effToks,tok_s:effSecs?+(effToks/effSecs).toFixed(1):null,model:model,memories_used:doneMemoriesUsed,memories:doneMemories});
   saveSession();
 }
@@ -2909,12 +3267,15 @@ function saveDefaultVoicePeer(){
 }
 async function sendChat(){
   const inp = $('chatInput');
-  const text = inp.value.trim();
-  if(!text) return;
+  let text = inp.value.trim();
+  if(!text && !pendingAttachments.length) return;
+  if(!text) text = 'Please use the attached files.';
   inp.value = '';
   await doSend(text, false);
 }
 $('prompt-form').addEventListener('submit', function(e){ e.preventDefault(); sendChat(); });
+$('attachBtn').addEventListener('click', function(){ $('attachInput').click(); });
+$('attachInput').addEventListener('change', function(){ uploadAttachments(this.files); this.value=''; });
 $('chatInput').addEventListener('keydown', function(e){
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
 });
@@ -2994,6 +3355,7 @@ async function loadServers(){
     const sp = $('srv-poller-status');
     if(sp){ sp.textContent = j2.running ? 'RUNNING' : 'DOWN'; sp.classList.toggle('busy', !j2.running); }
   }catch(e){}
+  loadTTS();
   const log = $('sys-log');
   if(log){
     const lines = [];
@@ -3341,14 +3703,27 @@ var waveData = {};
 var pendingVoices = {};
 var voiceReplyBuffer = [];
 var voicePollTimer = null;
+// This node's own pubkey (cached from /api/node/status): voicing our
+// own node goes direct to the local bridge instead of the mailbox
+// round-trip (60s poll + a base64 reply the sandbox proxy truncates).
+var ownPubkeyCache = null;
+function ownPubkey(){
+  if (ownPubkeyCache) return Promise.resolve(ownPubkeyCache);
+  return fetch('/api/node/status').then(function(r){ return r.json(); }).then(function(j){
+    ownPubkeyCache = j.pubkey || '';
+    return ownPubkeyCache;
+  }).catch(function(){ return ''; });
+}
 function voiceForText(enc, btn){
   var text = decodeURIComponent(enc);
   // Peer resolution: the Jobs peer box first, then the saved default
   // voice peer (Jobs → "Save as default voice peer"), so chat voice
   // works without visiting the Jobs tab once a default is set.
+  // No peer set at all defaults to THIS node (resolved below, once
+  // ownPubkey() answers) — a fresh browser should voice locally
+  // instead of dead-ending on "Pick a peer first".
   var to = ($('nodeJobTo') ? $('nodeJobTo').value.trim() : '') || localStorage.getItem('defaultVoicePeer') || '';
   var say = function(s){ if ($('nodeJobOut')) $('nodeJobOut').textContent = s; if (btn) { btn.textContent = s; setTimeout(function(){ btn.textContent = 'Generate voice'; }, 2500); } };
-  if (!to) { say('Pick a peer first: click a node, then Job → on its card (or save a default voice peer in Jobs).'); return; }
   // Chat messages live in <article> elements; Jobs buttons do not.
   // In chat, pin a persistent status line to the message itself.
   var art = (btn && btn.closest) ? btn.closest('article') : null;
@@ -3359,26 +3734,57 @@ function voiceForText(enc, btn){
     statusEl.textContent = 'Voice job: sending…';
     art.appendChild(statusEl);
   }
-  var body = {to_pubkey: to, capability: 'tts', text: text};
-  if ($('nodeJobVoice') && $('nodeJobVoice').value.trim()) body.voice = $('nodeJobVoice').value.trim();
-  fetch('/api/node/job/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if (j.error) {
-        if (statusEl) statusEl.textContent = 'Voice job error: ' + j.error;
-        if ($('nodeJobOut')) $('nodeJobOut').textContent = 'Voice job error: ' + j.error;
-        return;
-      }
-      var jid = j.job_id || '';
-      pendingVoices[jid] = {el: statusEl, started: Date.now()};
-      var msg = 'Voice job ' + jid + ' — waiting for the peer (auto-checking every 15s, no need to click Fetch)…';
-      if (statusEl) statusEl.textContent = msg;
-      if ($('nodeJobOut')) $('nodeJobOut').textContent = msg;
-      startVoicePoll();
-    })
-    .catch(function(e){
-      if (statusEl) statusEl.textContent = 'Voice job failed to send: ' + e;
-    });
+  var voiceName = ($('nodeJobVoice') && $('nodeJobVoice').value.trim()) || '';
+  // Local fast path: the target IS this node, so voice on the local
+  // bridge directly — seconds, no mailbox, no proxy truncation.
+  // Any other peer still goes through the mailbox job below.
+  ownPubkey().then(function(own){
+    if (!to) { to = own || ''; }
+    if (!to) { say('Pick a peer first: click a node, then Job → on its card (or save a default voice peer in Jobs).'); return; }
+    if (own && to.toLowerCase() === own.toLowerCase()) {
+      if (statusEl) statusEl.textContent = 'Voicing locally…';
+      fetch('/api/voice/local',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text: text, voice: voiceName})})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (j.error) {
+            if (statusEl) statusEl.textContent = 'Voice error: ' + j.error;
+            if ($('nodeJobOut')) $('nodeJobOut').textContent = 'Voice error: ' + j.error;
+            return;
+          }
+          var html = renderJobReply({in_reply_to: 'local', result: j});
+          if (statusEl) statusEl.innerHTML = html;
+          else if ($('nodeJobOut')) $('nodeJobOut').innerHTML = '<div>' + html + '</div>';
+          initWavePlayers();
+          // Persist the voice so it is still there after leaving
+          // the session or the page (see saveVoiceFile note).
+          if (art) saveVoiceFile(j.audio_b64, 'voice-local-' + Date.now() + '.mp3').then(function(fn){ attachVoiceToArticle(art, fn); });
+        })
+        .catch(function(e){
+          if (statusEl) statusEl.textContent = 'Voice failed: ' + e;
+        });
+      return;
+    }
+    var body = {to_pubkey: to, capability: 'tts', text: text};
+    if (voiceName) body.voice = voiceName;
+    fetch('/api/node/job/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j.error) {
+          if (statusEl) statusEl.textContent = 'Voice job error: ' + j.error;
+          if ($('nodeJobOut')) $('nodeJobOut').textContent = 'Voice job error: ' + j.error;
+          return;
+        }
+        var jid = j.job_id || '';
+        pendingVoices[jid] = {el: statusEl, started: Date.now()};
+        var msg = 'Voice job ' + jid + ' — waiting for the peer (auto-checking every 15s, no need to click Fetch)…';
+        if (statusEl) statusEl.textContent = msg;
+        if ($('nodeJobOut')) $('nodeJobOut').textContent = msg;
+        startVoicePoll();
+      })
+      .catch(function(e){
+        if (statusEl) statusEl.textContent = 'Voice job failed to send: ' + e;
+      });
+  });
 }
 function startVoicePoll(){
   if (voicePollTimer) return;
@@ -3416,6 +3822,9 @@ function tickVoicePoll(){
           if (e.el) { e.el.innerHTML = renderJobReply(m); }
           else if ($('nodeJobOut')) { $('nodeJobOut').innerHTML = '<div>' + renderJobReply(m) + '</div>'; }
           initWavePlayers();
+          if (e.el && m.result && m.result.audio_b64) {
+            saveVoiceFile(m.result.audio_b64, 'voice-' + String(m.in_reply_to||'peer').replace(/[^A-Za-z0-9]+/g,'').slice(0,12) + '-' + Date.now() + '.mp3').then(function(fn){ attachVoiceToArticle(e.el.closest('article'), fn); });
+          }
           return;
         }
         var c = pendingChatJobs[m.in_reply_to];
@@ -3470,13 +3879,61 @@ function b64ToBytes(s){
   for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+function bytesToB64(bytes){
+  var s = '';
+  var chunk = 0x8000;
+  for (var i = 0; i < bytes.length; i += chunk) s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(s);
+}
+// The waveform player markup, shared by live renders (base64) and
+// re-renders of a saved voice (stored file). `paren` is the text in
+// parentheses after the buttons: bytes for a live render, the stored
+// filename for a re-render.
+function wavePlayerHtml(wid, paren){
+  return '<div class="waveplayer" id="'+wid+'"><canvas width="600" height="64" style="width:100%;background:#02120a;cursor:pointer"></canvas><div style="height:4px;background:#123"><div class="waveprog" style="height:100%;width:0%;background:#17cfff"></div></div><div><button type="button" class="waveplay">Play</button> <a class="wavesave" href="#" title="Download voice">⬇ Save voice</a> <button type="button" class="waveshare" title="Store to shared files">Share</button> ('+paren+')</div></div>';
+}
+// A generated voice is saved server-side (data/chat-voice/) and the
+// filename is stored on the chat message, so the waveform player
+// survives leaving the session or the page — the same pattern as
+// chat images. Without this the player lived only in the DOM (and
+// its base64 was deleted after wiring), so it vanished on the first
+// re-render.
+function saveVoiceFile(b64, filename){
+  return fetch('/api/chat-voice/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data: b64, filename: filename})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){ return (j.filename || null); })
+    .catch(function(){ return null; });
+}
+function attachVoiceToArticle(art, filename){
+  if (!art || !filename) return;
+  var p = art.querySelector('.body p');
+  var text = p ? p.textContent : '';
+  for (var i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant' && messages[i].content === text) {
+      messages[i].voice = filename;
+      saveSession();
+      return;
+    }
+  }
+}
 function initWavePlayers(){
   Object.keys(waveData).forEach(function(id){
     var d = waveData[id]; delete waveData[id];
     var box = document.getElementById(id); if (!box) return;
-    var bytes = b64ToBytes(d.b64);
+    if (d.url) {
+      // Persisted voice: the MP3 lives on the server; fetch it,
+      // then wire the same player (Save links straight to the file).
+      fetch(d.url).then(function(r){ if (!r.ok) throw new Error('voice file gone'); return r.arrayBuffer(); })
+        .then(function(ab){ var bytes = new Uint8Array(ab); d.b64 = bytesToB64(bytes); wire(id, bytes, d, d.url); })
+        .catch(function(){ var b2 = document.getElementById(id); if (b2) b2.innerHTML = '<span class="small">voice file unavailable</span>'; });
+      return;
+    }
+    wire(id, b64ToBytes(d.b64), d, null);
+  });
+  function wire(id, bytes, d, fileUrl){
+    var box = document.getElementById(id); if (!box) return;
     var blob = new Blob([bytes], {type: d.ct});
-    var url = URL.createObjectURL(blob);
+    var url = fileUrl || URL.createObjectURL(blob);
     var audio = new Audio(url);
     var canvas = box.querySelector('canvas');
     var play = box.querySelector('.waveplay');
@@ -3528,7 +3985,7 @@ function initWavePlayers(){
         }, flat);
       } else flat();
     } catch (e) { flat(); }
-  });
+  }
 }
 function renderJobReply(m){
   const r = m.result||{};
@@ -3539,7 +3996,7 @@ function renderJobReply(m){
     const ct = /^audio\/[a-z0-9.+-]+$/i.test(r.content_type||'') ? r.content_type : 'audio/mpeg';
     var wid = 'wave-' + (++waveSeq);
     waveData[wid] = {b64: r.audio_b64, ct: ct, stamp: (m.in_reply_to||'voice').replace(/[^A-Za-z0-9]+/g,'').slice(0,12) + '-' + Date.now()};
-    return head + '<div class="waveplayer" id="'+wid+'"><canvas width="600" height="64" style="width:100%;background:#02120a;cursor:pointer"></canvas><div style="height:4px;background:#123"><div class="waveprog" style="height:100%;width:0%;background:#17cfff"></div></div><div><button type="button" class="waveplay">Play</button> <a class="wavesave" href="#" title="Download voice">⬇ Save voice</a> <button type="button" class="waveshare" title="Store to shared files">Share</button> ('+escHtml(String(r.bytes||''))+' bytes)</div></div>';
+    return head + wavePlayerHtml(wid, escHtml(String(r.bytes||'')) + ' bytes');
   }
   if (r.image_b64 && b64ok(r.image_b64)) {
     return head + '<img src="data:image/png;base64,'+r.image_b64+'" style="max-width:100%">';
@@ -3561,7 +4018,15 @@ async function pollNodeJobs(){
   voiceReplyBuffer = [];
   fresh.forEach(function(m){
     const e = pendingVoices[m.in_reply_to];
-    if (e) { if (e.el) e.el.innerHTML = renderJobReply(m); delete pendingVoices[m.in_reply_to]; }
+    if (e) {
+      if (e.el) {
+        e.el.innerHTML = renderJobReply(m);
+        if (m.result && m.result.audio_b64) {
+          saveVoiceFile(m.result.audio_b64, 'voice-' + String(m.in_reply_to||'peer').replace(/[^A-Za-z0-9]+/g,'').slice(0,12) + '-' + Date.now() + '.mp3').then(function(fn){ attachVoiceToArticle(e.el.closest('article'), fn); });
+        }
+      }
+      delete pendingVoices[m.in_reply_to];
+    }
   });
   const pendingNote = Object.keys(pendingVoices).length ? ' (voice job(s) still pending: ' + Object.keys(pendingVoices).join(', ') + ' — auto-checking, or Fetch again in a minute)' : '';
   $('nodeJobOut').innerHTML = all.map(function(m){ return '<div>'+renderJobReply(m)+'</div>'; }).join('') || ('(no job replies yet)' + pendingNote);
@@ -3655,6 +4120,65 @@ async function saveServing(){
 async function pollerControl(action){
   await fetch('/api/node/poller/'+action,{method:'POST'});
   loadServers(); loadNodePollerLog();
+}
+
+// ---- TTS server + voice panel (System view, Servers card) ----
+async function loadTTS(){
+  let j = null;
+  try{ j = await (await fetch('/api/tts/status')).json(); }catch(e){ j = null; }
+  const st = $('srv-tts-status');
+  if(st){ st.textContent = (j && j.running) ? 'RUNNING' : ((j && j.starting) ? 'STARTING' : 'DOWN'); st.classList.toggle('busy', !(j && j.running)); }
+  const tl = $('ttsLog');
+  if(tl){
+    // Show the bridge log while it is down/starting: a failed
+    // first-run install used to look identical to "still building".
+    // Clear it once running so a stale error does not linger.
+    tl.textContent = (j && !j.running && j.log_tail) ? j.log_tail : '';
+  }
+  const sel = $('ttsVoiceSelect');
+  if(sel && j && j.voices){
+    const cur = sel.value || j.default_voice || 'mya-03';
+    sel.innerHTML = j.voices.map(function(v){ return '<option value="'+escHtml(v.id)+'">'+escHtml(v.name)+' ('+escHtml(v.id)+')</option>'; }).join('');
+    if(j.voices.some(function(v){ return v.id === cur; })) sel.value = cur;
+    else if(j.voices.some(function(v){ return v.id === j.default_voice; })) sel.value = j.default_voice;
+  }
+  const dv = $('tts-default-val');
+  if(dv && j) dv.textContent = 'DEFAULT ' + (j.default_voice || 'mya-03');
+}
+async function ttsControl(action){
+  const out = $('ttsTestOut');
+  if(out) out.textContent = (action === 'start' ? 'Starting TTS server… (first run builds a venv + downloads the model, minutes — status refreshes)' : 'Stopping TTS server…');
+  const r = await fetch('/api/tts/'+action,{method:'POST'});
+  const j = await r.json();
+  if(out) out.textContent = j.note || (j.running ? 'TTS server running.' : 'TTS server stopped.');
+  loadServers();
+}
+async function testTTSVoice(){
+  const sel = $('ttsVoiceSelect');
+  const voice = sel ? sel.value : 'mya-03';
+  const text = ($('ttsTestText') ? $('ttsTestText').value : '').trim();
+  const out = $('ttsTestOut');
+  if(!text){ if(out) out.textContent = 'Type some test text first.'; return; }
+  if(out) out.textContent = 'Voicing…';
+  const r = await fetch('/api/voice/local',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text: text, voice: voice})});
+  const j = await r.json();
+  if(j.error){ if(out) out.textContent = 'Error: ' + j.error; return; }
+  if(!j.audio_b64){ if(out) out.textContent = 'No audio returned.'; return; }
+  const ct = /^audio\/[a-z0-9.+-]+$/i.test(j.content_type||'') ? j.content_type : 'audio/mpeg';
+  var wid = 'wave-' + (++waveSeq);
+  waveData[wid] = {b64: j.audio_b64, ct: ct, stamp: 'tts-test-' + voice + '-' + Date.now()};
+  if(out) out.innerHTML = wavePlayerHtml(wid, escHtml(String(j.bytes||'')) + ' bytes · ' + escHtml(voice));
+}
+async function setDefaultTTSVoice(){
+  const sel = $('ttsVoiceSelect');
+  const voice = sel ? sel.value : '';
+  const out = $('ttsTestOut');
+  if(!voice) return;
+  const r = await fetch('/api/tts/default-voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voice: voice})});
+  const j = await r.json();
+  if(j.error){ if(out) out.textContent = 'Error: ' + j.error; return; }
+  if(out) out.textContent = 'Default voice set to ' + voice + '.';
+  loadTTS();
 }
 async function loadNodePollerLog(){
   const j = await (await fetch('/api/node/poller')).json();
@@ -3823,6 +4347,113 @@ async function askCode(){
   const r = await fetch('/api/code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:$('codePrompt').value,file:$('codeFile').value})});
   const j = await r.json();
   $('codeOut').textContent = (j.code||j.error||'') + (j.saved ? ('\n\nSaved: '+j.saved) : '');
+}
+function copyCode(){
+  const text = $('codeOut').textContent;
+  if(!text || text==='Generating…') return;
+  navigator.clipboard.writeText(text);
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = 'Copied';
+  setTimeout(function(){ btn.textContent = original; }, 1200);
+}
+function agentKey(){
+  const p=$('agentProvider').value;
+  return p==='openrouter' ? (localStorage.getItem('or_key')||'') : p==='orcarouter' ? (localStorage.getItem('orca_key')||'') : (localStorage.getItem('nv_key')||'');
+}
+async function loadAgentModels(){
+  const p=$('agentProvider').value;
+  const m=$('agentModel'); if(!m) return;
+  m.innerHTML='<option>loading…</option>';
+  try{
+    const r=await fetch('/api/cloud/models?provider='+p,{headers:{'X-API-Key':agentKey()}});
+    const j=await r.json();
+    m.innerHTML='';
+    (j.models||[]).forEach(function(id){ const o=document.createElement('option'); o.value=id; o.textContent=id; m.appendChild(o); });
+    const free=Array.from(m.options).find(function(o){ return o.value.indexOf(':free')!==-1; });
+    if(free) m.value=free.value;
+  }catch(e){ m.innerHTML='<option>failed to load</option>'; }
+}
+async function runAgent(){
+  const key=agentKey();
+  if(!key){ alert('Add your '+$('agentProvider').value+' key in Settings first — the agent runs on a cloud model.'); return; }
+  if(!$('agentPrompt').value.trim()){ alert('Describe the task first.'); return; }
+  $('agentLog').textContent='Starting agent…';
+  $('agentFiles').textContent='';
+  const r=await fetch('/api/code/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:$('agentPrompt').value,provider:$('agentProvider').value,model:$('agentModel').value,api_key:key,seed_files:['hub/web_ui.html']})});
+  const j=await r.json();
+  if(j.error){ $('agentLog').textContent=j.error; return; }
+  window.lastAgentSession = j.session;
+  const poll=setInterval(async function(){
+    try{
+      const s=await (await fetch('/api/code/agent/'+j.job)).json();
+      $('agentLog').textContent=(s.log||[]).join('\n');
+      if(s.status==='done'||s.status==='failed'){
+        clearInterval(poll);
+        $('agentFiles').textContent = s.result ? ('Files changed: '+((s.result.files_changed||[]).join(', ')||'none')+' — work folder: data/code-work/'+s.result.session+'/') : (s.error||'');
+      }
+    }catch(e){ clearInterval(poll); }
+  },2000);
+}
+async function wsRequest(endpoint, method, needsPath){
+  const session=window.lastAgentSession;
+  const path=$('wsFile').value;
+  if(!session) throw new Error('Run the Code agent first to create a workspace.');
+  if(needsPath && !path) throw new Error('Refresh files and select a file first.');
+  let url='/api/code/'+endpoint;
+  const options={method:method};
+  if(method==='GET'){
+    url+='?session='+encodeURIComponent(session);
+    if(needsPath) url+='&path='+encodeURIComponent(path);
+  }else{
+    const body={session:session,path:path};
+    if(endpoint==='file') body.content=$('wsEditor').value;
+    options.headers={'Content-Type':'application/json'};
+    options.body=JSON.stringify(body);
+  }
+  const r=await fetch(url,options);
+  const j=await r.json();
+  if(!r.ok || j.error) throw new Error(j.error || j.result || ('Request failed: '+r.status));
+  return j;
+}
+async function wsRefreshFiles(){
+  $('wsStatus').textContent='Refreshing files…';
+  try{
+    const j=await wsRequest('files','GET',false);
+    const picker=$('wsFile');
+    const selected=picker.value;
+    picker.textContent='';
+    (j.files||[]).forEach(function(path){
+      const option=document.createElement('option');
+      option.value=path;
+      option.textContent=path;
+      picker.appendChild(option);
+    });
+    if(Array.from(picker.options).some(function(o){ return o.value===selected; })) picker.value=selected;
+    $('wsStatus').textContent=picker.options.length ? 'Files refreshed.' : 'No files in this workspace.';
+  }catch(e){ $('wsStatus').textContent=e.message; }
+}
+async function wsLoadFile(){
+  $('wsStatus').textContent='Loading…';
+  try{
+    const j=await wsRequest('file','GET',true);
+    $('wsEditor').value=j.content;
+    $('wsStatus').textContent='File loaded.';
+  }catch(e){ $('wsStatus').textContent=e.message; }
+}
+async function wsSaveFile(){
+  $('wsStatus').textContent='Saving…';
+  try{
+    const j=await wsRequest('file','POST',true);
+    $('wsStatus').textContent=j.result || j.message || JSON.stringify(j);
+  }catch(e){ $('wsStatus').textContent=e.message; }
+}
+async function wsCheckFile(){
+  $('wsStatus').textContent='Checking…';
+  try{
+    const j=await wsRequest('check','POST',true);
+    $('wsStatus').textContent=j.result;
+  }catch(e){ $('wsStatus').textContent=e.message; }
 }
 async function doSearch(){
   const q = $('searchQ').value;

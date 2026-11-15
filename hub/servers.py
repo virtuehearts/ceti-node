@@ -112,7 +112,26 @@ def ensure_servers(chat_model: str, embed_model: str, gpu: bool, ctx: int = 3276
         for attempt_ngl, label in ([("-1", "VRAM"), ("0", "RAM (CPU)")] if gpu else [("0", "RAM (CPU)")]):
             print(f"chat server attempt: {label} (ctx {ctx})")
             try:
-                proc = _start(chat_model, chat_port(), ctx, attempt_ngl, ["--cache-type-k", "q8_0", "--cache-type-v", "q8_0"])
+                # 2026-11-07: --reasoning-budget 512. LFM3's chat template
+                # enables thinking by default, and unrestricted thinking
+                # traps the model (it burns its whole output budget
+                # thinking and emits no content for distill/generation
+                # prompts: 0 content at 3000 tokens, 13,190 chars
+                # reasoning). --reasoning off fixes the empty output
+                # but the distill drifts off-topic (the 1.7B model
+                # cannot pick the topic rows out of a noisy report
+                # without thinking). A 512-token budget is the sweet
+                # spot (tested on the Nobel distill): 2,811 chars of
+                # content, 8 QA + 8 facts, first QA naming all three
+                # 2024 winners — better than reasoning-off (6 QA) and
+                # better than budget 256 (0 proposals, the forced cutoff
+                # broke the output). The budget counts towards
+                # max_tokens, so callers must size max_tokens as
+                # budget + answer (see research._local_complete and
+                # the web.py fit budget). The CETI reasoning ladder is
+                # Python retrieval, not model thinking, so it is
+                # unaffected.
+                proc = _start(chat_model, chat_port(), ctx, attempt_ngl, ["--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--reasoning-budget", "512"])
             except RuntimeError as e:
                 # No usable server binary: fail this server, not the
                 # whole run — the caller still starts the web UI.
@@ -200,10 +219,21 @@ def split_think_chunk(chunk: str, in_think: bool):
             out_answer.append(rest[:idx]); rest = rest[idx + len("<think>"):]; in_think = True
     return "".join(out_answer), "".join(out_think), in_think
 
-def chat_complete(messages, port=None, max_tokens=2048, temperature=0.7, repeat_penalty=1.15):
-    """POST to the chat server's OpenAI-compatible API. Returns (content, reasoning)."""
+def chat_complete(messages, port=None, max_tokens=2048, temperature=0.7, repeat_penalty=1.15, reasoning=True):
+    """POST to the chat server's OpenAI-compatible API. Returns (content, reasoning).
+
+    reasoning=False asks the server to disable thinking for this call
+    (chat_template_kwargs enable_thinking=false). The LFM3 chat
+    template enables thinking by default, and the model burns its whole
+    output budget thinking and emits no content for distill/generation
+    prompts; with reasoning off it answers directly. Default True
+    preserves current behaviour.
+    """
     port = port or chat_port()
-    payload = json.dumps({"messages": messages, "max_tokens": max_tokens, "temperature": temperature, "repeat_penalty": repeat_penalty}).encode("utf-8")
+    body = {"messages": messages, "max_tokens": max_tokens, "temperature": temperature, "repeat_penalty": repeat_penalty}
+    if not reasoning:
+        body["chat_template_kwargs"] = {"enable_thinking": False}
+    payload = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", data=payload, headers={"Content-Type": "application/json"})
     with urllib.request.build_opener().open(req, timeout=3600) as r:
         data = json.load(r)
@@ -215,21 +245,25 @@ def chat_complete(messages, port=None, max_tokens=2048, temperature=0.7, repeat_
     return answer, reasoning
 
 
-def stream_chat(messages, port=None, max_tokens=2048, temperature=0.7, cancel=None, repeat_penalty=1.15):
+def stream_chat(messages, port=None, max_tokens=2048, temperature=0.7, cancel=None, repeat_penalty=1.15, reasoning=True):
     """Stream a chat completion, yielding content chunks as they arrive.
     Uses the server's OpenAI-compatible SSE stream. cancel is an optional
     callable returning True when the caller wants to stop early.
-    Falls back to a single non-streaming call if streaming fails."""
+    Falls back to a single non-streaming call if streaming fails.
+    reasoning=False disables thinking for this call (see chat_complete)."""
     import urllib.request
     port = port or chat_port()
-    payload = json.dumps({"messages": messages, "max_tokens": max_tokens,
-                          "temperature": temperature, "stream": True, "repeat_penalty": repeat_penalty}).encode("utf-8")
+    body = {"messages": messages, "max_tokens": max_tokens,
+            "temperature": temperature, "stream": True, "repeat_penalty": repeat_penalty}
+    if not reasoning:
+        body["chat_template_kwargs"] = {"enable_thinking": False}
+    payload = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions",
                                  data=payload, headers={"Content-Type": "application/json"})
     try:
         resp = urllib.request.build_opener().open(req, timeout=3600)
     except Exception:
-        content, _r = chat_complete(messages, port=port, max_tokens=max_tokens, temperature=temperature, repeat_penalty=repeat_penalty)
+        content, _r = chat_complete(messages, port=port, max_tokens=max_tokens, temperature=temperature, repeat_penalty=repeat_penalty, reasoning=reasoning)
         yield content
         return
     buf = b""
@@ -270,24 +304,30 @@ def stream_chat(messages, port=None, max_tokens=2048, temperature=0.7, cancel=No
             pass
 
 
-def stream_chat_events(messages, port=None, max_tokens=2048, temperature=0.7, cancel=None, repeat_penalty=1.15):
+def stream_chat_events(messages, port=None, max_tokens=2048, temperature=0.7, cancel=None, repeat_penalty=1.15, reasoning=True):
     """Stream a chat completion, yielding (kind, text) events.
     kind is 'thinking' for reasoning_content, 'text' for content.
     This is what makes a reasoning model feel alive in the UI:
     without it the user stares at a blank box while the model thinks,
-    then gets the answer all at once."""
+    then gets the answer all at once.
+    reasoning=False disables thinking for this call (see chat_complete);
+    with reasoning off the stream carries only 'text' events.
+    """
     import urllib.request
     port = port or chat_port()
-    payload = json.dumps({"messages": messages, "max_tokens": max_tokens,
-                          "temperature": temperature, "stream": True, "repeat_penalty": repeat_penalty,
-                          "stream_options": {"include_usage": True}}).encode("utf-8")
+    body = {"messages": messages, "max_tokens": max_tokens,
+            "temperature": temperature, "stream": True, "repeat_penalty": repeat_penalty,
+            "stream_options": {"include_usage": True}}
+    if not reasoning:
+        body["chat_template_kwargs"] = {"enable_thinking": False}
+    payload = json.dumps(body).encode("utf-8")
     in_think = False
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions",
                                  data=payload, headers={"Content-Type": "application/json"})
     try:
         resp = urllib.request.build_opener().open(req, timeout=3600)
     except Exception:
-        content, _r = chat_complete(messages, port=port, max_tokens=max_tokens, temperature=temperature, repeat_penalty=repeat_penalty)
+        content, _r = chat_complete(messages, port=port, max_tokens=max_tokens, temperature=temperature, repeat_penalty=repeat_penalty, reasoning=reasoning)
         yield ("text", content)
         return
     buf = b""
@@ -413,3 +453,180 @@ def poller_stop():
     except OSError:
         pass
     return True
+
+
+# ---- TTS server (PocketTTS bridge, :8000) ---------------------------
+# The bridge is the container's old voice panel, brought into the Hub
+# UI: the System view's Servers card gets a TTS SERVER row (start/stop)
+# plus a voice panel (pick a voice, test it, set the default). The
+# bridge is started by autorun.py at boot; these functions let the UI
+# restart it without restarting the Hub. Same PID-file pattern as the
+# poller. The start script execs uvicorn, so on Linux the recorded
+# PID IS the server; on Windows the .bat spawns python under cmd, so
+# stop uses taskkill /T to take the whole tree. autorun.py writes the
+# same PID file at boot, so Stop works on the boot-started bridge too.
+
+def tts_port():
+    try:
+        return int(os.environ.get("TTS_PORT", "8000"))
+    except ValueError:
+        return 8000
+
+
+def tts_pid_path():
+    return os.path.join(data_dir(), "tts.pid")
+
+
+def tts_log_path():
+    return os.path.join(data_dir(), "tts.log")
+
+
+def tts_health():
+    """True when the bridge answers /health (auth is OFF, localhost)."""
+    try:
+        with urllib.request.build_opener().open(
+                f"http://127.0.0.1:{tts_port()}/health", timeout=3) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def tts_running():
+    return tts_health()
+
+
+def _tts_cmd(script, is_windows=None):
+    """Argv that runs the TTS start script. On Windows a .bat is not
+    an executable: Popen([script]) raises WinError 193, so it must go
+    through cmd /c (same as autorun.py's start_tts). The Hub's START
+    button used the bare form, so on the laptop it never launched
+    anything — the button silently did nothing while the UI said
+    "Starting TTS server…". On Linux/macOS the script itself is
+    executable (shebang + exec bit)."""
+    if is_windows is None:
+        is_windows = os.name == "nt"
+    if is_windows:
+        return ["cmd", "/c", script]
+    return [script]
+
+
+def tts_log_tail(n=25):
+    """Last n lines of the bridge log (data/tts.log), for the System
+    view: a failed first-run install used to leave only DOWN and a
+    static "starting…" line, with the real error buried in this file
+    where the UI never looked."""
+    try:
+        with open(tts_log_path(), "r", encoding="utf-8",
+                  errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return ""
+    return "\n".join(lines[-n:])
+
+
+def tts_starting():
+    """True when a start was recorded (PID file) but /health is still
+    down — the first-run venv + model install takes minutes, and the
+    UI should say "starting" only in this state, not on a dead start."""
+    if tts_health():
+        return False
+    try:
+        pid = int(open(tts_pid_path()).read().strip())
+    except (OSError, ValueError):
+        return False
+    if os.name == "nt":
+        # No kill(pid, 0) on Windows: ask tasklist whether the PID
+        # is alive. Fail open to "starting" when the check itself
+        # errors — health is the arbiter, this only labels the row.
+        try:
+            out = subprocess.run(
+                ["tasklist", "/FI", "PID eq %d" % pid],
+                capture_output=True, text=True, timeout=10)
+            return str(pid) in (out.stdout or "")
+        except Exception:
+            return True
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def tts_start():
+    """Start the bridge in the background. Returns True when the
+    process was launched (not when it is healthy — first run builds
+    a venv and downloads the model, minutes; the UI polls status).
+    True immediately when it is already up, False when tts/ is
+    missing or the launch itself fails."""
+    if tts_health():
+        return True
+    tts_dir = os.path.join(REPO_ROOT, "tts")
+    script = os.path.join(tts_dir, "start_tts.bat" if os.name == "nt" else "start_tts.sh")
+    if not os.path.isfile(script):
+        return False
+    try:
+        log = open(tts_log_path(), "ab")
+    except OSError:
+        return False
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        proc = subprocess.Popen(_tts_cmd(script), cwd=tts_dir,
+                                stdout=log, stderr=subprocess.STDOUT, **kwargs)
+    except Exception:
+        return False
+    with open(tts_pid_path(), "w") as f:
+        f.write(str(proc.pid))
+    return True
+
+
+def tts_stop():
+    """Stop the bridge via the PID file (whole tree on Windows).
+    Returns True when a process was stopped. When no PID file
+    exists but the bridge is up (an older boot that never recorded
+    one), there is nothing safe to kill by PID, so it reports
+    False and the UI says to restart the Hub."""
+    path = tts_pid_path()
+    if not os.path.exists(path):
+        return False
+    try:
+        pid = int(open(path).read().strip())
+    except Exception:
+        return False
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+        else:
+            os.kill(pid, 15)
+    except Exception:
+        pass
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+    return True
+
+
+def tts_voices():
+    """Voices the bridge knows, from its voices.db (id, name, type).
+    Falls back to the two built-ins when the DB is missing or
+    unreadable, so the panel always has something to offer."""
+    builtin = [{"id": "mya-03", "name": "Mya 03", "type": "builtin"},
+               {"id": "mya-02", "name": "Mya 02", "type": "builtin"}]
+    db = os.path.join(REPO_ROOT, "tts", "data", "voices.db")
+    if not os.path.isfile(db):
+        return builtin
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            rows = conn.execute("SELECT id, name, type FROM voices ORDER BY name").fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return builtin
+    out = [{"id": str(r[0]), "name": str(r[1]), "type": str(r[2])} for r in rows]
+    return out or builtin

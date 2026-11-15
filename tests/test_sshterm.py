@@ -258,6 +258,46 @@ class EndpointTest(unittest.TestCase):
         self.assertIn("initSshTerm", attach)
         self.assertNotIn("dispose", attach)
 
+    def test_read_build_matches_tree_readme(self):
+        # 0.0.1-beta2: _read_build must read the hyphenated
+        # beta version ("0.0.1-beta2") from the tree README —
+        # the old \w+ regex stopped at the hyphen and the UI
+        # showed a bare "0.0.1" for the whole beta line.
+        import re as _re
+        root = os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))
+        with open(os.path.join(root, "README.md"),
+                  encoding="utf-8") as f:
+            m = _re.search(r"Version:\*\* (0\.0\.1[\w-]+)", f.read())
+        self.assertIsNotNone(m)
+        self.assertEqual(webmod._read_build(), m.group(1))
+        self.assertEqual(webmod.BUILD, m.group(1))
+
+    def test_connect_status_carries_exit_code(self):
+        # 0.0.1-beta2: /api/ssh/status reports exit_code
+        # (None while alive) and /api/ssh/connect accepts the
+        # use_conpty flag without error.
+        status, j = self._req("POST", "/api/ssh/connect",
+                              {"host": "example.com", "port": 22,
+                               "cols": 80, "rows": 24})
+        self.assertEqual(status, 200)
+        sid = j["session_id"]
+        status, st = self._req(
+            "GET", "/api/ssh/status?session_id=" + sid)
+        self.assertEqual(status, 200)
+        self.assertIn("exit_code", st)
+        self.assertIsNone(st["exit_code"])
+        self.assertTrue(st["alive"])
+        status, j2 = self._req("POST", "/api/ssh/connect",
+                               {"host": "example.com", "port": 22,
+                                "use_conpty": True})
+        self.assertEqual(status, 200)
+        self.assertEqual(j2["session_type"], "posix")
+        self._req("POST", "/api/ssh/disconnect",
+                  {"session_id": sid})
+        self._req("POST", "/api/ssh/disconnect",
+                  {"session_id": j2["session_id"]})
+
     def test_addon_fit_constructs_via_namespace(self):
         # 0.0.1p regression: `new window.FitAddon()` threw
         # "window.FitAddon is not a constructor" on the laptop
@@ -587,6 +627,179 @@ class ConPtyFirstTest(unittest.TestCase):
                   encoding="utf-8") as f:
             web_src = f.read()
         self.assertIn("ConnectionAbortedError", web_src)
+
+
+class PipeDefaultTest(unittest.TestCase):
+    """0.0.1-beta2: on Windows the default session is the pipe
+    session, not ConPTY. ConPTY was the default from u through
+    beta and never delivered a byte on the laptop (live pid,
+    empty pipes, "no output yet" in every run, even after the
+    v alignment with Microsoft's sample), while the pipe
+    session rendered the HF TUI in the r–t era. ConPTY stays
+    available behind use_conpty=True, for the operator who
+    has passed tools/conpty_selftest.py. These tests drive
+    the routing through monkeypatched session classes and a
+    patched sys.platform — the ConPTY branch itself is
+    win32-only, as in ConPtyFirstTest above."""
+
+    def _patch(self, name, value):
+        old = getattr(sshterm, name, None)
+        had = hasattr(sshterm, name)
+        setattr(sshterm, name, value)
+        return old, had
+
+    def _restore(self, name, old, had):
+        if had:
+            setattr(sshterm, name, old)
+        else:
+            try:
+                delattr(sshterm, name)
+            except AttributeError:
+                pass
+
+    def test_default_is_pipe_on_windows(self):
+        class FakeConPty:
+            session_type = "conpty"
+
+            def __init__(self, *a):
+                raise AssertionError("ConPTY must not be tried by default")
+
+        class FakePipe:
+            session_type = "pipe"
+
+            def __init__(self, sid, argv, cols, rows):
+                self.cols, self.rows = cols, rows
+
+        old_c, had_c = self._patch("_ConPtySession", FakeConPty)
+        old_p, had_p = self._patch("_PipeSession", FakePipe)
+        old_platform = sys.platform
+        try:
+            sys.platform = "win32"
+            sess = sshterm._make_session("s1", ["ssh"], 80, 24)
+        finally:
+            sys.platform = old_platform
+            self._restore("_ConPtySession", old_c, had_c)
+            self._restore("_PipeSession", old_p, had_p)
+        self.assertIsInstance(sess, FakePipe)
+
+    def test_use_conpty_true_tries_conpty_first(self):
+        seen = {}
+
+        class FakeConPty:
+            session_type = "conpty"
+
+            def __init__(self, sid, argv, cols, rows):
+                seen["built"] = True
+
+        class FakePipe:
+            session_type = "pipe"
+
+            def __init__(self, *a):
+                raise AssertionError("pipe must not be tried first")
+
+        old_c, had_c = self._patch("_ConPtySession", FakeConPty)
+        old_p, had_p = self._patch("_PipeSession", FakePipe)
+        old_platform = sys.platform
+        try:
+            sys.platform = "win32"
+            sess = sshterm._make_session("s1", ["ssh"], 80, 24,
+                                         use_conpty=True)
+        finally:
+            sys.platform = old_platform
+            self._restore("_ConPtySession", old_c, had_c)
+            self._restore("_PipeSession", old_p, had_p)
+        self.assertIsInstance(sess, FakeConPty)
+        self.assertTrue(seen.get("built"))
+
+    def test_connect_passes_use_conpty_through(self):
+        seen = {}
+
+        class FakeSession:
+            session_type = "pipe"
+
+            def __init__(self):
+                self.cols, self.rows = 80, 24
+                self.pid = 1234
+                self.buffered = 0
+                self.last_activity = time.time()
+                self._alive = True
+
+            def alive(self):
+                return self._alive
+
+            def close(self):
+                self._alive = False
+
+            @property
+            def exit_code(self):
+                return None
+
+        def fake_make(sid, argv, cols, rows, use_conpty=False):
+            seen["use_conpty"] = use_conpty
+            return FakeSession()
+
+        old, had = self._patch("_make_session", fake_make)
+        try:
+            tmp = tempfile.TemporaryDirectory()
+            try:
+                mgr = SshManager(tmp.name,
+                                 command_builder=lambda *a: ["cat"])
+                sid = mgr.connect("example.com")
+                self.assertIs(seen.get("use_conpty"), False)
+                sid2 = mgr.connect("example.com", use_conpty=True)
+                self.assertIs(seen.get("use_conpty"), True)
+                mgr.shutdown()
+            finally:
+                tmp.cleanup()
+        finally:
+            self._restore("_make_session", old, had)
+
+    def test_exit_code_in_status(self):
+        # A live session reports exit_code None; a closed one
+        # reports the real wait status. This is the diagnostic
+        # that separates "ssh exited" from "PTY never delivered".
+        tmp = tempfile.TemporaryDirectory()
+        try:
+            mgr = SshManager(tmp.name,
+                             command_builder=lambda *a: ["cat"])
+            try:
+                sid = mgr.connect("example.com")
+                st = mgr.status(sid)
+                self.assertIn("exit_code", st)
+                self.assertIsNone(st["exit_code"])
+                sess = mgr._sessions[sid]
+                self.assertIsNone(sess.exit_code)
+                sess.close()
+                self.assertIsNotNone(sess.exit_code)
+            finally:
+                mgr.shutdown()
+        finally:
+            tmp.cleanup()
+
+    def test_pipe_session_exit_code_direct(self):
+        sess = sshterm._PipeSession("s1", ["cat"], 80, 24)
+        try:
+            self.assertIsNone(sess.exit_code)
+        finally:
+            sess.close()
+        self.assertIsNotNone(sess.exit_code)
+
+    def test_ui_wiring_in_source(self):
+        root = os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))
+        with open(os.path.join(root, "hub", "web.py"),
+                  encoding="utf-8") as f:
+            web_src = f.read()
+        self.assertIn("use_conpty", web_src)
+        with open(os.path.join(root, "hub", "web_ui.html"),
+                  encoding="utf-8") as f:
+            ui_src = f.read()
+        self.assertIn('id="sshConpty"', ui_src)
+        self.assertIn("use_conpty", ui_src)
+        # The status poll must surface the exit code, not just
+        # "no output yet": that is the whole diagnostic.
+        self.assertIn("exit_code", ui_src)
+        self.assertIn("conpty_selftest", ui_src)
 
 
 class WindowsImportSafetyTest(unittest.TestCase):

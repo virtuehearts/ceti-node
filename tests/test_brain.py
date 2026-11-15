@@ -116,7 +116,8 @@ class BrainTest(unittest.TestCase):
         roots = brain.resolve_roots(candidates=[tree_brain])
         self.assertTrue(roots["found"])
         mods = brain.list_modules(roots)
-        self.assertEqual(len(mods), 31)
+        # 31 at 0.0.1l; +2 in 0.0.1n (night-shift + modem research cassettes)
+        self.assertEqual(len(mods), 33)
 
     def test_list_modules(self):
         mods = brain.list_modules()

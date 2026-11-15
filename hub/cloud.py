@@ -40,12 +40,17 @@ PROVIDERS = {
     "nvidia": {
         "base": "https://integrate.api.nvidia.com/v1",
         "env": "NVIDIA_API_KEY",
-        "suggest": ["nvidia/llama-3.1-nemotron-70b-instruct",
-                    "meta/llama-3.1-8b-instruct",
-                    "mistralai/mixtral-8x7b-instruct-v0.1"],
-        # NOTE 2026-10-22: Nvidia chat for these IDs returned 404/410
-        # with the key tested (list works, chat does not). The web UI
-        # lists models live and surfaces the error per model.
+        # Verified 2026-11-06 with a free nvapi- key: these three answer.
+        # NOTE: /v1/models lists 84 ids but carries NO free/availability
+        # flag — several listed models 404 ("Not found for account") on
+        # chat, e.g. nemotron-3-super-120b, nemotron-3-nano-30b-a3b
+        # reasoning, llama-3.1-nemotron-51b, llama-3.1-nemotron-70b.
+        # The old suggest trio (llama-3.1-nemotron-70b, llama-3.1-8b,
+        # mixtral-8x7b) is retired: 404/410. Reasoning models need a
+        # real max_tokens budget or the reply comes back content:null.
+        "suggest": ["nvidia/nemotron-3.5-super-vl-120b-a12b",
+                    "nvidia/nemotron-3.5-lightning-30b-a3b",
+                    "nvidia/nemotron-3.5-bolt-e4b"],
     },
 }
 
@@ -103,7 +108,8 @@ def list_models(provider: str, api_key: str = ""):
 def chat_cloud(provider: str, api_key: str, model: str, messages,
                max_tokens=2048, temperature=0.7, stream=False):
     """Non-streaming cloud chat: returns content string.
-    For streaming, use stream_cloud below."""
+    For streaming, use stream_cloud below. For tool use, see
+    chat_cloud_tools."""
     base = PROVIDERS[provider]["base"]
     payload = json.dumps({"model": model, "messages": messages,
                           "max_tokens": max_tokens, "temperature": temperature,
@@ -114,6 +120,41 @@ def chat_cloud(provider: str, api_key: str, model: str, messages,
         data = json.load(r)
     msg = data["choices"][0]["message"]
     return msg.get("content") or ""
+
+
+def chat_cloud_tools(provider: str, api_key: str, model: str, messages,
+                     tools, max_tokens=2048, temperature=0.2):
+    """One cloud chat turn with OpenAI-compatible tool calling.
+
+    Returns {"content": str, "tool_calls": [{"id", "name",
+    "arguments": dict, "raw": <the provider's tool-call object>}]}.
+    The caller echoes each raw tool-call object back in the next
+    assistant message and appends {"role": "tool",
+    "tool_call_id": id, "content": result} per call.
+    """
+    base = PROVIDERS[provider]["base"]
+    payload = json.dumps({"model": model, "messages": messages,
+                          "tools": tools, "tool_choice": "auto",
+                          "max_tokens": max_tokens,
+                          "temperature": temperature,
+                          "stream": False}).encode("utf-8")
+    req = urllib.request.Request(f"{base}/chat/completions", data=payload,
+                                 headers=_headers(api_key, provider))
+    with urllib.request.build_opener().open(req, timeout=600) as r:
+        data = json.load(r)
+    msg = data["choices"][0]["message"]
+    calls = []
+    for tc in msg.get("tool_calls") or []:
+        fn = tc.get("function") or {}
+        try:
+            args = json.loads(fn.get("arguments") or "{}")
+        except Exception:
+            args = {"_raw": fn.get("arguments") or ""}
+        calls.append({"id": tc.get("id") or "",
+                      "name": fn.get("name") or "",
+                      "arguments": args if isinstance(args, dict) else {"_raw": args},
+                      "raw": tc})
+    return {"content": msg.get("content") or "", "tool_calls": calls}
 
 
 def stream_cloud(provider: str, api_key: str, model: str, messages,

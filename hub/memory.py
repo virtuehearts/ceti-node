@@ -105,6 +105,19 @@ def search(conn, identity_hash: str, query_embedding, top_k=5, sources=None):
     return scored[:top_k]
 
 
+def attachment_sources(conn, identity_hash: str, session_id: str):
+    """Distinct attachment sources filed under one chat session.
+
+    Attachments are stored with source "attachment:<session>:<file>";
+    the ladder uses this list to pull exactly this session's files
+    back as context (memory.search takes exact sources)."""
+    rows = conn.execute(
+        "SELECT DISTINCT source FROM memories WHERE identity_hash = ? "
+        "AND source LIKE ?",
+        (identity_hash, "attachment:%s:%%" % session_id)).fetchall()
+    return [r[0] for r in rows]
+
+
 def forget_all(conn, identity_hash: str) -> int:
     cur = conn.execute("DELETE FROM memories WHERE identity_hash = ?", (identity_hash,))
     # Usage rows point at reply memories; drop the ones left orphaned.

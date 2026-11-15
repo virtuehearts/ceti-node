@@ -374,6 +374,29 @@ def send_job(to_pubkey, capability, payload, data_dir=None):
     return out
 
 
+def voice_local(text, voice=None, data_dir=None):
+    """Synthesize text on THIS node's own bridge, direct — no mailbox.
+
+    The web Generate-voice button uses this when the target peer is
+    this node itself. The mailbox round-trip (60s poll + a base64
+    reply the sandbox proxy truncates mid-body, so the audio never
+    reaches the UI) is the wrong path for a bridge that is localhost
+    on this box: the direct call answers in seconds and never touches
+    the proxy. Other peers still go via send_job. Returns the
+    poller's bridge_tts shape so the UI renders it with the same
+    waveform code."""
+    text = (text or "").strip()
+    if not text:
+        return {"error": "voice needs text"}
+    voice = (voice or "").strip() or "mya-03"
+    if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", voice):
+        return {"error": "bad voice name"}
+    try:
+        return tunnel_mod.bridge_tts(text, voice)
+    except Exception as e:
+        return {"error": "%s: %s" % (type(e).__name__, e)}
+
+
 def mailbox_poll(data_dir=None):
     """Fetch + clear this node's mailbox (job replies land here).
 
@@ -605,3 +628,36 @@ def set_serving(body, data_dir=None):
     except OSError:
         pass
     return {"ok": True, "serving": get_serving(data_dir)}
+
+
+def set_default_voice(voice, data_dir=None):
+    """Set ONLY the default TTS voice, preserving every other serving
+    field. set_serving() is the wrong tool for this: posting a voice
+    alone would pop text_backend and blank text_model. The System
+    voice panel uses this so 'Set as default' cannot clobber the
+    node's serving backend."""
+    voice = (voice or "").strip()
+    if not voice:
+        return {"error": "voice is empty"}
+    if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", voice):
+        return {"error": "bad voice name"}
+    try:
+        with open(_serving_path(data_dir)) as f:
+            cfg = json.load(f)
+        cfg = cfg if isinstance(cfg, dict) else {}
+    except (OSError, ValueError):
+        cfg = {}
+    cfg["tts_voice"] = voice
+    tmp = _serving_path(data_dir) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f)
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, _serving_path(data_dir))
+    try:
+        os.chmod(_serving_path(data_dir), 0o600)
+    except OSError:
+        pass
+    return {"ok": True, "tts_voice": voice}

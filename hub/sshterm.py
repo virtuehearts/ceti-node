@@ -343,6 +343,14 @@ class _PosixSession:
         return self.proc.pid
 
     @property
+    def exit_code(self):
+        # None while the child runs; the wait status once it exits.
+        # This is the diagnostic that separates "ssh failed" (a
+        # real exit code, e.g. 255 for connection/auth failure)
+        # from "the PTY never delivered" (still running, no bytes).
+        return self.proc.poll()
+
+    @property
     def buffered(self):
         with self._lock:
             return len(self.buffer)
@@ -518,6 +526,12 @@ class _PipeSession:
     @property
     def pid(self):
         return self.proc.pid
+
+    @property
+    def exit_code(self):
+        # None while ssh runs; its exit status once it ends
+        # (see _PosixSession.exit_code for why this is exposed).
+        return self.proc.poll()
 
     @property
     def buffered(self):
@@ -740,6 +754,23 @@ if sys.platform == "win32":
         @property
         def pid(self):
             return self._pid
+
+        @property
+        def exit_code(self):
+            # None while the child runs (STILL_ACTIVE); the real
+            # wait status once it exits. Same diagnostic role as
+            # the pipe/POSIX exit_code: an ssh that died with 255
+            # failed at the network/auth layer, while a live pid
+            # with zero bytes is a PTY attachment failure.
+            if self._hproc is None:
+                return None
+            code = wintypes.DWORD(0)
+            if not _kernel32.GetExitCodeProcess(self._hproc,
+                                                ctypes.byref(code)):
+                return None
+            if code.value == _STILL_ACTIVE:
+                return None
+            return code.value
 
         @property
         def buffered(self):
@@ -983,19 +1014,27 @@ def _make_windows_session(session_id, argv, cols, rows):
         return _PipeSession(session_id, argv, cols, rows)
 
 
-def _make_session(session_id, argv, cols, rows):
+def _make_session(session_id, argv, cols, rows, use_conpty=False):
     """Platform session factory. Never crashes at import: a platform
     with no PTY at all fails here, at connect time, with a clear
-    error the endpoint returns as JSON."""
+    error the endpoint returns as JSON.
+
+    0.0.1-beta2: on Windows the default is the pipe session,
+    not ConPTY. ConPTY was the default from u through beta and
+    never produced a working session on the laptop — every
+    run was a live pid with empty pipes ("no output yet") even
+    after the v alignment with Microsoft's sample — while the
+    pipe session rendered the HF TUI in the r–t era. ConPTY
+    is still available, behind use_conpty=True, for the
+    operator who has passed tools/conpty_selftest.py: it is
+    the only path with real resize. The pipe fallback inside
+    _make_windows_session is unchanged (creation failure
+    only)."""
     cols, rows = _clamp_size(cols, rows)
     if sys.platform == "win32":
-        # 0.0.1u: ConPTY first (headless, real resize), pipe
-        # fallback on creation failure. Pipe was the sole
-        # Windows path in r–t because ConPTY opened a visible
-        # window on the laptop across n–q; the u headless
-        # flags plus the laptop self-test gate are what make
-        # the return to ConPTY safe to attempt.
-        return _make_windows_session(session_id, argv, cols, rows)
+        if use_conpty:
+            return _make_windows_session(session_id, argv, cols, rows)
+        return _PipeSession(session_id, argv, cols, rows)
     if not _HAVE_POSIX_PTY:
         raise RuntimeError("PTY unavailable on this platform")
     return _PosixSession(session_id, argv, cols, rows)
@@ -1037,7 +1076,7 @@ class SshManager:
         self._reaper.start()
 
     def connect(self, host, port=22, username="", key_id="",
-                cols=80, rows=24):
+                cols=80, rows=24, use_conpty=False):
         host = validate_host(host)
         port = validate_port(port)
         # 0.0.1u: clamp here as well as in _make_session, so a
@@ -1051,7 +1090,8 @@ class SshManager:
             validate_id(key_id)
         argv = self._build_argv(host, port, username, key_id)
         session_id = "ssh-" + secrets.token_hex(8)
-        sess = _make_session(session_id, argv, cols, rows)
+        sess = _make_session(session_id, argv, cols, rows,
+                             use_conpty=use_conpty)
         with self._lock:
             self._sessions[session_id] = sess
         self._start_reaper()
@@ -1082,6 +1122,7 @@ class SshManager:
         return {"session_id": session_id, "alive": sess.alive(),
                 "cols": sess.cols, "rows": sess.rows,
                 "session_type": sess.session_type, "pid": sess.pid,
+                "exit_code": sess.exit_code,
                 "buffered": sess.buffered,
                 "idle_seconds": round(time.time() - sess.last_activity, 1)}
 

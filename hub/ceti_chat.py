@@ -1,22 +1,37 @@
 """CETI chat: the CETI answer ladder as a test layer in the node.
 
-Tier order, first hit wins:
-  1. facts — the fact store (facts.sqlite3) plus cassette <fact>
-     elements (this is where the 195-country capitals live).
+`answer()` delegates to the local reasoning layer
+(`hub/reasoning.py: answer_with_reasoning`) and adapts its result to
+this module's contract (thinking = the reasoning trace joined with
+newlines). Tier order, first hit wins:
+  0. math — deterministic Python arithmetic (safe AST parser).
+  1. facts — predicate-aware: the fact store (facts.sqlite3) plus
+     cassette <fact> elements (this is where the 195-country
+     capitals live). Two-hop composition first ("capital of the
+     country whose currency is the yen" -> yen is Japan's currency
+     -> capital Tokyo), then plain predicate-matched facts.
   2. aiml — cassette <category> pattern match (exact, plus the
      single `*` wildcard with <star/> substitution).
-  3. local-model — vector memory as context, then the local chat
-     server. Nothing here is an answer by itself: memory is
-     context for the model, the way the CETI ladder runs it.
-  4. cloud-suggested — NOT called. Every local tier missed, so
+  3. lexicon — synonym/definition expansion (built-in seed, plus
+     the shipped Open English WordNet WNDB when present) before
+     vector search, so paraphrases reach local knowledge.
+  4. vector memory — the expanded query embedded and searched;
+     only hits sharing a content word with the question count as
+     grounded context (see the empty-context guard in reasoning.py).
+  5. local-model — local model ONLY, with the assembled context
+     and a strict "answer only from this context" prompt, plus a
+     numbers-grounded guard. Never called on empty context.
+  6. cloud-suggested — NOT called. Every local tier missed, so
      the answer says so and suggests cloud. Nothing leaves this
      machine from this path.
 
-Read-only by design, except the local-model call: CETI chat never
-writes to vector memory (a test layer must not contaminate the
-tier it tests), never writes to the brain stores, and never calls
-a cloud API. Every answer carries its tier + evidence, so the
-ladder can be verified tier by tier.
+The helper functions below (_facts_tier, _aiml_tier, _memory_hits,
+_local_model, facts_search) are kept for backwards compatibility
+and for the reasoning layer to reuse; answer() itself no longer
+runs the old ladder (its facts tier returned the first fact for a
+subject and ignored the predicate — "currency of Japan" answered
+"capital: Tokyo"). Every answer carries its tier + evidence, so
+the ladder can be verified tier by tier.
 """
 import json
 import os
@@ -124,17 +139,47 @@ def _render_template(template, stars):
     return _TAG_RE.sub("", text).strip()
 
 
-def _aiml_tier(query, roots):
+def _aiml_all_matches(query, roots):
+    """Every AIML category whose pattern matches the question, in
+    cassette order. Returns a list of dicts with cassette, pattern,
+    template (tags stripped) and the rendered answer. Used by the
+    arbitration step: when several patterns match, the local model
+    picks the best instead of the ladder taking the first."""
     qn = _norm(query)
+    out = []
     for name, text in _iter_cassettes(roots):
         for pattern, template in _CAT_RE.findall(text):
             stars = _pattern_match(pattern, qn)
             if stars is None:
                 continue
-            return {"tier": "aiml",
-                    "answer": _render_template(template, stars),
-                    "evidence": "cassette %s pattern: %s" % (name, _norm(pattern))}
-    return None
+            out.append({"cassette": name,
+                        "pattern": _norm(pattern),
+                        "template": _TAG_RE.sub("", template).strip(),
+                        "answer": _render_template(template, stars)})
+    return out
+
+
+def _aiml_tier(query, roots):
+    matches = _aiml_all_matches(query, roots)
+    if not matches:
+        return None
+    m = matches[0]
+    return {"tier": "aiml",
+            "answer": m["answer"],
+            "evidence": "cassette %s pattern: %s" % (m["cassette"],
+                                                      m["pattern"])}
+
+
+def _iter_categories(roots):
+    """Yield (cassette, pattern, template) for every AIML category.
+
+    Shared by the exact-match tier and the retrieval step: the
+    retrieval step scores categories instead of matching patterns,
+    so an open-ended question can still ground the local model in
+    the stores."""
+    for name, text in _iter_cassettes(roots):
+        for pattern, template in _CAT_RE.findall(text):
+            yield name, _norm(pattern), _TAG_RE.sub("", template).strip()
 
 
 def _memory_hits(query, ident_hash):
@@ -163,67 +208,28 @@ def _local_model(messages):
     return answer
 
 
-def answer(query, roots=None, ident_hash=None):
-    """Run the ladder. Returns tier, answer, evidence, cloud_suggested,
-    thinking (the ladder trace, shown in the chat thinking panel),
-    and memories (local-model tier only)."""
+def answer(query, roots=None, ident_hash=None, session_id=None):
+    """Run the ladder (via hub/reasoning.py). Returns tier, answer,
+    evidence, cloud_suggested, thinking (the ladder trace, shown in
+    the chat thinking panel), memories, and numbers_grounded.
+    session_id, when given, lets the ladder pull this session's
+    attached files in as context (see reasoning._attachment_hits)."""
     if roots is None:
         roots = brain.resolve_roots()
     query = (query or "").strip()
     if not query:
         return {"tier": "empty", "answer": "(empty question)",
                 "evidence": "", "cloud_suggested": False, "thinking": ""}
-    steps = []
-    hit = _facts_tier(query, roots)
-    if hit:
-        steps.append("FACTS — hit: " + hit["evidence"])
-        hit["cloud_suggested"] = False
-        hit["thinking"] = "\n".join(steps)
-        return hit
-    steps.append("FACTS — miss: no fact subject matched the question")
-    hit = _aiml_tier(query, roots)
-    if hit:
-        steps.append("AIML — hit: " + hit["evidence"])
-        hit["cloud_suggested"] = False
-        hit["thinking"] = "\n".join(steps)
-        return hit
-    steps.append("AIML — miss: no category pattern matched")
-    memories = _memory_hits(query, ident_hash)
-    if memories:
-        steps.append("VECTOR MEMORY — %d node(s) in context: %s" % (
-            len(memories),
-            ", ".join("#%s" % m["id"] for m in memories)))
-    else:
-        steps.append("VECTOR MEMORY — no nodes retrieved")
-    messages = []
-    if memories:
-        ctx = ("Relevant local knowledge (use it if it helps, ignore it "
-               "if not):\n" + "\n".join("- " + m["text"] for m in memories))
-        messages.append({"role": "system", "content": ctx})
-    messages.append({"role": "user", "content": query})
-    try:
-        text = _local_model(messages)
-    except Exception as e:
-        text = None
-        model_error = str(e)
-    if text:
-        steps.append("LOCAL MODEL — answered (chat server)")
-        return {"tier": "local-model", "answer": text,
-                "evidence": ("memories used: %d" % len(memories)) if memories
-                            else "no memory hits; local model alone",
-                "memories": memories, "cloud_suggested": False,
-                "thinking": "\n".join(steps)}
-    steps.append("LOCAL MODEL — unavailable: %s" % model_error)
-    steps.append("CLOUD — suggested only, never called")
-    return {"tier": "cloud-suggested",
-            "answer": ("Local tiers missed: no fact, no AIML pattern, and "
-                       "the local model is unavailable (%s). Cloud "
-                       "suggestion: retry this question in a regular chat "
-                       "session with a cloud provider selected — the CETI "
-                       "layer itself never calls a cloud API." % model_error),
-            "evidence": "facts: miss · aiml: miss · local-model: unavailable",
-            "cloud_suggested": True,
-            "thinking": "\n".join(steps)}
+    from . import reasoning
+    result = reasoning.answer_with_reasoning(
+        query, roots=roots, ident_hash=ident_hash, session_id=session_id)
+    return {"tier": result["tier"],
+            "answer": result["answer"],
+            "evidence": result.get("evidence", ""),
+            "cloud_suggested": result.get("cloud_suggested", False),
+            "thinking": "\n".join(result.get("reasoning_trace", [])),
+            "memories": result.get("memories", []),
+            "numbers_grounded": result.get("numbers_grounded", True)}
 
 
 def record_answer_memory(data_dir, ident_hash, query, answer, tier,
@@ -233,15 +239,17 @@ def record_answer_memory(data_dir, ident_hash, query, answer, tier,
     Writes two nodes — "User: <query>" and "Assistant: <answer>" —
     with source "ceti", so a repeated question retrieves the earlier
     exchange as context instead of reporting no memory hits. Only real
-    answer tiers are recorded (facts, aiml, local-model); a
-    cloud-suggested miss is a suggestion, not knowledge, and is never
-    stored. Deduped on the exact question: a repeat ask does not stack
-    duplicate nodes. Fail-soft by design: any failure (no embedding
-    server, no identity, no store) skips the write and never breaks
-    the answer itself. The Debug console's ad-hoc ask passes
-    record=False at the endpoint and never reaches this function.
+    answer tiers are recorded (facts, aiml, local-model, math,
+    facts-composition); a cloud-suggested miss is a suggestion, not
+    knowledge, and is never stored. Deduped on the exact question: a
+    repeat ask does not stack duplicate nodes. Fail-soft by design: any
+    failure (no embedding server, no identity, no store) skips the
+    write and never breaks the answer itself. The Debug console's
+    ad-hoc ask passes record=False at the endpoint and never reaches
+    this function.
     """
-    if tier not in ("facts", "aiml", "local-model"):
+    if tier not in ("facts", "aiml", "local-model", "math",
+                   "facts-composition"):
         return False
     if not ident_hash or not query or not answer:
         return False
