@@ -19,6 +19,9 @@ newlines). Tier order, first hit wins:
      only hits sharing a content word with the question count as
      grounded context (see the empty-context guard in reasoning.py).
   5. local-model — local model ONLY, with the assembled context
+  5b. local-model-ungrounded — the loaded model from its own
+      knowledge, ONLY after the grounded Tier 5 call refused;
+      labelled UNGROUNDED, never recorded into vector memory
      and a strict "answer only from this context" prompt, plus a
      numbers-grounded guard. Never called on empty context.
   6. cloud-suggested — NOT called. Every local tier missed, so
@@ -241,7 +244,9 @@ def record_answer_memory(data_dir, ident_hash, query, answer, tier,
     exchange as context instead of reporting no memory hits. Only real
     answer tiers are recorded (facts, aiml, local-model, math,
     facts-composition); a cloud-suggested miss is a suggestion, not
-    knowledge, and is never stored. Deduped on the exact question: a
+    knowledge, and is never stored. A local-model-ungrounded answer
+    is likewise never stored: model output from its own weights must
+    not become local knowledge. Deduped on the exact question: a
     repeat ask does not stack duplicate nodes. Fail-soft by design: any
     failure (no embedding server, no identity, no store) skips the
     write and never breaks the answer itself. The Debug console's

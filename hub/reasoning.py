@@ -29,6 +29,14 @@
                       prompt, plus a numbers-grounded guard: every
                       number in the answer must appear in the context
                       or the question.
+  Tier 5b UNGROUNDED — when Tier 5 ran and the model refused
+                      ("I don't know from local knowledge"): the
+                      loaded local model is asked again from its own
+                      knowledge, and the answer is labelled
+                      UNGROUNDED in tier and evidence. Never runs
+                      when no grounded context existed (the model
+                      is never called on an empty context), and
+                      never recorded into vector memory.
   Tier 6  CLOUD     — suggested only, never called. Reached when no
                       local tier produced anything AND there was no
                       local context worth handing to the model (the
@@ -754,6 +762,22 @@ _SYSTEM = (
 
 _NUM_RE = re.compile(r"\d[\d,\.]*")
 
+# The exact refusal the grounded Tier 5 system prompt demands when the
+# assembled local context does not contain the answer. Tier 5b below
+# treats this as "the model was called but local knowledge has no
+# answer" — the trigger to ask the loaded model from its own
+# knowledge instead of stopping there.
+_REFUSAL_TEXT = "I don't know from local knowledge."
+
+
+def _is_refusal(answer):
+    """True when the answer is the grounded-tier refusal (ignoring
+    case, surrounding whitespace, and a trailing period)."""
+    if not isinstance(answer, str):
+        return False
+    text = answer.strip().casefold().rstrip(".").strip()
+    return text == _REFUSAL_TEXT.rstrip(".").casefold()
+
 
 def _numbers_grounded(answer, context_text, question):
     """Every number in the answer must appear in the context or the
@@ -859,6 +883,73 @@ def _arbitrate_tier(query, fact_candidates, aiml_matches):
     hit["evidence"] = ("arbitrated over %d fact(s) + %d AIML template(s); "
                        % (len(fact_candidates), len(aiml_matches))) \
         + hit["evidence"]
+    return hit, lines
+
+
+_UNGROUNDED_SYSTEM = (
+    "You are CETI, a local brain. The local stores were checked and "
+    "do not contain the answer to this question, so answer it from "
+    "your own knowledge, in plain words, keeping the answer short. "
+    "The LOCAL CONTEXT below is background only: it is related, but "
+    "it does not contain the answer, so do not quote it as the answer. "
+    "Do not invent numbers, dates or names — if you are unsure of a "
+    "specific fact, say so instead of guessing.")
+
+
+def _model_tier_ungrounded(query, context_sections):
+    """Tier 5b — the loaded local model, from its own knowledge.
+
+    Called ONLY when the grounded Tier 5 call ran and returned the
+    exact refusal: the model was already consulted, local context
+    existed, and none of it answers the question. The model is asked
+    again with a prompt that permits answering from its weights, and
+    the result is labelled UNGROUNDED in its tier and evidence, so a
+    reader can always tell it apart from a grounded local answer.
+
+    Deliberately NOT used when no grounded context existed at all:
+    the empty-context guard (answer_with_reasoning, Tier 6) never
+    calls the model, and tests guard that rule — a question with no
+    local context still suggests cloud instead of asking the model
+    to answer from nothing.
+
+    Returns (result, lines) like _model_tier, or (None, lines) when
+    the model is unavailable, answers empty, or refuses again. The
+    numbers guard does not apply here — numbers in an ungrounded
+    answer come from the model's weights, not local context — so
+    numbers_grounded is always False and the trace says so. The
+    result is never recorded into vector memory (ceti_chat's record
+    gate only accepts facts/aiml/local-model/math/facts-composition),
+    so ungrounded model output can never become local knowledge."""
+    lines = []
+    hit, mtrace = _model_tier(query, context_sections,
+                              system=_UNGROUNDED_SYSTEM,
+                              max_tokens=2048, reasoning=True)
+    # The numbers-guard line _model_tier appended does not apply to
+    # an ungrounded answer: drop it and say so plainly.
+    mtrace = [l for l in mtrace if "numbers guard" not in l]
+    lines.extend(mtrace)
+    if hit is None:
+        return None, lines
+    if not (hit.get("answer") or "").strip():
+        lines.append("LOCAL MODEL (UNGROUNDED) — model returned an "
+                     "empty answer; falling through")
+        return None, lines
+    if _is_refusal(hit.get("answer")):
+        lines.append("LOCAL MODEL (UNGROUNDED) — model refused again "
+                     "from its own knowledge; falling through")
+        return None, lines
+    hit = dict(hit)
+    hit["tier"] = "local-model-ungrounded"
+    hit["evidence"] = (
+        "local model, UNGROUNDED — from the model's own knowledge, "
+        "not local stores (no fact, AIML pattern, or memory "
+        "answered this)")
+    hit["numbers_grounded"] = False
+    hit["ungrounded_numbers"] = hit.pop("ungrounded_numbers", [])
+    lines.append("LOCAL MODEL (UNGROUNDED) — answered from the "
+                 "model's own knowledge; numbers guard not "
+                 "applicable (numbers come from weights, not local "
+                 "context) — labelled, not grounded")
     return hit, lines
 
 
@@ -1069,6 +1160,15 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
         arb_hit, atrace = _arbitrate_tier(query, fact_candidates,
                                           aiml_matches)
         trace.extend(atrace)
+        if arb_hit and _is_refusal(arb_hit.get("answer")):
+            # The model refused: none of the candidates answers the
+            # question. That is a failure to answer, not an answer —
+            # fall through to the lower tiers (and Tier 5b) instead
+            # of returning the refusal as the final word.
+            trace.append("ARBITRATE — model refused (none of the "
+                         "candidates answers); falling through to "
+                         "the lower tiers")
+            arb_hit = None
         if arb_hit:
             arb_hit["reasoning_trace"] = trace
             arb_hit["memories"] = []
@@ -1177,6 +1277,30 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
     ]
     model_hit, mtrace = _model_tier(query, context_sections)
     trace.extend(mtrace)
+    if model_hit and _is_refusal(model_hit.get("answer")):
+        # Tier 5b (2026-11-14): the model ran, local context
+        # existed, and none of it answers the question — the
+        # grounded prompt gagged it into the refusal. The loaded
+        # local model is asked again from its own knowledge and
+        # the answer is labelled UNGROUNDED, so a reader can
+        # always tell it apart from a grounded local answer.
+        # (When no grounded context existed at all, the guard
+        # above skipped the model entirely and this never runs.)
+        trace.append("LOCAL MODEL — grounded answer refused: no "
+                     "local context contains the answer; asking "
+                     "the loaded model from its own knowledge, "
+                     "labelled ungrounded")
+        ungrounded, utrace = _model_tier_ungrounded(query,
+                                                    context_sections)
+        trace.extend(utrace)
+        if ungrounded:
+            ungrounded["reasoning_trace"] = trace
+            ungrounded["memories"] = memories
+            ungrounded["cloud_suggested"] = False
+            return ungrounded
+        # The model refused again or is unavailable: fall through
+        # to the cloud suggestion below.
+        model_hit = None
     if model_hit:
         model_hit["reasoning_trace"] = trace
         model_hit["memories"] = memories
@@ -1185,8 +1309,7 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
 
     # Tier 6 — cloud suggested, never called.
     trace.append("CLOUD — suggested only, never called: no local tier "
-                 "answered and no local context existed to ground a "
-                 "model answer")
+                 "answered")
     return {"tier": "cloud-suggested",
             "answer": ("No local knowledge answers this: no math, no "
                        "fact, no AIML pattern, no lexicon definition "

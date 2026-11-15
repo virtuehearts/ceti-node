@@ -411,6 +411,12 @@ class CetiChatTest(unittest.TestCase):
                 embed_fn=fake_embed, connect_fn=connect_fn)
             self.assertFalse(ok3)
             self.assertEqual(memory.count(conn, "testhash"), 2)
+            ok4 = ceti_chat.record_answer_memory(
+                d, "testhash", "how to setup a bbs",
+                "model knowledge, not local", "local-model-ungrounded",
+                embed_fn=fake_embed, connect_fn=connect_fn)
+            self.assertFalse(ok4)
+            self.assertEqual(memory.count(conn, "testhash"), 2)
         finally:
             conn.close()
 
@@ -532,6 +538,118 @@ class CetiChatTest(unittest.TestCase):
             model=lambda q, ctx, **kw: (None, ["LOCAL MODEL — unavailable"]))
         try:
             r = ceti_chat.answer("Tell me about Japan")
+        finally:
+            self._restore_reasoning()
+        self.assertEqual(r["tier"], "cloud-suggested")
+        self.assertTrue(r["cloud_suggested"])
+
+    def test_grounded_refusal_falls_back_to_ungrounded_model(self):
+        # 0.0.1-beta2 Tier 5b: the grounded Tier 5 call ran (AIML
+        # context exists) and the model refused because the context
+        # does not contain the answer. The loaded model is asked
+        # again from its own knowledge, and the answer is labelled
+        # UNGROUNDED — never passed off as grounded.
+        calls = []
+
+        def _two_step(q, ctx, system=None, **kw):
+            calls.append(system)
+            if len(calls) == 1:
+                return ({"tier": "local-model",
+                         "answer": "I don't know from local knowledge.",
+                         "evidence": "local model, grounded in: AIML CONTEXT",
+                         "numbers_grounded": True},
+                        ["LOCAL MODEL — answered"])
+            return ({"tier": "local-model",
+                     "answer": "To set up a BBS you need a modem, "
+                               "phone line, and BBS software.",
+                     "evidence": "local model, grounded in: AIML CONTEXT",
+                     "numbers_grounded": True},
+                    ["LOCAL MODEL — answered"])
+        self._patch_reasoning(
+            vector=lambda q, h: (
+                [], ["VECTOR MEMORY — no nodes above 0.35"]),
+            model=_two_step)
+        try:
+            r = ceti_chat.answer("tell me how to setup a bbs")
+        finally:
+            self._restore_reasoning()
+        self.assertEqual(len(calls), 2)
+        # First call uses the default grounded prompt (system=None);
+        # the second call carries the ungrounded prompt.
+        self.assertIsNone(calls[0])
+        self.assertIn("own knowledge", calls[1])
+        self.assertEqual(r["tier"], "local-model-ungrounded")
+        self.assertIn("modem", r["answer"])
+        self.assertIn("UNGROUNDED", r["evidence"])
+        self.assertIs(r["numbers_grounded"], False)
+        self.assertFalse(r["cloud_suggested"])
+        self.assertIn("UNGROUNDED", r["thinking"])
+
+    def test_grounded_answer_does_not_call_model_twice(self):
+        # A grounded answer ends the ladder: no second call, no
+        # ungrounded label.
+        calls = []
+
+        def _once(q, ctx, **kw):
+            calls.append(1)
+            return ({"tier": "local-model", "answer": "model says hi",
+                     "evidence": "local model, grounded in: AIML CONTEXT",
+                     "numbers_grounded": True},
+                    ["LOCAL MODEL — answered"])
+        self._patch_reasoning(
+            vector=lambda q, h: (
+                [], ["VECTOR MEMORY — no nodes above 0.35"]),
+            model=_once)
+        try:
+            r = ceti_chat.answer("tell me about fidonet")
+        finally:
+            self._restore_reasoning()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(r["tier"], "local-model")
+        self.assertNotIn("UNGROUNDED", r["evidence"])
+
+    def test_ungrounded_fallback_when_model_down_goes_cloud(self):
+        # Grounded refusal, then the model is down for the second
+        # call: the ladder falls through to the cloud suggestion,
+        # it does not return the refusal as an answer.
+        calls = []
+
+        def _refuse_then_down(q, ctx, **kw):
+            calls.append(1)
+            if len(calls) == 1:
+                return ({"tier": "local-model",
+                         "answer": "I don't know from local knowledge.",
+                         "evidence": "local model, grounded in: AIML CONTEXT",
+                         "numbers_grounded": True},
+                        ["LOCAL MODEL — answered"])
+            return (None, ["LOCAL MODEL — unavailable"])
+        self._patch_reasoning(
+            vector=lambda q, h: (
+                [], ["VECTOR MEMORY — no nodes above 0.35"]),
+            model=_refuse_then_down)
+        try:
+            r = ceti_chat.answer("tell me how to setup a bbs")
+        finally:
+            self._restore_reasoning()
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(r["tier"], "cloud-suggested")
+        self.assertTrue(r["cloud_suggested"])
+
+    def test_arbitration_refusal_falls_through(self):
+        # Ambiguous facts, but the model refuses arbitration ("none
+        # of the candidates answers"): that is a failure to answer,
+        # not an answer — the ladder falls through instead of
+        # returning the refusal as the final word.
+        self._patch_reasoning(
+            vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
+            model=lambda q, ctx, **kw: (
+                {"tier": "local-model",
+                 "answer": "I don't know from local knowledge.",
+                 "evidence": "local model, grounded in: CANDIDATE FACTS",
+                 "numbers_grounded": True},
+                ["LOCAL MODEL — answered"]))
+        try:
+            r = ceti_chat.answer("What is Japan?")
         finally:
             self._restore_reasoning()
         self.assertEqual(r["tier"], "cloud-suggested")
