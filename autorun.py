@@ -18,6 +18,9 @@ What it does, in order:
   5. Starts chat (8080) + embedding (11435) servers — chat on VRAM if
      a GPU is present (RAM/CPU otherwise, with VRAM->RAM fallback),
      embedding on CPU/RAM by default (tiny model, saves VRAM for chat).
+  5b. Starts the bundled Mya TTS (tts/start_tts.sh or .bat) in the
+     background on http://127.0.0.1:8000 — fail-soft, so a missing
+     tts/ folder or a failed start never blocks the Hub.
   6. Starts the ChatGPT-style web UI on http://127.0.0.1:8900.
   7. Waits for Ctrl-C, then stops the servers.
 
@@ -99,6 +102,65 @@ def ensure_hfhub():
     return True
 
 
+def start_tts(log_path: str):
+    """Start the bundled Mya TTS (PocketTTS bridge) as a background
+    process, or return None if it cannot start.
+
+    Fail-soft by design: TTS is optional. If the tts/ folder is
+    missing (older extract) or the start fails, the Hub still runs
+    and chat still works — just without local TTS. The bridge takes
+    a while to come up (model load; venv + model download on first
+    run), so this returns immediately and never blocks the Hub.
+    """
+    tts_dir = os.path.join(ROOT, "tts")
+    script = os.path.join(
+        tts_dir, "start_tts.bat" if os.name == "nt" else "start_tts.sh")
+    if not os.path.isfile(script):
+        print("tts: tts/ not present in this extract — skipping local TTS")
+        return None
+    try:
+        log = open(log_path, "ab")
+    except OSError as e:
+        print(f"tts: cannot open log {log_path} ({e}) — skipping local TTS")
+        return None
+    if os.name == "nt":
+        cmd = ["cmd", "/c", script]
+    else:
+        cmd = ["bash", script]
+    try:
+        proc = subprocess.Popen(cmd, cwd=tts_dir,
+                                stdout=log, stderr=subprocess.STDOUT)
+    except Exception as e:
+        print(f"tts: failed to start ({e}) — continuing without local TTS")
+        log.close()
+        return None
+    # Record the PID beside the log (data/tts.pid) so the Hub UI's
+    # System → TTS SERVER Stop can stop the boot-started bridge too.
+    # On Linux the script execs uvicorn, so this PID IS the server.
+    try:
+        with open(os.path.join(os.path.dirname(log_path), "tts.pid"), "w") as f:
+            f.write(str(proc.pid))
+    except OSError:
+        pass
+    print("tts: starting in the background (log: %s) ..." % log_path)
+    print("tts: http://127.0.0.1:8000 (voice mya-03) — ready once the model loads")
+    return proc
+
+
+def stop_tts(proc) -> None:
+    """Stop a TTS process started by start_tts (best effort)."""
+    if proc is None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=10)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 def main():
     p = argparse.ArgumentParser(description="Uncensored Hub autorun")
     p.add_argument("--ctx", type=int, default=32768, choices=[16384, 32768])
@@ -169,6 +231,10 @@ def main():
         print("WARNING: chat server did not come up — check data/server-*.log")
         print("Continuing to the web UI anyway: Node tab, Files, and Settings still work.")
 
+    # Local TTS (Mya's PocketTTS bridge, tts/). Background, fail-soft:
+    # a missing folder or a failed start never blocks the Hub.
+    tts_proc = start_tts(os.path.join(data_dir(), "tts.log"))
+
     web_thread = None
     if not args.no_web:
         os.environ["HUB_WEB_PORT"] = str(args.web_port)
@@ -187,6 +253,7 @@ def main():
         time.sleep(2)
         print(f"health: chat={_health(chat_port())} embed={_health(embed_port())}")
         stop_all()
+        stop_tts(tts_proc)
         print("servers stopped (setup-only mode)")
         return 0
 
@@ -197,6 +264,7 @@ def main():
     except KeyboardInterrupt:
         print("\nstopping servers ...")
         stop_all()
+        stop_tts(tts_proc)
         print("stopped")
     return 0
 

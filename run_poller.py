@@ -43,10 +43,14 @@ def main():
     ap.add_argument("--allow-pubkey", action="append", default=[],
                     help="whitelist a peer's compressed pubkey (repeatable)")
     ap.add_argument("--interval", type=int, default=60,
-                    help="poll interval in seconds (default 60: on the Paid "
-                         "plan 100 clients at 60s cost ~4.3M writes/month, "
-                         "~14% of the 30M budget; on a free-tier list host "
-                         "pass 120, where 100 clients cost ~2.2M/month)")
+                    help="poll interval in seconds (default 60). Idle polls "
+                         "cost 0 KV writes (the list host only writes when a "
+                         "mailbox is drained), so the interval drives reads, "
+                         "requests, and latency, not the write budget: 50 "
+                         "nodes at 15s is ~480k reads/month, inside the Paid "
+                         "plan; use 15 during testing for snappier jobs.")
+    ap.add_argument("--name", default="",
+                    help="node name announced on heartbeat (default: node id)")
     ap.add_argument("--text-backend", choices=["ollama", "llama"], default="ollama",
                     help="text backend fallback (serving.json, set on the Serving page, wins when present)")
     ap.add_argument("--llama-url", default="http://127.0.0.1:11436",
@@ -69,10 +73,18 @@ def main():
     if not args.no_tts:
         handlers["tts"] = lambda p: tunnel_mod.bridge_tts(
             p.get("text", ""), p.get("voice") or tunnel_mod.serving_voice(args.data_dir))
+    # Capabilities announced on heartbeat = the handlers actually
+    # wired here (what this node really offers).
+    caps = ["text"]
+    if not args.no_tts:
+        caps.append("tts")
+    if args.image_queue and args.image_outdir:
+        caps.append("image")
     poller = tunnel_mod.TunnelClient(
         args.data_dir, args.list_url, set(args.allow_pubkey), handlers,
         image_queue=args.image_queue, image_outdir=args.image_outdir,
-        image_engine=args.image_engine)
+        image_engine=args.image_engine,
+        name=args.name, capabilities=caps)
     print("poller: node %s polling %s every %ds"
           % (poller.identity.node_id, args.list_url, args.interval))
     print("poller: handlers: %s; allow: %s"

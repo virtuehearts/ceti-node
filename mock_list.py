@@ -41,29 +41,65 @@ import node as node_mod  # noqa: E402
 
 
 class Store:
-    def __init__(self):
+    # Mirrors worker-node-list.js: nodes are sharded (one entry per
+    # pubkey) with a server `seen` timestamp; GET /nodes only returns
+    # entries seen within `ttl` (default 900s = 15 min). Sends are
+    # rate-limited per verified sender (default 600 per `rate_window`
+    # seconds). Tests pass short values to prove expiry/limiting
+    # without waiting.
+    def __init__(self, ttl=900, rate_limit=600, rate_window=600):
+        self.ttl = ttl
+        self.rate_limit = rate_limit
+        self.rate_window = rate_window
+        self.rate_counts = {}     # (pubkey, window) -> count
         self.pending_announces = {}   # pubkey -> announce payload
-        self.nodes = {}               # pubkey -> public list entry
+        self.nodes = {}               # pubkey -> public list entry (+seen)
         self.uploads = []             # offered files (no accept step)
         self.mailbox = {}             # pubkey -> queued job/reply messages
         self.lobby = []               # public lobby messages (last 100)
         self.chatbox = {}             # pubkey -> private chat messages
 
+    def live_node(self, pubkey):
+        entry = self.nodes.get(pubkey)
+        if not entry:
+            return None
+        if time.time() - entry.get("_seen", 0) > self.ttl:
+            return None
+        return entry
 
-def list_entry(ann):
+    def live_nodes(self):
+        now = time.time()
+        return [e for e in self.nodes.values()
+                if now - e.get("_seen", 0) <= self.ttl]
+
+    def check_rate(self, pubkey):
+        window = int(time.time() // self.rate_window)
+        key = (pubkey, window)
+        count = self.rate_counts.get(key, 0)
+        if count >= self.rate_limit:
+            return False
+        self.rate_counts[key] = count + 1
+        return True
+
+
+def list_entry(ann, seen=None):
     """Public list entry for an announced node. Capabilities are what
     the node CLAIMS to offer (its announce payload) — whether anyone
     may use them is each receiving node's own decision, not a
     server-side grant. There is no verified flag in this model:
-    recognition is per-node (allow-list / favorites), not global."""
-    return {
+    recognition is per-node (allow-list / favorites), not global.
+    `seen` is the server time of the last announce (ISO)."""
+    entry = {
         "node_id": ann["node_id"],
         "fingerprint": ann["fingerprint"],
         "name": ann["name"],
         "pubkey": ann["pubkey"],
         "capabilities": list(ann.get("capabilities", [])),
         "endpoint": ann.get("endpoint", ""),
+        "seen": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                              time.gmtime(seen if seen is not None else time.time())),
     }
+    return entry
 
 
 def verify_signed(payload):
@@ -105,8 +141,12 @@ def make_handler(store):
             parsed = urllib.parse.urlparse(self.path)
             qs = urllib.parse.parse_qs(parsed.query)
             if parsed.path == "/nodes":
+                # Live nodes only (seen within the TTL); the internal
+                # _seen stamp is stripped from the public entries.
+                live = [{k: v for k, v in e.items() if k != "_seen"}
+                        for e in store.live_nodes()]
                 self._send(200, {"format": "tc-node-list", "version": 1,
-                                 "nodes": list(store.nodes.values())})
+                                 "nodes": live})
             elif parsed.path == "/uploads":
                 self._send(200, {"uploads": store.uploads})
             elif parsed.path == "/lobby":
@@ -129,8 +169,12 @@ def make_handler(store):
                 # Gopher model: the server checks signature + listed
                 # ONLY. Whether the job runs is the receiving node's
                 # own decision (its poller allow/deny/block policy).
-                if payload.get("pubkey", "") not in store.nodes:
+                # "Listed" means a live node entry (seen within TTL).
+                if not store.live_node(payload.get("pubkey", "")):
                     self._send(403, {"error": "not a listed node"})
+                    return
+                if not store.check_rate(payload.get("pubkey", "")):
+                    self._send(429, {"error": "rate limited"})
                     return
                 store.mailbox.setdefault(payload["to_pubkey"], []).append(payload)
                 self._send(200, {"status": "queued", "id": payload.get("id")})
@@ -146,6 +190,9 @@ def make_handler(store):
                 if not verify_signed(payload):
                     self._send(401, {"error": "bad signature"})
                     return
+                if not store.check_rate(payload.get("pubkey", "")):
+                    self._send(429, {"error": "rate limited"})
+                    return
                 store.mailbox.setdefault(payload["to_pubkey"], []).append(payload)
                 self._send(200, {"status": "queued"})
                 return
@@ -153,16 +200,19 @@ def make_handler(store):
                 if not verify_signed(payload):
                     self._send(401, {"error": "bad signature"})
                     return
-                sender = payload.get("pubkey", "")
-                if sender not in store.nodes:
+                sender = store.live_node(payload.get("pubkey", ""))
+                if not sender:
                     self._send(403, {"error": "not a listed node"})
+                    return
+                if not store.check_rate(payload.get("pubkey", "")):
+                    self._send(429, {"error": "rate limited"})
                     return
                 text = str(payload.get("text", "")).strip()
                 if not text:
                     self._send(400, {"error": "empty message"})
                     return
-                entry = {"pubkey": sender,
-                         "name": store.nodes[sender].get("name", ""),
+                entry = {"pubkey": sender["pubkey"],
+                         "name": sender.get("name", ""),
                          "text": text[:2000],
                          "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
                 store.lobby.append(entry)
@@ -173,17 +223,20 @@ def make_handler(store):
                 if not verify_signed(payload):
                     self._send(401, {"error": "bad signature"})
                     return
-                sender = payload.get("pubkey", "")
-                if sender not in store.nodes:
+                sender = store.live_node(payload.get("pubkey", ""))
+                if not sender:
                     self._send(403, {"error": "not a listed node"})
+                    return
+                if not store.check_rate(payload.get("pubkey", "")):
+                    self._send(429, {"error": "rate limited"})
                     return
                 text = str(payload.get("text", "")).strip()
                 if not text:
                     self._send(400, {"error": "empty message"})
                     return
                 store.chatbox.setdefault(payload["to_pubkey"], []).append({
-                    "from_pubkey": sender,
-                    "from_name": store.nodes.get(sender, {}).get("name", ""),
+                    "from_pubkey": sender["pubkey"],
+                    "from_name": sender.get("name", ""),
                     "text": text[:2000],
                     "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
                 self._send(200, {"status": "queued"})
@@ -199,18 +252,29 @@ def make_handler(store):
                 if not verify_signed(payload):
                     self._send(401, {"error": "bad signature"})
                     return
+                if not store.check_rate(payload["pubkey"]):
+                    self._send(429, {"error": "rate limited"})
+                    return
                 store.pending_announces[payload["pubkey"]] = payload
                 # Gopher model: a valid announce lists the node
                 # immediately, with the capabilities it claims to
                 # offer. No approval, no verified flag — recognition
-                # is per-node, not global.
-                store.nodes[payload["pubkey"]] = list_entry(payload)
+                # is per-node, not global. Presence: the entry is
+                # stamped with the server time and drops off GET
+                # /nodes after the TTL until the node heartbeats
+                # (re-announces) again.
+                entry = list_entry(payload)
+                entry["_seen"] = time.time()
+                store.nodes[payload["pubkey"]] = entry
                 self._send(200, {"status": "listed",
                                  "note": "listed; each node decides its own allow/deny/mute"})
                 return
             if self.path == "/upload":
                 if not verify_signed(payload):
                     self._send(401, {"error": "bad signature"})
+                    return
+                if not store.check_rate(payload["pubkey"]):
+                    self._send(429, {"error": "rate limited"})
                     return
                 store.uploads.append(payload)
                 self._send(200, {"status": "offered",

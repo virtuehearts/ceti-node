@@ -1,0 +1,19 @@
+# Pinned to the exact versions verified working with the shipped
+# bridge (live on the author's box, 2026-11-14). torch, pocket-tts
+# and scipy used to float: a fresh extract installed whatever was
+# newest that day, so a release that worked in testing could fail
+# its first-run install on the laptop with no visible error. Pin
+# everything; bump only after booting the packaged bridge on the
+# pinned set and re-verifying a real synthesis.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0+cpu
+pocket-tts==3.2.0
+scipy==1.18.1
+numpy==2.5.3
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+jinja2==3.1.4
+python-multipart==0.0.32
+pytest==8.3.4
+httpx==0.28.1
+itsdangerous==2.2.0

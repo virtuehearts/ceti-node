@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PocketTTS Coqui Bridge</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="container-fluid">
+    <nav>
+      <ul>
+        <li><strong>PocketTTS Bridge</strong></li>
+        <li><a href="/" class="secondary">Synthesize</a></li>
+        <li><a href="/voices" class="secondary">Voices</a></li>
+        <li><a href="/api-keys" class="secondary">API Keys</a></li>
+        <li><a href="/settings" class="secondary">Settings</a></li>
+        <li>
+          <form action="/logout" method="post" style="margin:0">
+            <button type="submit" class="outline contrast" style="padding: 0.25rem 0.75rem; margin: 0; font-size: 0.8rem;">Logout</button>
+          </form>
+        </li>
+      </ul>
+    </nav>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    <footer>
+      <p>Powered by PocketTTS , Agent Bridge by darknet.ca labs.  (admin@darknet.ca)</p>
+    </footer>
+  </div>
+</body>
+</html>

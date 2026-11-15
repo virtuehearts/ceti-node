@@ -1,0 +1,478 @@
+{
+  "ident_hash": "cff8e94ea81768a22fd2caa43a53722d78f8c7187eabb6cbab68e01962d5ffaa",
+  "note": "PARTIAL \u2014 Q1-Q7 from the live ladder run 2026-11-06 ~06:10 UTC (pre-reboot). Q8 was in progress when the sandbox rebooted (~06:19 UTC) and killed the ladder, LFM3, Hub and poller; /tmp results were wiped. Q1-Q7 below are the exact values printed by that run. Q8-Q13 to be re-run after LFM3 :11436 is back (restarted by the main context, not by this task).",
+  "results": [
+    {
+      "answer": "Canada \u2014 capital: Ottawa",
+      "cloud_suggested": false,
+      "evidence": "cassette geography/countries.aiml fact: Canada capital Ottawa",
+      "expected": "Ottawa",
+      "facts_search_matches": [
+        {
+          "object": "Ottawa",
+          "predicate": "capital",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "Canadian dollar",
+          "predicate": "currency",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "CAD",
+          "predicate": "currency_code",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "Americas",
+          "predicate": "region",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "41417056",
+          "predicate": "population",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "English, French",
+          "predicate": "languages",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "CA",
+          "predicate": "iso_alpha2",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        },
+        {
+          "object": "CAN",
+          "predicate": "iso_alpha3",
+          "source": "geography/countries.aiml",
+          "subject": "Canada"
+        }
+      ],
+      "id": "Q1",
+      "kind": "fact",
+      "memories": null,
+      "question": "What is the capital of Canada?",
+      "seconds": 0.1,
+      "thinking": "FACTS \u2014 hit: cassette geography/countries.aiml fact: Canada capital Ottawa",
+      "tier": "facts"
+    },
+    {
+      "id": "Q10",
+      "kind": "math",
+      "question": "What is 15% of 240?",
+      "expected": "36",
+      "tier": "local-model",
+      "answer": "To find 15% of 240:\n\n\\[\n15\\% \\times 240 = \\frac{15}{100} \\times 240 = \\frac{15 \\times 240}{100}\n\\]\n\nCalculate \\(15 \\times 240\\):\n\n- \\(10 \\times 240 = 2400\\)\n- \\(5 \\times 240 = 1200\\)\n- Sum: \\(2400 + 1200 = 3600\\)\n\nThen divide by 100:\n\n\\[\n\\frac{3600}{100} = 36\n\\]\n\nSo, **15% of 240 is 36**.\n\n**Answer:** 36",
+      "evidence": "memories used: 2",
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 miss: no category pattern matched\nVECTOR MEMORY \u2014 2 node(s) in context: #1, #2\nLOCAL MODEL \u2014 answered (chat server)",
+      "memories": [
+        {
+          "id": 1,
+          "text": "User: capital of canada",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.648
+        },
+        {
+          "id": 2,
+          "text": "Assistant: Canada \u2014 capital: Ottawa",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.628
+        }
+      ],
+      "cloud_suggested": false,
+      "facts_search_matches": [],
+      "seconds": 968.9
+    },
+    {
+      "id": "Q11",
+      "kind": "fact-or-miss",
+      "question": "What is the capital of Tuvalu?",
+      "expected": "Funafuti",
+      "tier": "facts",
+      "answer": "Tuvalu \u2014 capital: Funafuti",
+      "evidence": "cassette geography/countries.aiml fact: Tuvalu capital Funafuti",
+      "thinking": "FACTS \u2014 hit: cassette geography/countries.aiml fact: Tuvalu capital Funafuti",
+      "memories": null,
+      "cloud_suggested": false,
+      "facts_search_matches": [
+        {
+          "subject": "Tuvalu",
+          "predicate": "capital",
+          "object": "Funafuti",
+          "source": "geography/countries.aiml"
+        },
+        {
+          "subject": "Tuvalu",
+          "predicate": "currency",
+          "object": "Australian dollar",
+          "source": "geography/countries.aiml"
+        },
+        {
+          "subject": "Tuvalu",
+          "predicate": "currency_code",
+          "object": "AUD",
+          "source": "geography/countries.aiml"
+        },
+        {
+          "subject": "Tuvalu",
+          "predicate": "region",
+          "object": "Oceania",
+          "source": "geography/countries.aiml"
+        },
+        {
+          "subject": "Tuvalu",
+          "predicate": "languages",
+          "object": "English",
+          "source": "geography/countries.aiml"
+        },
+        {
+          "subject": "Tuvalu",
+          "predicate": "iso_alpha2",
+          "object": "TV",
+          "source": "geography/countries.aiml"
+        },
+        {
+          "subject": "Tuvalu",
+          "predicate": "iso_alpha3",
+          "object": "TUV",
+          "source": "geography/countries.aiml"
+        }
+      ],
+      "seconds": 0.0
+    },
+    {
+      "id": "Q12",
+      "kind": "miss",
+      "question": "Who won the 2026 World Cup?",
+      "expected": null,
+      "tier": "local-model",
+      "answer": "The 2026 FIFA World Cup has not been held yet\u2014it\u2019s scheduled for June\u2013July\u202f2026 and will take place in the United States, Canada, and Mexico. Therefore, no winner has been crowned as of now (mid\u20112025). The final match results and champion will be decided at that time.\n\nIf you\u2019d like to know predictions or potential contenders, let me know!",
+      "evidence": "memories used: 2",
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 miss: no category pattern matched\nVECTOR MEMORY \u2014 2 node(s) in context: #1, #2\nLOCAL MODEL \u2014 answered (chat server)",
+      "memories": [
+        {
+          "id": 1,
+          "text": "User: capital of canada",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.64
+        },
+        {
+          "id": 2,
+          "text": "Assistant: Canada \u2014 capital: Ottawa",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.621
+        }
+      ],
+      "cloud_suggested": false,
+      "facts_search_matches": [],
+      "seconds": 1903.9
+    },
+    {
+      "id": "Q13",
+      "kind": "composition",
+      "question": "What is the capital of the country whose currency is the yen?",
+      "expected": "Tokyo",
+      "tier": "local-model",
+      "answer": "The currency known as the **yen** (JPY) is the official currency of **Japan**. The capital of Japan is **Tokyo**.\n\nSo: **Capital = Tokyo**.",
+      "evidence": "memories used: 2",
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 miss: no category pattern matched\nVECTOR MEMORY \u2014 2 node(s) in context: #1, #2\nLOCAL MODEL \u2014 answered (chat server)",
+      "memories": [
+        {
+          "id": 1,
+          "text": "User: capital of canada",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.699
+        },
+        {
+          "id": 2,
+          "text": "Assistant: Canada \u2014 capital: Ottawa",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.672
+        }
+      ],
+      "cloud_suggested": false,
+      "facts_search_matches": [],
+      "seconds": 174.7
+    },
+    {
+      "answer": "Japan \u2014 capital: Tokyo",
+      "cloud_suggested": false,
+      "evidence": "cassette geography/countries.aiml fact: Japan capital Tokyo",
+      "expected": "Japanese yen",
+      "facts_search_matches": [
+        {
+          "object": "Tokyo",
+          "predicate": "capital",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "Japanese yen",
+          "predicate": "currency",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "JPY",
+          "predicate": "currency_code",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "Asia",
+          "predicate": "region",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "122950000",
+          "predicate": "population",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "Japanese",
+          "predicate": "languages",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "JP",
+          "predicate": "iso_alpha2",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        },
+        {
+          "object": "JPN",
+          "predicate": "iso_alpha3",
+          "source": "geography/countries.aiml",
+          "subject": "Japan"
+        }
+      ],
+      "id": "Q2",
+      "kind": "fact",
+      "memories": null,
+      "question": "What is the currency of Japan?",
+      "seconds": 0.1,
+      "thinking": "FACTS \u2014 hit: cassette geography/countries.aiml fact: Japan capital Tokyo",
+      "tier": "facts"
+    },
+    {
+      "answer": "France \u2014 capital: Paris",
+      "cloud_suggested": false,
+      "evidence": "cassette geography/countries.aiml fact: France capital Paris",
+      "expected": "69081996",
+      "facts_search_matches": [
+        {
+          "object": "Paris",
+          "predicate": "capital",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "Euro",
+          "predicate": "currency",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "EUR",
+          "predicate": "currency_code",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "Europe",
+          "predicate": "region",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "69081996",
+          "predicate": "population",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "French",
+          "predicate": "languages",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "FR",
+          "predicate": "iso_alpha2",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        },
+        {
+          "object": "FRA",
+          "predicate": "iso_alpha3",
+          "source": "geography/countries.aiml",
+          "subject": "France"
+        }
+      ],
+      "id": "Q3",
+      "kind": "fact",
+      "memories": null,
+      "question": "What is the population of France?",
+      "seconds": 0.0,
+      "thinking": "FACTS \u2014 hit: cassette geography/countries.aiml fact: France capital Paris",
+      "tier": "facts"
+    },
+    {
+      "answer": "1984",
+      "cloud_suggested": false,
+      "evidence": "cassette fidonet.aiml pattern: WHEN DID FIDONET START OPERATING",
+      "expected": "1984",
+      "facts_search_matches": [],
+      "id": "Q4",
+      "kind": "aiml",
+      "memories": null,
+      "question": "When did FidoNet start operating?",
+      "seconds": 0.0,
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 hit: cassette fidonet.aiml pattern: WHEN DID FIDONET START OPERATING",
+      "tier": "aiml"
+    },
+    {
+      "answer": "The Commodore 64 was introduced in January 1982 by Commodore International.",
+      "cloud_suggested": false,
+      "evidence": "cassette commodore-64.aiml pattern: WHAT WAS INTRODUCTION DATE OF COMMODORE 64",
+      "expected": "January 1982",
+      "facts_search_matches": [],
+      "id": "Q5",
+      "kind": "aiml",
+      "memories": null,
+      "question": "What was introduction date of Commodore 64",
+      "seconds": 0.1,
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 hit: cassette commodore-64.aiml pattern: WHAT WAS INTRODUCTION DATE OF COMMODORE 64",
+      "tier": "aiml"
+    },
+    {
+      "answer": "56k was the fastest common dial-up modem speed, becoming the standard for dial-up internet access in the 1990s.",
+      "cloud_suggested": false,
+      "evidence": "cassette dial-up-modems.aiml pattern: WHAT IS MOST COMMON SPEED OF DIAL UP MODEMS",
+      "expected": "56k",
+      "facts_search_matches": [],
+      "id": "Q6",
+      "kind": "aiml",
+      "memories": null,
+      "question": "What is most common speed of dial-up modems",
+      "seconds": 0.1,
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 hit: cassette dial-up-modems.aiml pattern: WHAT IS MOST COMMON SPEED OF DIAL UP MODEMS",
+      "tier": "aiml"
+    },
+    {
+      "answer": "**Dial-up forums** were online discussion boards dedicated to users who connected via **dial\u2011up modems** (typically 28\u202fkbps, or even lower) in the mid\u20111990s through early 2000s. These communities centered on people sharing their experiences with slow internet connections.\n\n### Key points\n- **When they flourished:** Roughly from the late \u201990s until broadband was mainstream around 2005\u20132010.\n- **Main topics:**\n  - Troubleshooting dial\u2011up issues (slow speeds, laggy browsing).\n  - Tips for using email and chat over slow connections (e.g., compression, batch transfers, \u201cping\u201d management).\n  - Stories about AOL\u2019s PSTN phone line, ISDN, and early broadband trials.\n- **Style:** Often character\u2011by\u2011character posts; topics were casual (\u201cMy connection is on a whim\u2026\u201d) or focused on practical tricks (e.g., how to use dial\u2011up in Windows Explorer).\n- **Why they existed:**\n  - Before fiber/DSL speeds became common, many people relied solely on dial\u2011up.\n  - Forums provided a space for tips from users who had made it work and shared troubleshooting guides.\n- **Decline:** As broadband (cable, DSL) offered much faster speeds (>100\u202fkbps), most forums migrated to modern connections. A handful of legacy sites persist as nostalgia or archived communities.\n\nIf you\u2019re curious about a specific forum name (e.g., \u201cDial\u2011Up Talk\u201d, \u201cThe Slow Internet Forum\u201d), let me know and I can dive deeper!",
+      "cloud_suggested": false,
+      "evidence": "memories used: 2",
+      "expected": null,
+      "facts_search_matches": [],
+      "id": "Q7",
+      "kind": "vector/local",
+      "memories": [
+        {
+          "id": 1,
+          "model": "CETI",
+          "score": 0.613,
+          "source": "ceti",
+          "text": "User: capital of canada"
+        },
+        {
+          "id": 2,
+          "model": "CETI",
+          "score": 0.591,
+          "source": "ceti",
+          "text": "Assistant: Canada \u2014 capital: Ottawa"
+        }
+      ],
+      "question": "tell me about dial-up forums",
+      "seconds": 470.1,
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 miss: no category pattern matched\nVECTOR MEMORY \u2014 2 node(s) in context: #1, #2\nLOCAL MODEL \u2014 answered (chat server)",
+      "tier": "local-model"
+    },
+    {
+      "id": "Q8",
+      "kind": "vector/local",
+      "question": "what did sysops do on a BBS?",
+      "expected": null,
+      "tier": "local-model",
+      "answer": "In the context of a Basic Bulletin System (BBS), **SysOps**\u2014or \"system operators\"\u2014were typically responsible for maintaining and managing the entire system infrastructure. Their tasks included:\n\n- Setting up and configuring hardware/software (servers, modems, bulletin board software).\n- Managing user accounts and login privileges.\n- Monitoring traffic flow on the network to ensure smooth operation of forums or message boards.\n- Installing programs, updating systems, and troubleshooting issues.\n\nEssentially, they acted as the backbone for keeping the BBS running reliably and securely. If you're referring to a specific local group or project, details might vary\u2014but this covers typical responsibilities in historical and early internet bulletin board environments.",
+      "evidence": "memories used: 2",
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 miss: no category pattern matched\nVECTOR MEMORY \u2014 2 node(s) in context: #1, #2\nLOCAL MODEL \u2014 answered (chat server)",
+      "memories": [
+        {
+          "id": 1,
+          "text": "User: capital of canada",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.601
+        },
+        {
+          "id": 2,
+          "text": "Assistant: Canada \u2014 capital: Ottawa",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.593
+        }
+      ],
+      "cloud_suggested": false,
+      "facts_search_matches": [],
+      "seconds": 683.7
+    },
+    {
+      "id": "Q9",
+      "kind": "math",
+      "question": "What is 17 * 23 + 41?",
+      "expected": "432",
+      "tier": "local-model",
+      "answer": "The calculation proceeds as follows:\n\n1. Multiply first: \\(17 \\times 23\\).\n   - \\(17 \\times 20 = 340\\)\n   - \\(17 \\times 3 = 51\\)\n   - Total: \\(340 + 51 = 391\\)\n\n2. Add 41:\n   - \\(391 + 41 = 432\\)\n\nSo, **\\(17 * 23 + 41 = 432\\)**.",
+      "evidence": "memories used: 2",
+      "thinking": "FACTS \u2014 miss: no fact subject matched the question\nAIML \u2014 miss: no category pattern matched\nVECTOR MEMORY \u2014 2 node(s) in context: #1, #2\nLOCAL MODEL \u2014 answered (chat server)",
+      "memories": [
+        {
+          "id": 1,
+          "text": "User: capital of canada",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.644
+        },
+        {
+          "id": 2,
+          "text": "Assistant: Canada \u2014 capital: Ottawa",
+          "source": "ceti",
+          "model": "CETI",
+          "score": 0.629
+        }
+      ],
+      "cloud_suggested": false,
+      "facts_search_matches": [],
+      "seconds": 115.8
+    }
+  ],
+  "roots": {
+    "cassettes_dir": "/home/hatch/workspace/uncensored-node/brain/cassettes",
+    "ceti_dir": "/home/hatch/workspace/uncensored-node/brain",
+    "facts_db": "/home/hatch/workspace/uncensored-node/brain/facts.sqlite3",
+    "found": true,
+    "looked": [
+      "/home/hatch/workspace/mya-node/data/brain",
+      "/home/hatch/workspace/uncensored-node/brain"
+    ]
+  }
+}

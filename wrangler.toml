@@ -1,0 +1,16 @@
+# Deploy template for the node.darknet.ca list Worker.
+# Fill in the KV namespace id, then:
+#   wrangler deploy --name <existing-script-name>
+# Deploy under the EXISTING script name so the node.darknet.ca route keeps
+# pointing at it. Do NOT deploy a second worker and leave the old
+# discovery worker answering the domain.
+# Gopher model: NO key needed at deploy time — there is no central
+# sysop and no grant system. Allow/deny/mute live on each node.
+name = "ceti-node-discovery"
+main = "worker-node-list.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "NODE_LIST_KV"
+# Create with: wrangler kv namespace create NODE_LIST_KV
+id = "026efe1f9b3349798d7f488a4c76b341"

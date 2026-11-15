@@ -1,0 +1,190 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
+
+from app.services.audio import normalize_to_wav, timestamped_output, wav_to_mp3
+
+router = APIRouter(prefix='/api')
+v1_router = APIRouter(prefix='/v1')
+
+
+def _pick(params: dict, *keys: str, default=None):
+    for key in keys:
+        if key in params and params[key] not in (None, ""):
+            return params[key]
+    return default
+
+
+@router.post('/tts')
+async def tts(request: Request):
+    settings = request.app.state.settings
+    registry = request.app.state.voice_registry
+    tts_service = request.app.state.tts_service
+    auth_service = request.app.state.auth_service
+
+    api_key_data = None
+    if settings.enable_auth:
+        api_key = request.headers.get('X-API-Key') or request.query_params.get('api_key')
+        api_key_data = auth_service.validate_api_key(api_key)
+        if not api_key_data and not auth_service.ui_authenticated(request):
+            raise HTTPException(status_code=401, detail='Invalid API Key')
+
+    params = {}
+    upload_file = None
+    ctype = request.headers.get('content-type', '')
+    if 'application/json' in ctype:
+        params = await request.json()
+    else:
+        form = await request.form()
+        params = dict(form)
+        upload_file = form.get('speaker_wav') or form.get('speaker-wav')
+
+    text = _pick(params, 'text')
+    if not text:
+        raise HTTPException(status_code=400, detail='text is required')
+
+    voice = _pick(params, 'speaker-id', 'speaker_id', 'voice', 'speaker', default=settings.default_voice)
+    if voice:
+        voice = voice.lower()
+    fmt = _pick(params, 'format', default=settings.default_output_format).lower()
+    save_voice = str(_pick(params, 'save_voice', default='false')).lower() in {'1', 'true', 'yes'}
+    clone_name = _pick(params, 'clone_name', default='cloned-voice')
+
+    output_wav = settings.output_dir / timestamped_output('tts', '.wav')
+
+    if upload_file and hasattr(upload_file, 'filename'):
+        raw = await upload_file.read()
+        src = settings.output_dir / timestamped_output('speaker_upload', Path(upload_file.filename).suffix or '.wav')
+        src.write_bytes(raw)
+        normalized = settings.output_dir / timestamped_output('speaker_norm', '.wav')
+        try:
+            normalize_to_wav(src, normalized)
+            tts_service.ensure_cloning_available()
+            tts_service.synthesize_to_wav(text, voice='clone', output_path=output_wav, voice_sample=str(normalized))
+            if save_voice:
+                voice_id = clone_name.lower().replace(' ', '-')
+                sample_path = settings.voices_dir / f'{voice_id}.wav'
+                sample_path.write_bytes(normalized.read_bytes())
+                emb_path = settings.embeddings_dir / f'{voice_id}.safetensors'
+                tts_service.clone_and_register_assets(sample_path, emb_path)
+                registry.create_cloned(voice_id, clone_name, str(sample_path), str(emb_path))
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        finally:
+            src.unlink(missing_ok=True)
+            normalized.unlink(missing_ok=True)
+    else:
+        if not registry.get(voice):
+            raise HTTPException(status_code=404, detail='voice not found')
+        voice_info = registry.get(voice)
+        tts_service.synthesize_to_wav(
+            text,
+            voice,
+            output_wav,
+            voice_sample=voice_info.get('sample_path') if voice_info else None,
+            voice_embedding=voice_info.get('embedding_path') if voice_info else None,
+        )
+
+    if fmt == 'mp3':
+        mp3_path = settings.output_dir / output_wav.with_suffix('.mp3').name
+        try:
+            wav_to_mp3(output_wav, mp3_path)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if api_key_data:
+            auth_service.increment_usage(api_key_data['id'], len(text))
+        return FileResponse(mp3_path, media_type='audio/mpeg', filename=mp3_path.name)
+
+    if api_key_data:
+        auth_service.increment_usage(api_key_data['id'], len(text))
+
+    return FileResponse(output_wav, media_type='audio/wav', filename=output_wav.name)
+
+
+@v1_router.post('/audio/speech')
+async def openai_speech(request: Request):
+    settings = request.app.state.settings
+    auth_service = request.app.state.auth_service
+
+    api_key_data = None
+    if settings.enable_auth:
+        api_key = request.headers.get('X-API-Key') or request.query_params.get('api_key')
+        # Also check Authorization header for OpenAI compatibility
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            api_key = api_key or auth_header[7:].strip()
+
+        api_key_data = auth_service.validate_api_key(api_key)
+        if not api_key_data and not auth_service.ui_authenticated(request):
+            raise HTTPException(status_code=401, detail='Invalid API Key')
+
+    params = {}
+    ctype = request.headers.get('content-type', '')
+    if 'application/json' in ctype:
+        params = await request.json()
+    else:
+        form = await request.form()
+        params = dict(form)
+
+    text = _pick(params, 'input', 'text')
+    if not text:
+        raise HTTPException(status_code=400, detail='input is required')
+
+    voice = _pick(params, 'voice', 'speaker-id', 'speaker_id', 'speaker', default=request.app.state.settings.default_voice)
+    if voice:
+        voice = voice.lower()
+    fmt = _pick(params, 'response_format', 'format', default=request.app.state.settings.default_output_format).lower()
+
+    if not request.app.state.voice_registry.get(voice):
+        raise HTTPException(status_code=404, detail='voice not found')
+
+    output_wav = request.app.state.settings.output_dir / timestamped_output('tts', '.wav')
+    voice_info = request.app.state.voice_registry.get(voice)
+    request.app.state.tts_service.synthesize_to_wav(
+        text,
+        voice,
+        output_wav,
+        voice_sample=voice_info.get('sample_path') if voice_info else None,
+        voice_embedding=voice_info.get('embedding_path') if voice_info else None,
+    )
+
+    if fmt == 'mp3':
+        mp3_path = request.app.state.settings.output_dir / output_wav.with_suffix('.mp3').name
+        try:
+            wav_to_mp3(output_wav, mp3_path)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        if api_key_data:
+            auth_service.increment_usage(api_key_data['id'], len(text))
+        return FileResponse(mp3_path, media_type='audio/mpeg', filename=mp3_path.name)
+
+    if api_key_data:
+        auth_service.increment_usage(api_key_data['id'], len(text))
+    return FileResponse(output_wav, media_type='audio/wav', filename=output_wav.name)
+
+
+@router.post('/preview')
+async def preview(request: Request):
+    if request.app.state.settings.enable_auth:
+        request.app.state.auth_service.require_user(request)
+    payload = await request.json()
+    text = payload.get('text', '').strip()
+    voice = payload.get('voice', request.app.state.settings.default_voice)
+    if voice:
+        voice = voice.lower()
+    if not text:
+        raise HTTPException(status_code=400, detail='text is required')
+    out = request.app.state.settings.output_dir / timestamped_output('preview', '.wav')
+    voice_info = request.app.state.voice_registry.get(voice)
+    request.app.state.tts_service.synthesize_to_wav(
+        text,
+        voice,
+        out,
+        voice_sample=voice_info.get('sample_path') if voice_info else None,
+        voice_embedding=voice_info.get('embedding_path') if voice_info else None,
+    )
+    return {'ok': True, 'audio_url': f'/generated/{out.name}'}

@@ -362,7 +362,8 @@ class TunnelClient:
 
     def __init__(self, data_dir, list_url, allow, handlers,
                  image_queue=None, image_outdir=None, peers_file=None,
-                 image_engine="z-image"):
+                 image_engine="z-image",
+                 name="", capabilities=None, heartbeat_interval=None):
         self.identity, _ = node_mod.load_or_create_identity(data_dir)
         self.data_dir = data_dir
         self.list_url = list_url.rstrip("/")
@@ -378,6 +379,36 @@ class TunnelClient:
         self._pending_requeues = []  # replies whose bounce failed (burst)
         self._pending_replies = []  # job replies whose post failed (burst)
         self._seen_jobs = set()  # job ids already answered (dedup below)
+        # Presence: the list host only shows nodes seen within 15 min,
+        # so the poller heartbeats (re-announces) every 5 min. Name
+        # defaults to the node id; capabilities default to the
+        # handlers actually wired (what this node really offers).
+        self.name = name or self.identity.node_id
+        self.capabilities = (list(capabilities) if capabilities is not None
+                             else sorted(handlers))
+        self.heartbeat_interval = (node_mod.HEARTBEAT_INTERVAL
+                                   if heartbeat_interval is None
+                                   else heartbeat_interval)
+        self._last_heartbeat = 0
+
+    def heartbeat(self):
+        """Re-announce to the list host: refreshes this node's `seen`
+        stamp so it stays listed. Best-effort — a failed heartbeat
+        is logged, never fatal; the next cycle retries. Returns True
+        when the announce was accepted (200)."""
+        try:
+            client = node_mod.NodeClient(
+                self.data_dir, self.name, self.list_url,
+                announce=True, capabilities=self.capabilities)
+            status, _ = client.announce()
+            if status == 200:
+                self._last_heartbeat = time.time()
+                return True
+            print("tunnel: heartbeat announce returned %s" % (status,))
+            return False
+        except Exception as e:
+            print("tunnel: heartbeat failed: %s" % e)
+            return False
 
     def _peers(self):
         """This node's own per-peer policy: {pubkey: allow|deny|block}.
@@ -640,6 +671,9 @@ class TunnelClient:
         return processed, skipped
 
     def run_forever(self, interval=5):
+        # Heartbeat immediately on start (so the node is listed from
+        # the first minute), then every heartbeat_interval.
+        self.heartbeat()
         while True:
             try:
                 processed, skipped = self.run_once()
@@ -649,4 +683,6 @@ class TunnelClient:
                     print("tunnel: delivered %s" % (self.last_deliveries,))
             except Exception as e:
                 print("tunnel: poll error: %s" % e)
+            if time.time() - self._last_heartbeat >= self.heartbeat_interval:
+                self.heartbeat()
             time.sleep(interval)

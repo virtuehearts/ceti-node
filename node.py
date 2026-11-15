@@ -54,6 +54,10 @@ Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
 DEFAULT_LIST_URL = "https://node.darknet.ca"
 CAPABILITIES_NOW = ["text"]
 CAPABILITIES_LATER = ["music", "tts", "image", "music-gen", "files"]
+# Presence: the list host only shows nodes seen within NODE_TTL
+# (15 min, server-side). A node stays listed by re-announcing
+# every HEARTBEAT_INTERVAL — the poller does this in run_forever.
+HEARTBEAT_INTERVAL = 300  # seconds (5 min)
 
 
 def _announce_caps(capabilities, engines):
@@ -335,6 +339,14 @@ class NodeClient:
         })
         return _post(self.list_url, "/announce", payload)
 
+    def heartbeat(self):
+        """Re-announce: refreshes this node's `seen` stamp on the
+        list host so it stays listed (presence). Same payload as
+        announce — a heartbeat IS an announce, engine tags included.
+        The poller calls this every HEARTBEAT_INTERVAL (5 min); the
+        list host drops entries unseen for 15 min."""
+        return self.announce()
+
     def nodes(self):
         return _get(self.list_url, "/nodes")
 
@@ -563,7 +575,14 @@ def fetch_transfer(list_url, base_url, allow, out_dir):
     allow-listed BY THE RECEIVER (its own choice — no central accept),
     and every chunk must verify. Returns (ok, detail, manifest)."""
     os.makedirs(out_dir, exist_ok=True)
-    manifest = json.loads(_get_bytes(base_url.rstrip("/") + "/manifest.json").decode("utf-8"))
+    try:
+        manifest = json.loads(_get_bytes(base_url.rstrip("/") + "/manifest.json").decode("utf-8"))
+    except Exception as e:
+        # A dead outbox is a clean refusal, not a crash: the manifest
+        # fetch used to sit outside the download try-block, so a dead
+        # outbox raised instead of returning (False, "download
+        # failed: ..."). Fixed 2026-11-07 (caught by test_edge_cases).
+        return False, "download failed: %s" % e, {}
     status, offers = _get(list_url.rstrip("/"), "/uploads")
     if status != 200 or not any(
             u.get("file_sha256") == manifest.get("file_sha256")

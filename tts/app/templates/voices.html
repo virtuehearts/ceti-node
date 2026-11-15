@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <hgroup>
+    <h2 style="color: var(--primary);">Voice Management</h2>
+    <p>Clone new identities or manage your existing custom voices.</p>
+  </hgroup>
+</section>
+
+<div class="grid">
+  <!-- Voice Cloning Form -->
+  <article>
+    <header><strong>Clone New Voice</strong></header>
+    <form method="post" action="/api/voices/clone" enctype="multipart/form-data">
+      <label for="name">Voice Name
+        <input type="text" id="name" name="name" placeholder="e.g. My Custom Voice" required />
+      </label>
+      <label for="audio_file">Sample Audio (wav, mp3, m4a, flac)
+        <input type="file" id="audio_file" name="audio_file" accept="audio/*" required />
+      </label>
+      <button type="submit" class="primary">Clone Voice</button>
+    </form>
+  </article>
+
+  <!-- Voices List -->
+  <article>
+    <header><strong>Existing Cloned Voices</strong></header>
+    {% if not voices %}
+    <div style="text-align: center; padding: 2rem; color: var(--muted-color);">
+        <p>No cloned voices found. Use the form to clone your first voice.</p>
+    </div>
+    {% else %}
+    <div style="max-height: 500px; overflow-y: auto;">
+        {% for v in voices %}
+        <div class="voice-card">
+            <div class="voice-info">
+                <div style="font-weight: 600;" id="name-{{ v.id }}">{{ v.name }}</div>
+                <div style="font-size: 0.75rem; color: var(--muted-color);">ID: <code>{{ v.id }}</code></div>
+
+                <form class="test-voice-form" onsubmit="testVoice(event, '{{ v.id }}')">
+                    <input type="text" placeholder="Test text..." required />
+                    <button type="submit" class="outline contrast" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Test</button>
+                </form>
+            </div>
+            <div class="voice-actions">
+                <button class="outline secondary" onclick="renameVoice('{{ v.id }}', '{{ v.name }}')" title="Rename">Rename</button>
+                <a href="/api/voices/{{ v.id }}/export" role="button" class="outline contrast" title="Export to ZIP">Export</a>
+                <button class="outline" style="border-color: #ef4444; color: #ef4444;" onclick="deleteVoice('{{ v.id }}')" title="Delete">Del</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+  </article>
+</div>
+
+<!-- Audio player for tests -->
+<audio id="globalPlayer" style="display:none"></audio>
+
+<script>
+async function testVoice(e, id) {
+  e.preventDefault();
+  const form = e.target;
+  const input = form.querySelector('input');
+  const btn = form.querySelector('button');
+  const text = input.value;
+
+  btn.setAttribute('aria-busy', 'true');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: id })
+    });
+
+    if (!res.ok) {
+      alert('Error: ' + await res.text());
+      return;
+    }
+
+    const data = await res.json();
+    const player = document.getElementById('globalPlayer');
+    player.src = data.audio_url + '?t=' + new Date().getTime();
+    player.play();
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.setAttribute('aria-busy', 'false');
+    btn.disabled = false;
+  }
+}
+
+async function renameVoice(id, currentName) {
+  const newName = prompt('Enter new name for voice:', currentName);
+  if (!newName || newName === currentName) return;
+
+  const res = await fetch(`/api/voices/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName })
+  });
+
+  if (res.ok) {
+    location.reload();
+  } else {
+    alert('Failed to rename: ' + await res.text());
+  }
+}
+
+async function deleteVoice(id) {
+  if (!confirm(`Are you sure you want to delete voice "${id}"?`)) return;
+
+  const res = await fetch(`/api/voices/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    location.reload();
+  } else {
+    alert('Failed to delete: ' + await res.text());
+  }
+}
+</script>
+
+<style>
+  a[role="button"] {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+  }
+  button.outline {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    margin-bottom: 0;
+  }
+</style>
+{% endblock %}
