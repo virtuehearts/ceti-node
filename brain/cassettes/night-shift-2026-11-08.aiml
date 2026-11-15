@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- night-shift-2026-11-08.aiml — CETI night-shift research batch, 2026-11-08.
+     13 topics, researched and distilled by the local LFM3 via the Hub research
+     pipeline; every fact/QA below was verified against a source actually fetched
+     that night before approval (fact-gate). Unverified proposals were left
+     pending and are NOT in this file.
+     Darknet Diaries episode list: extracted deterministically from the RSS feed
+     https://feeds.megaphone.fm/darknetdiaries (183 episodes, 1-182 + 1 bonus),
+     because the model distill caps at 8 facts per call.
+     Per-topic sources:
+       Bitcoin: https://en.wikipedia.org/wiki/Bitcoin
+       Bitcoin: https://en.wikipedia.org/wiki/Bitcoin_(disambiguation)
+       Bitcoin: https://en.wikipedia.org/wiki/Bitcoin_Cash
+       Bitcoin: https://en.wikipedia.org/wiki/Bitcoin_protocol
+       Bitcoin: https://en.wikipedia.org/wiki/History_of_bitcoin
+       Cloudflare Workers: https://en.wikipedia.org/wiki/Cloudflare
+       Cloudflare Workers: https://en.wikipedia.org/wiki/CodeSandbox
+       Cloudflare Workers: https://en.wikipedia.org/wiki/DB-Engines_ranking
+       Cloudflare Workers: https://en.wikipedia.org/wiki/Deno_(software)
+       Cloudflare Workers: https://en.wikipedia.org/wiki/Hono.js
+       Darknet Diaries: https://darknetdiaries.com/
+       Darknet Diaries: https://feeds.megaphone.fm/darknetdiaries
+       Ethereum (ETH): https://en.wikipedia.org/wiki/2026_Binance_hack
+       Ethereum (ETH): https://en.wikipedia.org/wiki/Ethereum
+       Ethereum (ETH): https://en.wikipedia.org/wiki/Ethereum_Classic
+       Ethereum (ETH): https://en.wikipedia.org/wiki/Smart_contract
+       Ethereum (ETH): https://en.wikipedia.org/wiki/Vitalik_Buterin
+       Gopher protocol: https://en.wikipedia.org/wiki/Gemini_(protocol)
+       Gopher protocol: https://en.wikipedia.org/wiki/Gopher_(protocol)
+       Gopher protocol: https://en.wikipedia.org/wiki/Mark_P._McCahill
+       Gopher protocol: https://en.wikipedia.org/wiki/Veronica_(search_engine)
+       Gopher protocol: https://en.wikipedia.org/wiki/Wide_Area_Information_Server
+       IPFS: https://en.wikipedia.org/wiki/IPF
+       IPFS: https://en.wikipedia.org/wiki/InterPlanetary_File_System
+       IPFS: https://en.wikipedia.org/wiki/Ipf_(mountain)
+       IPFS: https://en.wikipedia.org/wiki/Library_Genesis
+       IPFS: https://en.wikipedia.org/wiki/Protocol_Labs
+       Jack Rhysider X handle: https://x.com/JackRhysider
+       Rust programming language: https://en.wikipedia.org/wiki/Comparison_of_functional_programming_languages
+       Rust programming language: https://en.wikipedia.org/wiki/List_of_programming_languages_by_type
+       Rust programming language: https://en.wikipedia.org/wiki/Outline_of_the_Rust_programming_language
+       Rust programming language: https://en.wikipedia.org/wiki/Rust_(programming_language)
+       Rust programming language: https://en.wikipedia.org/wiki/Rust_syntax
+       Tor (onion routing): https://en.wikipedia.org/wiki/Tor
+       Tor (onion routing): https://en.wikipedia.org/wiki/Tor_(network)
+       Tor (onion routing): https://en.wikipedia.org/wiki/Tor_Books
+       Tor (onion routing): https://en.wikipedia.org/wiki/Tor_missile_system
+       Tor (onion routing): https://en.wikipedia.org/wiki/Tor_tor
+       WireGuard: https://en.wikipedia.org/wiki/Amnezia_VPN
+       WireGuard: https://en.wikipedia.org/wiki/Mullvad
+       WireGuard: https://en.wikipedia.org/wiki/PfSense
+       WireGuard: https://en.wikipedia.org/wiki/Tailscale
+       WireGuard: https://en.wikipedia.org/wiki/WireGuard
+       darknet.ca registration dates: https://rdap.org/domain/darknet.ca
+       llama.cpp: https://en.wikipedia.org/wiki/GGUF
+       llama.cpp: https://en.wikipedia.org/wiki/Hugging_Face
+       llama.cpp: https://en.wikipedia.org/wiki/Llama.cpp
+       llama.cpp: https://en.wikipedia.org/wiki/Llama_(language_model)
+       llama.cpp: https://en.wikipedia.org/wiki/Ollama
+       secp256k1: https://en.bitcoin.it/wiki/Secp256k1
+       secp256k1: https://en.wikipedia.org/wiki/Elliptic-curve_cryptography
+     darknet.ca dates: live RDAP (modern whois) https://rdap.org/domain/darknet.ca
+     Darknet Diaries episodes: https://feeds.megaphone.fm/darknetdiaries
+     Jack Rhysider X handle: https://x.com/JackRhysider
+     Gopher topic: first distill drifted to Gemini; the Gemini facts are labelled
+     as Gemini. Real Gopher facts come from the repair distill (report-fixed.txt).
+     Tor topic: first distill mined only the disambiguation page (rejected); real
+     Tor (onion routing) facts come from the repair distill (report-fixed.txt).
+-->
+<aiml version="1.0">
+<fact subject="Ethereum" predicate="conceived" object="2013"/>
+<fact subject="Vitalik Buterin" predicate="programmer of" object="Ethereum"/>
+<fact subject="Ethereum" predicate="allows anyone to deploy" object="decentralized applications"/>
+<fact subject="Users on Ethereum" predicate="can create" object="fungible assets (tokens)"/>
+<fact subject="secp256k1" predicate="defined on" object="field Z/p"/>
+<fact subject="elliptic curve y^2 = x^3 + 7" predicate="equation of" object="secp256k1 (over real numbers)"/>
+<fact subject="graph of secp256k1&#x27;s elliptic curve" predicate="looks like" object="random scattered points"/>
+<fact subject="Gemini" predicate="started" object="June 2019"/>
+<fact subject="comp.infosystems.gemini" predicate="newsgroup creation date" object="October 2021"/>
+<fact subject="Gemini" predicate="intended to replace" object="neither Gopher nor HTTP (co-exist)"/>
+<fact subject="gemtext" predicate="document format for Gemini protocol" object="special document format allowing linking"/>
+<fact subject="Gemini server" predicate="listens on" object="TCP port 1965"/>
+<fact subject="darknet.ca" predicate="registered" object="2002-11-08"/>
+<fact subject="darknet.ca" predicate="expires" object="2028-11-08"/>
+<fact subject="Jack Rhysider" predicate="X handle" object="@JackRhysider"/>
+<fact subject="llama.cpp" predicate="can download and run compatible models" object="GGUF from the Hugging Face Hub"/>
+<fact subject="Gerganov" predicate="worked on" object="whisper.cpp"/>
+<fact subject="whisper.cpp" predicate="implemented" object="Whisper, a speech-to-text model by OpenAI"/>
+<fact subject="Deno Deploy" predicate="inspired_by" object="Cloudflare Workers"/>
+<fact subject="Stable release 0.4.9.16" predicate="last updated" object="4 November 2026 (5 days ago)"/>
+<fact subject="Tor operating system support" predicate="operating systems" object="Unix-like, Android, Linux, BSD, macOS, iOS, Microsoft Windows"/>
+<fact subject="Software license" predicate="license type" object="BSD 3-clause"/>
+<fact subject="Tor website" predicate="url" object="torproject.org"/>
+<fact subject="Repository location" predicate="gitlab path" object="/tpo /core /tor /"/>
+<fact subject="Protocol Labs" predicate="founded" object="2014"/>
+<fact subject="Juan Benet" predicate="founder of" object="Protocol Labs"/>
+<fact subject="libp2p" predicate="used as networking layer for" object="IPFS"/>
+<fact subject="IPLD" predicate="developed by" object="Protocol Labs"/>
+<fact subject="InterPlanetary File System (IPFS)" predicate="type of" object="peer-to-peer decentralized web protocol"/>
+<fact subject="Filecoin token" predicate="purpose for" object="decentralized file storage and rent out disk space"/>
+<fact subject="Bitcoin" predicate="is" object="the first decentralized cryptocurrency"/>
+<fact subject="Bitcoin" predicate="invented in" object="2008"/>
+<fact subject="Satoshi Nakamoto" predicate="published" object="the Bitcoin white paper in 2008"/>
+<fact subject="Bitcoin" predicate="genesis block mined" object="2009-01-03"/>
+<fact subject="Bitcoin" predicate="uses" object="proof-of-work mining"/>
+<fact subject="Bitcoin" predicate="fourth halving" object="April 2024"/>
+<fact subject="Gopher" predicate="is a" object="communication protocol for distributing, searching, and retrieving documents"/>
+<fact subject="Gopher" predicate="invented by" object="Mark P. McCahill"/>
+<fact subject="Gopher" predicate="created in" object="1991"/>
+<fact subject="Gopher" predicate="uses" object="TCP port 70"/>
+<fact subject="Gopher" predicate="described in" object="RFC 1436"/>
+<fact subject="Gopher" predicate="user interface is" object="menu-driven"/>
+<fact subject="Cloudflare Workers" predicate="launched in" object="2017"/>
+<fact subject="Cloudflare Workers" predicate="is a" object="serverless computing platform"/>
+<fact subject="Cloudflare Workers" predicate="is for" object="creating new applications and augmenting existing ones without configuring or maintaining infrastructure"/>
+<fact subject="Cloudflare Workers" predicate="includes" object="Workers KV"/>
+<fact subject="Workers KV" predicate="is a" object="low-latency key-value data store"/>
+<fact subject="Cloudflare Workers" predicate="includes" object="Cron Triggers"/>
+<fact subject="Cloudflare Workers" predicate="is" object="edge computing through the Workers platform"/>
+<fact subject="episode 179" predicate="title" object="The Courthouse - Revisited"/>
+<fact subject="Graydon Hoare" predicate="created" object="Rust"/>
+<fact subject="Mozilla Foundation" predicate="sponsored" object="Rust (project)"/>
+<fact subject="Rust 1.0 release" predicate="published in" object="May 2015"/>
+<fact subject="Rust Foundation" predicate="sponsor of project since" object="February 2021"/>
+<fact subject="Mozilla headquarters location" predicate="in" object="Mountain View, California (June 2009)"/>
+<fact subject="Ownership system in Rust" predicate="established by" object="2010"/>
+<fact subject="Rust logo development year" predicate="based on" object="bicycle chainring (2011)"/>
+<fact subject="First public release of Rust 0.1" predicate="for platforms" object="Windows, Linux, and MacOS (January 20, 2012)"/>
+<fact subject="WireGuard" predicate="passes traffic over" object="UDP"/>
+<fact subject="WireGuard Linux release" predicate="reached stable production" object="March 2020"/>
+<fact subject="Linux kernel components license" predicate="are licensed under" object="GNU General Public License version 2 (GPLv2)"/>
+<fact subject="WireGuard logo inspiration" predicate="is inspired by" object="stone engraving of the mythological Python seen by Jason Donenfeld in Delphi"/>
+<fact subject="David Miller role and action date" predicate="accepted patches into maintainer tree for inclusion" object="9 December 2019"/>
+<fact subject="Linux kernel version reference" predicate="incorporated into" object="Linux 5.6 kernel (and earlier distributions backported)"/>
+<fact subject="Darknet Diaries" predicate="is a" object="podcast about true stories from the dark side of the Internet"/>
+<fact subject="Darknet Diaries" predicate="host" object="Jack Rhysider"/>
+<fact subject="Jack Rhysider" predicate="hosts" object="Darknet Diaries"/>
+<fact subject="Darknet Diaries episode 182" predicate="title" object="Blackshades"/>
+<fact subject="Darknet Diaries episode 181" predicate="title" object="Ricky"/>
+<fact subject="Darknet Diaries episode 180" predicate="title" object="Conti"/>
+<fact subject="Darknet Diaries" predicate="bonus episode" object="LOW - Now Available"/>
+<fact subject="Darknet Diaries episode 179" predicate="title" object="The Courthouse - Revisited"/>
+<fact subject="Darknet Diaries episode 178" predicate="title" object="Ubiquiti"/>
+<fact subject="Darknet Diaries episode 177" predicate="title" object="National Public Data"/>
+<fact subject="Darknet Diaries episode 176" predicate="title" object="NSL"/>
+<fact subject="Darknet Diaries episode 175" predicate="title" object="Bayrob"/>
+<fact subject="Darknet Diaries episode 174" predicate="title" object="Pacific Rim"/>
+<fact subject="Darknet Diaries episode 173" predicate="title" object="Tarjeteros"/>
+<fact subject="Darknet Diaries episode 172" predicate="title" object="SuperBox"/>
+<fact subject="Darknet Diaries episode 171" predicate="title" object="Melody Fraud"/>
+<fact subject="Darknet Diaries episode 170" predicate="title" object="Phrack"/>
+<fact subject="Darknet Diaries episode 169" predicate="title" object="MoD"/>
+<fact subject="Darknet Diaries episode 168" predicate="title" object="LoD"/>
+<fact subject="Darknet Diaries episode 167" predicate="title" object="Threatlocker"/>
+<fact subject="Darknet Diaries episode 166" predicate="title" object="Maxie"/>
+<fact subject="Darknet Diaries episode 165" predicate="title" object="Tanya"/>
+<fact subject="Darknet Diaries episode 164" predicate="title" object="Oak Cliff Swipers"/>
+<fact subject="Darknet Diaries episode 163" predicate="title" object="Ola"/>
+<fact subject="Darknet Diaries episode 162" predicate="title" object="Hieu"/>
+<fact subject="Darknet Diaries episode 161" predicate="title" object="mg"/>
+<fact subject="Darknet Diaries episode 160" predicate="title" object="Greg"/>
+<fact subject="Darknet Diaries episode 159" predicate="title" object="Vastaamo"/>
+<fact subject="Darknet Diaries episode 158" predicate="title" object="MalwareTech"/>
+<fact subject="Darknet Diaries episode 157" predicate="title" object="Grifter"/>
+<fact subject="Darknet Diaries episode 156" predicate="title" object="Kill List"/>
+<fact subject="Darknet Diaries episode 155" predicate="title" object="Kingpin"/>
+<fact subject="Darknet Diaries episode 154" predicate="title" object="Hijacked Line"/>
+<fact subject="Darknet Diaries episode 153" predicate="title" object="Bike Index"/>
+<fact subject="Darknet Diaries episode 152" predicate="title" object="Stacc Attack"/>
+<fact subject="Darknet Diaries episode 151" predicate="title" object="Chris Rock"/>
+<fact subject="Darknet Diaries episode 150" predicate="title" object="mobman 2"/>
+<fact subject="Darknet Diaries episode 149" predicate="title" object="Mini-Stories: Vol 3"/>
+<fact subject="Darknet Diaries episode 148" predicate="title" object="Dubsnatch"/>
+<fact subject="Darknet Diaries episode 147" predicate="title" object="Tornado"/>
+<fact subject="Darknet Diaries episode 146" predicate="title" object="ANOM"/>
+<fact subject="Darknet Diaries episode 145" predicate="title" object="Shannen"/>
+<fact subject="Darknet Diaries episode 144" predicate="title" object="Rachel"/>
+<fact subject="Darknet Diaries episode 143" predicate="title" object="Jim Hates Scams"/>
+<fact subject="Darknet Diaries episode 142" predicate="title" object="Axact"/>
+<fact subject="Darknet Diaries episode 141" predicate="title" object="The Pig Butcher"/>
+<fact subject="Darknet Diaries episode 140" predicate="title" object="Revenge Bytes"/>
+<fact subject="Darknet Diaries episode 139" predicate="title" object="D3f4ult"/>
+<fact subject="Darknet Diaries episode 138" predicate="title" object="The Mimics of Punjab"/>
+<fact subject="Darknet Diaries episode 137" predicate="title" object="Predator"/>
+<fact subject="Darknet Diaries episode 136" predicate="title" object="Team Xecuter"/>
+<fact subject="Darknet Diaries episode 135" predicate="title" object="The D.R. Incident"/>
+<fact subject="Darknet Diaries episode 134" predicate="title" object="Deviant"/>
+<fact subject="Darknet Diaries episode 133" predicate="title" object="I&#x27;m the Real Connor"/>
+<fact subject="Darknet Diaries episode 132" predicate="title" object="Sam the Vendor"/>
+<fact subject="Darknet Diaries episode 131" predicate="title" object="Welcome to Video"/>
+<fact subject="Darknet Diaries episode 130" predicate="title" object="Jason&#x27;s Pen Test"/>
+<fact subject="Darknet Diaries episode 129" predicate="title" object="Gollumfun (Part 2)"/>
+<fact subject="Darknet Diaries episode 128" predicate="title" object="Gollumfun (Part 1)"/>
+<fact subject="Darknet Diaries episode 127" predicate="title" object="Maddie"/>
+<fact subject="Darknet Diaries episode 126" predicate="title" object="REvil"/>
+<fact subject="Darknet Diaries episode 125" predicate="title" object="Jeremiah"/>
+<fact subject="Darknet Diaries episode 124" predicate="title" object="Synthetic Remittance"/>
+<fact subject="Darknet Diaries episode 123" predicate="title" object="Newswires"/>
+<fact subject="Darknet Diaries episode 122" predicate="title" object="Lisa"/>
+<fact subject="Darknet Diaries episode 121" predicate="title" object="Ed"/>
+<fact subject="Darknet Diaries episode 120" predicate="title" object="Voulnet"/>
+<fact subject="Darknet Diaries episode 119" predicate="title" object="Hot Wallets"/>
+<fact subject="Darknet Diaries episode 118" predicate="title" object="Hot Swaps"/>
+<fact subject="Darknet Diaries episode 117" predicate="title" object="Daniel the Paladin"/>
+<fact subject="Darknet Diaries episode 116" predicate="title" object="Mad Dog"/>
+<fact subject="Darknet Diaries episode 115" predicate="title" object="Player Cheater Developer Spy"/>
+<fact subject="Darknet Diaries episode 114" predicate="title" object="HD"/>
+<fact subject="Darknet Diaries episode 113" predicate="title" object="Adam"/>
+<fact subject="Darknet Diaries episode 112" predicate="title" object="Dirty Coms"/>
+<fact subject="Darknet Diaries episode 111" predicate="title" object="ZeuS"/>
+<fact subject="Darknet Diaries episode 110" predicate="title" object="Spam Botnets"/>
+<fact subject="Darknet Diaries episode 109" predicate="title" object="TeaMp0isoN"/>
+<fact subject="Darknet Diaries episode 108" predicate="title" object="Marq"/>
+<fact subject="Darknet Diaries episode 107" predicate="title" object="Alethe"/>
+<fact subject="Darknet Diaries episode 106" predicate="title" object="@Tennessee"/>
+<fact subject="Darknet Diaries episode 105" predicate="title" object="Secret Cells"/>
+<fact subject="Darknet Diaries episode 104" predicate="title" object="Arya"/>
+<fact subject="Darknet Diaries episode 103" predicate="title" object="Cloud Hopper"/>
+<fact subject="Darknet Diaries episode 102" predicate="title" object="Money Maker"/>
+<fact subject="Darknet Diaries episode 101" predicate="title" object="Lotería"/>
+<fact subject="Darknet Diaries episode 100" predicate="title" object="NSO"/>
+<fact subject="Darknet Diaries episode 99" predicate="title" object="The Spy"/>
+<fact subject="Darknet Diaries episode 98" predicate="title" object="Zero Day Brokers"/>
+<fact subject="Darknet Diaries episode 97" predicate="title" object="The Pizza Problem"/>
+<fact subject="Darknet Diaries episode 96" predicate="title" object="The Police Station Incident"/>
+<fact subject="Darknet Diaries episode 95" predicate="title" object="Jon &amp; Brian&#x27;s Big Adventure"/>
+<fact subject="Darknet Diaries episode 94" predicate="title" object="Mariposa"/>
+<fact subject="Darknet Diaries episode 93" predicate="title" object="Kik"/>
+<fact subject="Darknet Diaries episode 92" predicate="title" object="The Pirate Bay"/>
+<fact subject="Darknet Diaries episode 91" predicate="title" object="webjedi"/>
+<fact subject="Darknet Diaries episode 90" predicate="title" object="Jenny"/>
+<fact subject="Darknet Diaries episode 89" predicate="title" object="Cybereason - Molerats in the Cloud"/>
+<fact subject="Darknet Diaries episode 88" predicate="title" object="Victor"/>
+<fact subject="Darknet Diaries episode 87" predicate="title" object="Guild of the Grumpy Old Hackers"/>
+<fact subject="Darknet Diaries episode 86" predicate="title" object="The LinkedIn Incident"/>
+<fact subject="Darknet Diaries episode 85" predicate="title" object="Cam the Carder"/>
+<fact subject="Darknet Diaries episode 84" predicate="title" object="Jet-setters"/>
+<fact subject="Darknet Diaries episode 83" predicate="title" object="NSA Cryptologists"/>
+<fact subject="Darknet Diaries episode 82" predicate="title" object="Master of Pwn"/>
+<fact subject="Darknet Diaries episode 81" predicate="title" object="The Vendor"/>
+<fact subject="Darknet Diaries episode 80" predicate="title" object="The Whistleblower"/>
+<fact subject="Darknet Diaries episode 79" predicate="title" object="Dark Basin"/>
+<fact subject="Darknet Diaries episode 78" predicate="title" object="Nerdcore"/>
+<fact subject="Darknet Diaries episode 77" predicate="title" object="Olympic Destroyer"/>
+<fact subject="Darknet Diaries episode 76" predicate="title" object="Knaves Out"/>
+<fact subject="Darknet Diaries episode 75" predicate="title" object="Compromised Comms"/>
+<fact subject="Darknet Diaries episode 74" predicate="title" object="Mikko"/>
+<fact subject="Darknet Diaries episode 73" predicate="title" object="WannaCry"/>
+<fact subject="Darknet Diaries episode 72" predicate="title" object="Bangladesh Bank Heist"/>
+<fact subject="Darknet Diaries episode 71" predicate="title" object="Information Monopoly"/>
+<fact subject="Darknet Diaries episode 70" predicate="title" object="Ghost Exodus"/>
+<fact subject="Darknet Diaries episode 69" predicate="title" object="Human Hacker"/>
+<fact subject="Darknet Diaries episode 68" predicate="title" object="Triton"/>
+<fact subject="Darknet Diaries episode 67" predicate="title" object="The Big House"/>
+<fact subject="Darknet Diaries episode 66" predicate="title" object="freakyclown"/>
+<fact subject="Darknet Diaries episode 65" predicate="title" object="PSYOP"/>
+<fact subject="Darknet Diaries episode 64" predicate="title" object="The Athens Shadow Games"/>
+<fact subject="Darknet Diaries episode 63" predicate="title" object="w0rmer"/>
+<fact subject="Darknet Diaries episode 62" predicate="title" object="Cam"/>
+<fact subject="Darknet Diaries episode 61" predicate="title" object="Samy"/>
+<fact subject="Darknet Diaries episode 60" predicate="title" object="dawgyg"/>
+<fact subject="Darknet Diaries episode 59" predicate="title" object="The Courthouse"/>
+<fact subject="Darknet Diaries episode 58" predicate="title" object="OxyMonster"/>
+<fact subject="Darknet Diaries episode 57" predicate="title" object="MS08-067"/>
+<fact subject="Darknet Diaries episode 56" predicate="title" object="Jordan"/>
+<fact subject="Darknet Diaries episode 55" predicate="title" object="NoirNet"/>
+<fact subject="Darknet Diaries episode 54" predicate="title" object="NotPetya"/>
+<fact subject="Darknet Diaries episode 53" predicate="title" object="Shadow Brokers"/>
+<fact subject="Darknet Diaries episode 52" predicate="title" object="Magecart"/>
+<fact subject="Darknet Diaries episode 51" predicate="title" object="The Indo-Pak Conflict"/>
+<fact subject="Darknet Diaries episode 50" predicate="title" object="Operation Glowing Symphony"/>
+<fact subject="Darknet Diaries episode 49" predicate="title" object="Elliot"/>
+<fact subject="Darknet Diaries episode 48" predicate="title" object="Operation Socialist"/>
+<fact subject="Darknet Diaries episode 47" predicate="title" object="Project Raven"/>
+<fact subject="Darknet Diaries episode 46" predicate="title" object="XBox Underground (Part 2)"/>
+<fact subject="Darknet Diaries episode 45" predicate="title" object="XBox Underground (Part 1)"/>
+<fact subject="Darknet Diaries episode 44" predicate="title" object="Zain"/>
+<fact subject="Darknet Diaries episode 43" predicate="title" object="PPP"/>
+<fact subject="Darknet Diaries episode 42" predicate="title" object="Mini-Stories: Vol 2"/>
+<fact subject="Darknet Diaries episode 41" predicate="title" object="Just Visiting"/>
+<fact subject="Darknet Diaries episode 40" predicate="title" object="No Parking"/>
+<fact subject="Darknet Diaries episode 39" predicate="title" object="3 Alarm Lamp Scooter"/>
+<fact subject="Darknet Diaries episode 38" predicate="title" object="Dark Caracal"/>
+<fact subject="Darknet Diaries episode 37" predicate="title" object="LVS"/>
+<fact subject="Darknet Diaries episode 36" predicate="title" object="Jeremy from Marketing"/>
+<fact subject="Darknet Diaries episode 35" predicate="title" object="Carbanak"/>
+<fact subject="Darknet Diaries episode 34" predicate="title" object="For Your Eyes Only"/>
+<fact subject="Darknet Diaries episode 33" predicate="title" object="RockYou"/>
+<fact subject="Darknet Diaries episode 32" predicate="title" object="The Carder"/>
+<fact subject="Darknet Diaries episode 31" predicate="title" object="Hacker Giraffe"/>
+<fact subject="Darknet Diaries episode 30" predicate="title" object="Shamoon"/>
+<fact subject="Darknet Diaries episode 29" predicate="title" object="Stuxnet"/>
+<fact subject="Darknet Diaries episode 28" predicate="title" object="Unit 8200"/>
+<fact subject="Darknet Diaries episode 27" predicate="title" object="Chartbreakers"/>
+<fact subject="Darknet Diaries episode 26" predicate="title" object="IRS"/>
+<fact subject="Darknet Diaries episode 25" predicate="title" object="Alberto"/>
+<fact subject="Darknet Diaries episode 24" predicate="title" object="Operation Bayonet"/>
+<fact subject="Darknet Diaries episode 23" predicate="title" object="Vladimir Levin"/>
+<fact subject="Darknet Diaries episode 22" predicate="title" object="Mini-Stories: Vol 1"/>
+<fact subject="Darknet Diaries episode 21" predicate="title" object="Black Duck Eggs"/>
+<fact subject="Darknet Diaries episode 20" predicate="title" object="mobman"/>
+<fact subject="Darknet Diaries episode 19" predicate="title" object="Operation Aurora"/>
+<fact subject="Darknet Diaries episode 18" predicate="title" object="Jackpot"/>
+<fact subject="Darknet Diaries episode 17" predicate="title" object="Finn"/>
+<fact subject="Darknet Diaries episode 16" predicate="title" object="Eijah"/>
+<fact subject="Darknet Diaries episode 15" predicate="title" object="Ill Tills"/>
+<fact subject="Darknet Diaries episode 14" predicate="title" object="#OpJustina"/>
+<fact subject="Darknet Diaries episode 13" predicate="title" object="Carna Botnet"/>
+<fact subject="Darknet Diaries episode 12" predicate="title" object="Crypto Wars"/>
+<fact subject="Darknet Diaries episode 11" predicate="title" object="Strictly Confidential"/>
+<fact subject="Darknet Diaries episode 10" predicate="title" object="Misadventures of a Nation State Actor"/>
+<fact subject="Darknet Diaries episode 9" predicate="title" object="The Rise and Fall of Mt. Gox"/>
+<fact subject="Darknet Diaries episode 8" predicate="title" object="Manfred (Part 2)"/>
+<fact subject="Darknet Diaries episode 7" predicate="title" object="Manfred (Part 1)"/>
+<fact subject="Darknet Diaries episode 6" predicate="title" object="The Beirut Bank Job"/>
+<fact subject="Darknet Diaries episode 5" predicate="title" object="#ASUSGATE"/>
+<fact subject="Darknet Diaries episode 4" predicate="title" object="Panic! at the TalkTalk Board Room"/>
+<fact subject="Darknet Diaries episode 3" predicate="title" object="DigiNotar, You are the Weakest Link, Good Bye!"/>
+<fact subject="Darknet Diaries episode 2" predicate="title" object="The Peculiar Case of the VTech Hacker"/>
+<fact subject="Darknet Diaries episode 1" predicate="title" object="The Phreaky World of PBX Hacking"/>
+<category><pattern>WHAT IS ETHEREUM</pattern><template>Ethereum is a decentralized blockchain that provides smart contract functionality.</template></category>
+<category><pattern>WHO CONCEIVED ETHEREUM AND WHEN WAS IT CREATED</pattern><template>It was conceived in 2013 by programmer Vitalik Buterin.</template></category>
+<category><pattern>CAN ANYONE DEPLOY APPLICATIONS ON ETHEREUM AND CAN THEY USE THEM</pattern><template>Yes, anyone can deploy decentralized applications onto Ethereum, and then use them.</template></category>
+<category><pattern>WHAT TYPE OF ASSETS OR TOKENS CAN USERS CREATE ON ETHEREUM</pattern><template>Users can create fungible assets such as tokens (e.g., ERC-20).</template></category>
+<category><pattern>IS ETHEREUM OPEN TO ALL PARTICIPANTS</pattern><template>Ethereum allows anyone to deploy and use applications, making it accessible to a broad audience.</template></category>
+<category><pattern>WHAT IS THE PURPOSE OF SMART CONTRACTS ON ETHEREUM</pattern><template>Smart contracts enable automated execution of agreements directly on the blockchain without intermediaries.</template></category>
+<category><pattern>WHEN WAS ETHEREUM FIRST INTRODUCED CONCEIVED</pattern><template>Ethereum was conceived in 2013.</template></category>
+<category><pattern>DOES ETHEREUM SUPPORT DECENTRALIZED APPLICATIONS DAPPS</pattern><template>Yes, it allows anyone to deploy and use decentralized applications on its network.</template></category>
+<category><pattern>WHAT IS THE EQUATION OF THE ELLIPTIC CURVE FOR SECP256K1</pattern><template>The curve is defined by y^2 = x^3 + 7 over the real numbers, but its actual graph uses points in the finite field Z_p.</template></category>
+<category><pattern>OVER WHICH NUMBER SYSTEM IS SECP256K1 ACTUALLY DEFINED</pattern><template>It is defined over the field Z_p (a large prime field).</template></category>
+<category><pattern>WHY DOES THE GRAPH OF THIS CURVE LOOK LIKE RANDOM SCATTERED POINTS</pattern><template>Because secp256k1&#x27;s graph uses elements from a finite field, not real numbers; thus its discrete points appear as scattered points rather than a smooth curve.</template></category>
+<category><pattern>WHAT FIELD IS SECP256K1 DEFINED OVER</pattern><template>It is defined over the finite field Z/p (where p is a large prime).</template></category>
+<category><pattern>IS THERE ANY MENTION OF DATES OR FOUNDING YEAR FOR SECP256K1 IN THIS REPORT</pattern><template>No specific date is given; the focus is on its mathematical definition and graph appearance.</template></category>
+<category><pattern>HOW DOES THE REAL NUMBER VERSION DIFFER FROM THE ACTUAL CURVE USED IN PRACTICE</pattern><template>The real-number equation y^2 = x^3 + 7 would produce a smooth cubic, but over Z_p it becomes discrete points that look random.</template></category>
+<category><pattern>WHO STARTED THE GEMINI PROTOCOL</pattern><template>It was started in June 2019 by a pseudonymous person known as Solderpunk.</template></category>
+<category><pattern>WHEN DID THE USENET NEWSGROUP COMP INFOSYSTEMS GEMINI GET CREATED</pattern><template>October 2021, which is noted as the first new newsgroup in the Big Eight hierarchy in eight years.</template></category>
+<category><pattern>WHAT IS GEMINI S PURPOSE RELATIVE TO GOPHER AND HTTP</pattern><template>Gemini is not intended to replace Gopher or HTTP but is designed to co-exist with them.</template></category>
+<category><pattern>IS GEMINI STANDARDIZED BY THE IETF</pattern><template>No, it has not yet been submitted to the IETF organization for standardization.</template></category>
+<category><pattern>WHAT FORMAT DOES GEMINI USE FOR ITS DOCUMENTS</pattern><template>It uses a special document format called &#x27;gemtext&#x27; which allows linking to other documents and is analogous to HTML for HTTP.</template></category>
+<category><pattern>HOW SHOULD CONNECTIONS IN THE GEMINI PROTOCOL BE SECURED</pattern><template>Gemini mandates the use of TLS (Transport Layer Security) with privacy-related features and TOFU verification being strongly suggested.</template></category>
+<category><pattern>WHAT PORT DOES A GEMINI SERVER LISTEN ON</pattern><template>A Gemini server should listen on TCP port 1965.</template></category>
+<category><pattern>WHAT IS LLAMA CPP</pattern><template>llama.cpp is an open-source software library that performs inference on various large language models such as Meta&#x27;s Llama model.</template></category>
+<category><pattern>WHO CREATED A SIMILAR LIBRARY BEFORE LLAMA CPP</pattern><template>Gerganov worked on whisper.cpp, which implemented Whisper, a speech-to-text model by OpenAI, prior to llama.cpp.</template></category>
+<category><pattern>WHERE CAN YOU DOWNLOAD AND RUN COMPATIBLE GGUF MODELS FOR LLAMA CPP</pattern><template>You can download and run them directly from the Hugging Face Hub via llama.cpp.</template></category>
+<category><pattern>WHEN DID PFSENSE ADD WIREGUARD SUPPORT</pattern><template>In February 2021, pfSense CE 2.5.0 and pfSense Plus 21.02 added support for a kernel WireGuard implementation.</template></category>
+<category><pattern>WHY WAS WIREGUARD SUPPORT TEMPORARILY REMOVED IN MARCH 2021</pattern><template>Support for WireGuard was temporarily removed after implementation issues were discovered by WireGuard founder Jason Donenfeld.</template></category>
+<category><pattern>WHEN DID PFSENSE RE INCLUDE WIREGUARD</pattern><template>The July 2021 release of pfSense CE 2.5.2 version re-included WireGuard.</template></category>
+<category><pattern>WHAT IS BITCOIN</pattern><template>Bitcoin is the first decentralized cryptocurrency.</template></category>
+<category><pattern>WHO INVENTED BITCOIN</pattern><template>Bitcoin was invented in 2008 when an unknown person published a white paper under the pseudonym of Satoshi Nakamoto.</template></category>
+<category><pattern>WHEN WAS THE BITCOIN GENESIS BLOCK MINED</pattern><template>On 3 January 2009, Satoshi Nakamoto mined the genesis block of bitcoin (block number 0), which had a reward of 50 bitcoins.</template></category>
+<category><pattern>WHAT IS GOPHER</pattern><template>Gopher is a communication protocol designed for distributing, searching, and retrieving documents in Internet Protocol networks.</template></category>
+<category><pattern>WHO INVENTED GOPHER</pattern><template>Gopher was invented by a team led by Mark P. McCahill at the University of Minnesota.</template></category>
+<category><pattern>WHAT PORT DOES GOPHER USE</pattern><template>IANA has assigned TCP port 70 to the Gopher protocol.</template></category>
+<category><pattern>WHAT IS CLOUDFLARE WORKERS</pattern><template>Cloudflare Workers is a serverless computing platform launched by Cloudflare in 2017 for creating new applications and augmenting existing ones, without configuring or maintaining infrastructure.</template></category>
+<category><pattern>WHEN WAS CLOUDFLARE WORKERS LAUNCHED</pattern><template>In 2017, Cloudflare launched Cloudflare Workers.</template></category>
+<category><pattern>WHAT IS WORKERS KV</pattern><template>Workers KV is a low-latency key-value data store, part of the Cloudflare Workers platform.</template></category>
+<category><pattern>WHAT IS DARKNET DIARIES</pattern><template>Darknet Diaries is a podcast about true stories from the dark side of the Internet.</template></category>
+<category><pattern>WHO HOSTS DARKNET DIARIES</pattern><template>Darknet Diaries is hosted by Jack Rhysider.</template></category>
+</aiml>

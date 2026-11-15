@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- modem-research-2026-11-09.aiml — CETI modem technology research batch, 2026-11-09.
+     7 topics, researched and distilled by the local LFM3 via the Hub research
+     pipeline; every fact/QA below was verified against a source actually fetched
+     that day before approval (fact-gate). Unverified proposals were left
+     pending and are NOT in this file; duplicates were dropped, not shipped twice.
+     Distill notes: task 21 (V.32bis) first parse failed on LFM3 JSON escapes
+     (invalid \' escapes, trailing commas) — repaired by sanitizing the raw
+     output. Task 22 (V.34) facts were salvaged item-by-item from malformed JSON;
+     the lost facts were hand-extracted from the verified report. Task 24
+     (Hayes AT) had one drifted Fidonet fact — quarantined as pending, not shipped.
+     Task 26 (timeline) dropped 11 distilled items as duplicates of tasks 20-25
+     or the existing cassettes; its new ground is the 212A/V.32 dates, the DS0
+     56k ceiling, and the dial-up decline / AOL shutdown.
+     Per-topic sources:
+       2400 baud BBS era: https://bbspreservation.org/history/
+       2400 baud BBS era: https://en.wikipedia.org/wiki/Acoustic_coupler
+       2400 baud BBS era: https://en.wikipedia.org/wiki/Bulletin_board_system
+       2400 baud BBS era: https://en.wikipedia.org/wiki/Bulletin_board_system?wprov=sfti1
+       2400 baud BBS era: https://en.wikipedia.org/wiki/CBBS
+       2400 baud BBS era: https://en.wikipedia.org/wiki/Hayes_Microcomputer_Products
+       2400 baud BBS era: https://en.wikipedia.org/wiki/Modem
+       Dial-up modem history timeline: https://en.wikipedia.org/wiki/Dial-up_Internet_access
+       Dial-up modem history timeline: https://en.wikipedia.org/wiki/List_of_ITU-T_V-series_recommendations
+       Dial-up modem history timeline: https://en.wikipedia.org/wiki/Modem
+       Dial-up modem history timeline: https://www.itu.int/rec/T-REC-V.22bis-198811-I/en
+       Dial-up modem history timeline: https://www.itu.int/rec/T-REC-V.90/en
+       Dial-up modem history timeline: https://www.itu.int/rec/T-REC-V.92-200011-I/en
+       Hayes AT command set: http://encyclopedia.kids.net.au/page/ha/Hayes_AT_command_set?title=Telebit
+       Hayes AT command set: https://en.wikipedia.org/wiki/Hayes_AT_command_set
+       Hayes AT command set: https://www.conventionalmemory.io/guides/hayes-modem-at-commands-cheat-sheet/
+       Hayes AT command set: https://www.ibm.com/docs/en/aix/7.2?topic=troubleshooting-commands
+       USR Sportster / Courier modems: https://en.wikipedia.org/wiki/3Com
+       USR Sportster / Courier modems: https://en.wikipedia.org/wiki/Modem
+       USR Sportster / Courier modems: https://en.wikipedia.org/wiki/USRobotics
+       USR Sportster / Courier modems: https://manualmachine.com/usrobotics/33600/706980-user-manual/
+       USR Sportster / Courier modems: https://www.company-histories.com/US-Robotics-Corporation-Company-History.html
+       USR Sportster / Courier modems: https://www.encyclopedia.com/education/economics-magazines/cowell-casey-g
+       V.32bis 14.4k: https://en.wikipedia.org/wiki/ITU-T_V-Series_Recommendations
+       V.32bis 14.4k: https://en.wikipedia.org/wiki/Modem
+       V.32bis 14.4k: https://infobytes.de/pages/v32bis.pdf
+       V.32bis 14.4k: https://legacy.hylafax.org/site2//Modems-PeterChen/02protocols.html
+       V.32bis 14.4k: https://www.itu.int/rec/T-REC-v
+       V.32bis 14.4k: https://www.jaredsec.com/modem/
+       V.34 28.8k / 33.6k: http://www.audentia-gestion.fr/research.microsoft/v34.pdf
+       V.34 28.8k / 33.6k: https://en.wikipedia.org/wiki/List_of_ITU-T_V-series_recommendations
+       V.34 28.8k / 33.6k: https://en.wikipedia.org/wiki/Modem
+       V.34 28.8k / 33.6k: https://en.wikipedia.org/wiki/Trellis_coded_modulation
+       V.34 28.8k / 33.6k: https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-V.34-199802-I!!PDF-E&type=items
+       V.90, K56flex and X2 — the 56k standards war: https://en.wikipedia.org/wiki/ITU-T_V.90
+       V.90, K56flex and X2 — the 56k standards war: https://en.wikipedia.org/wiki/Telephone_modem
+       V.90, K56flex and X2 — the 56k standards war: https://encyclopedia.thefreedictionary.com/56k+modem
+       V.90, K56flex and X2 — the 56k standards war: https://goughlui.com/2018/06/10/project-record-a-us-robotics-x2-dial-up-modem-connection/
+       V.90, K56flex and X2 — the 56k standards war: https://support.usr.com/support/3453/3453-command-ref/chap%2013-handshaking.htm
+       V.90, K56flex and X2 — the 56k standards war: https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-V.90-199809-I!!PDF-E&type=items
+       V.90, K56flex and X2 — the 56k standards war: https://www.modem19.com/history_v90.php
+-->
+<aiml version="1.0">
+<fact subject="Robert Weitbrecht" predicate="built" object="acoustic coupler workaround in 1963"/>
+<fact subject="Livermore Data Systems" predicate="provided early commercial model of acoustic coupler" object="1968"/>
+<fact subject="Novation CAT" predicate="became popular example of acoustic coupler" object="300-baud"/>
+<fact subject="Hayes Smartmodem" predicate="announced in April 1981 as" object="300 bit/s direct-connect modem with AT commands and +++ escape sequence"/>
+<fact subject="CBBS" predicate="went online" object="16 February 1978"/>
+<fact subject="FidoNet" predicate="begun by" object="Tom Jennings around Christmas 1983"/>
+<fact subject="Acoustic coupler" predicate="used" object="rubber-sealed cups around the telephone handset"/>
+<fact subject="CBBS" predicate="ran on" object="homebrew S-100 computer"/>
+<fact subject="V.32bis" predicate="full title" object="A duplex modem operating at data signalling rates of up to 14 400 bit/s for use on the general switched telephone network and on leased point-to-point 2-wire telephone-type circuits"/>
+<fact subject="Recommendation V.32bis" predicate="approved date" object="22 February 1991 (when body was still called CCITT)"/>
+<fact subject="V.32bis" predicate="approved date" object="22 February 1991 (when body was still called CCITT)"/>
+<fact subject="V.32bis" predicate="used" object="echo cancellation and a 1,800 Hz carrier for full-duplex operation"/>
+<fact subject="V.32 symbol rate" predicate="value" object="2,400 symbols per second"/>
+<fact subject="V.32bis" predicate="top speed vs V.32" object="14,400 bit/s vs 9,600 bit/s"/>
+<fact subject="SupraFAXModem 14400" predicate="launched" object="January 1992 at $399"/>
+<fact subject="V.32bis modems" predicate="sold for by end of 1992" object="about $250"/>
+<fact subject="Courier HST Dual Standard" predicate="combined" object="HST with V.32bis"/>
+<fact subject="V.34" predicate="approved by" object="ITU-T"/>
+<fact subject="V.34" predicate="reached" object="28,800 bit/s in both directions over an ordinary switched telephone line"/>
+<fact subject="V.32bis" predicate="had fixed its symbol rate at" object="2,400 baud"/>
+<fact subject="V.34" predicate="extended in 1996 to" object="33,600 bit/s"/>
+<fact subject="V.8" predicate="approved" object="September 1994"/>
+<fact subject="V.34" predicate="used" object="four-dimensional trellis-coded modulation"/>
+<fact subject="V.34" predicate="used" object="shell mapping to reduce transmit power"/>
+<fact subject="USRobotics" predicate="shipped" object="X2 in early 1997"/>
+<fact subject="Rockwell" predicate="developed" object="K56flex with Lucent and Motorola"/>
+<fact subject="V.90" predicate="draft appeared" object="February 1998"/>
+<fact subject="FCC transmit power limits" predicate="capped practical downstream at" object="53,333 bit/s"/>
+<fact subject="V.92" predicate="raised upstream to" object="48 kbit/s"/>
+<fact subject="ATX" predicate="selects" object="how complete the result codes are (X0, X1, X2, X3, X4)"/>
+<fact subject="&amp;C0" predicate="makes the modem assume" object="a carrier is always present"/>
+<fact subject="&amp;C1" predicate="makes the DCD signal track" object="the real carrier"/>
+<fact subject="&amp;D0" predicate="ignores" object="DTR signal"/>
+<fact subject="AT" predicate="prefix for" object="every Hayes command line"/>
+<fact subject="ATS0" predicate="sets" object="rings before auto-answer (0 means never)"/>
+<fact subject="S7" predicate="wait for carrier after dial" object="default 50 seconds"/>
+<fact subject="S11" predicate="DTMF tone duration" object="default 95 milliseconds"/>
+<fact subject="U.S. Robotics Corporation (USR)" predicate="founded" object="1976"/>
+<fact subject="Casey Cowell" predicate="served as CEO for most of the company&#x27;s history" object="USR"/>
+<fact subject="Paul Collard" predicate="designed modems into the mid-1980s" object="USR"/>
+<fact subject="Courier" predicate="first sold to corporate customers from" object="1979"/>
+<fact subject="HST" predicate="made faster" object="FidoNet transfers for BBSs"/>
+<fact subject="Courier HST" predicate="introduced" object="1986"/>
+<fact subject="HST" predicate="reached 9,600 bit/s in" object="1986"/>
+<fact subject="X2" predicate="named because" object="56k was twice 28k"/>
+<fact subject="AT&amp;T&#x27;s 212A" predicate="introduced" object="November 1976"/>
+<fact subject="V.32" predicate="listed as released" object="1984"/>
+<fact subject="56 kbit/s" predicate="highest possible on" object="an analogue phone line"/>
+<fact subject="AOL" predicate="ended dial-up service on" object="30 September 2025"/>
+<fact subject="Dial-up availability in the US" predicate="fell from 40% to 3%" object="early 2000s to early 2010s"/>
+<category><pattern>WHO BUILT THE FIRST PUBLIC DIAL UP BBS AND WHEN DID IT GO ONLINE</pattern><template>The CBBS (first public dial-up BBS) was built by Ward Christensen and Randy Suess of CACHE during the Great Blizzard of 1978, and went online in Chicago on 16 February 1978.</template></category>
+<category><pattern>WHAT MODEM TECHNOLOGY DID HAYES INTRODUCE IN APRIL 1981</pattern><template>Hayes announced the Smartmodem, a 300 bit/s direct-connect modem whose computer could dial, answer and hang up over the same RS-232 line using AT commands and the +++ escape sequence with one-second guard time.</template></category>
+<category><pattern>WHEN WAS THE ORIGINAL BELL 212 COMPATIBLE SMARTMODEM 1200 RELEASED</pattern><template>In 1982 Hayes introduced the Bell 212-compatible Smartmodem 1200 for $699; the earlier 300 bit/s design was redesignated the Smartmodem 300.</template></category>
+<category><pattern>WHAT IS THE TYPICAL BAUD RATE RANGE AND PRACTICAL CEILING OF ACOUSTIC COUPLERS IN THE BBS ERA</pattern><template>With luck a coupler reached 300 baud, but 150 baud was more typical, and 1200 baud was its practical ceiling for acoustic couplers.</template></category>
+<category><pattern>HOW MANY CALLERS DID THE EARLY CBBS EVENTUALLY CONNECT</pattern><template>The first public dial-up BBS, CBBS, eventually connected 253,301 callers during its operation in Chicago after going online on 16 February 1978.</template></category>
+<category><pattern>WHEN WAS FIDONET BEGUN AND WHAT WAS ITS PURPOSE</pattern><template>FidoNet, begun by Tom Jennings around Christmas 1983, let boards exchange mail in cheap night-time calls; by the early 1990s it had more than 20,000 boards.</template></category>
+<category><pattern>WHAT ORGANIZATIONS OR INDIVIDUALS ARE CREDITED WITH BUILDING ACOUSTIC COUPLERS AND EARLY BBS SYSTEMS</pattern><template>Robert Weitbrecht built such a workaround in 1963, an early commercial model came from Livermore Data Systems in 1968, and the Novation CAT became popular; Ward Christensen and Randy Suess of CACHE built CBBS during the Great Blizzard of 1978.</template></category>
+<category><pattern>WHAT WAS THE DAILY TIME LIMIT FOR LOGGING INTO A BBS TERMINAL AFTER CONNECT 2400</pattern><template>It often had a daily time limit, typically half an hour, and callers usually hit a busy signal and redialled before watching the login screen draw a line at a time.</template></category>
+<category><pattern>WHAT IS THE FULL TITLE OF ITU T STANDARD V 32BIS</pattern><template>A duplex modem operating at data signalling rates of up to 14,400 bit/s for use on the general switched telephone network and on leased point-to-point 2-wire telephone-type circuits</template></category>
+<category><pattern>WHEN WAS RECOMMENDATION V 32BIS APPROVED</pattern><template>22 February 1991, when the body was still called the CCITT</template></category>
+<category><pattern>WHEN WAS V 32BIS APPROVED</pattern><template>22 February 1991, when the body was still called the CCITT</template></category>
+<category><pattern>WHAT TYPE OF MODEM IS V 32BIS</pattern><template>It was a full-duplex modem for ordinary switched phone lines and 2-wire leased circuits, using echo cancellation so both ends could transmit and receive at once on the same line, on a 1,800 Hz carrier.</template></category>
+<category><pattern>HOW DOES V 32BIS COMPARE IN SPEED TO EARLIER STANDARD V 32</pattern><template>V.32bis was half as fast again as V.32, which had a symbol rate of 2,400 symbols per second but packed more data into each symbol; at top speed it used trellis-coded modulation sending six data bits per symbol plus one redundant bit, seven bits per symbol in a 128-point constellation.</template></category>
+<category><pattern>WHAT WAS THE MARKET PRICE FOR SUPRAFAXMODEM 14400 LAUNCHED BY SUPRA</pattern><template>Supra built the SupraFAXModem 14400, launched in January 1992 at $399, half the price of the slower V.32 modems already on sale, and by the end of that year V.32bis modems sold for about $250.</template></category>
+<category><pattern>WHEN DID US ROBOTICS REACH 14 400 BIT S</pattern><template>US Robotics had already reached 14,400 bit/s in 1989 with its proprietary HST, which was asymmetric and not V.32bis, but its Courier HST Dual Standard combined HST with V.32bis.</template></category>
+<category><pattern>WHAT SPEED DID AT T OFFER FOR A MODEM RELATED TO V 32</pattern><template>AT&amp;T offered a 19,200 bit/s V.32ter — neither non-standard modem sold well.</template></category>
+<category><pattern>WHICH COMPANY BUILT THE SUPRAFAXMODEM 14400</pattern><template>Supra built the SupraFAXModem 14400</template></category>
+<category><pattern>WHAT IS V 34</pattern><template>V.34 was an approved ITU-T dial-up modem standard in September 1994 that supported up to 28,800 bit/s in both directions over ordinary switched telephone lines.</template></category>
+<category><pattern>WHEN DID THE REVISION OF V 34 EXTEND ITS SPEED LIMIT</pattern><template>A 1996 revision extended V.34&#x27;s capability to 33,600 bit/s, with 31,200 bit/s as an intermediate step and modems often sold as V.34+.</template></category>
+<category><pattern>WHAT SYMBOL RATES DOES V 34 DEFINE FOR BANDWIDTH ADAPTATION</pattern><template>V.34 defined six symbol rates — 2,400, 2,743, 2,800, 3,000, 3,200 and 3,429 baud — of which 2,400, 3,000 and 3,200 were mandatory; the start-up chose rate and carrier frequency.</template></category>
+<category><pattern>WHAT IS V 8</pattern><template>V.8 was the 1994 procedure for starting a data session that let two modems agree on a common mode before training.</template></category>
+<category><pattern>HOW DID EACH MODEM MEASURE SIGNAL QUALITY DURING LINE PROBING</pattern><template>During line probing, each modem sent tones across the voice band so the receiver could measure signal-to-noise ratio against frequency and pick the fastest rate the actual line could support.</template></category>
+<category><pattern>WHAT MODULATION TECHNIQUE DOES V 34 USE FOR PACKING MORE BITS PER SYMBOL</pattern><template>V.34 used quadrature amplitude modulation plus four-dimensional trellis-coded modulation and shell mapping, a form of constellation shaping that cut average transmit power.</template></category>
+<category><pattern>WHY WAS 33 6 KBIT S THE PRACTICAL CEILING FOR ANALOGUE DIAL UP</pattern><template>The combination put 33.6 kbit/s close to the theoretical Shannon limit of about 35 kbit/s for a voiceband phone line, meaning it was the practical ceiling for fully analogue two-way dial-up.</template></category>
+<category><pattern>WHAT SPEED DID V 90 ACHIEVE DOWNSTREAM AND UPSTREAM</pattern><template>V.90 reached 56 kbit/s downstream only by sending digitally from the ISP side, while its upstream stayed at 33.6 kbit/s.</template></category>
+<category><pattern>WHAT ARE THE NAMES AND RELEASE TIMELINES FOR THE X2 AND K56FLEX MODEMS</pattern><template>USRobotics shipped X2 in early 1997, while Rockwell developed K56flex with Lucent and Motorola. The V.90 standard was approved in September 1998 as an amalgam of both, designed to be firmware-upgraded for existing modems.</template></category>
+<category><pattern>WHY DID THE TWO MODEM STANDARDS BECOME INCOMPATIBLE</pattern><template>An X2 modem requires an X2 ISP and a K56flex modem requires a K56flex ISP; mismatched pairs fell back to V.34.</template></category>
+<category><pattern>WHAT WAS THE TECHNICAL REASON FOR THE ASYMMETRY BETWEEN UPSTREAM AND DOWNSTREAM SPEEDS</pattern><template>By mid-1990s the phone network&#x27;s core became digital while only local loops remained analog; crossing two conversions at the subscriber end kept upstream at V.34 (33.6 kbit/s), whereas a direct plug-in to T1/PRI lines reduced that segment to one conversion and allowed 56k downstream.</template></category>
+<category><pattern>HOW LONG DID IT TAKE FOR ISPS TO OFFER 56K CONNECTIVITY</pattern><template>About half of ISPs offered 56k by October 1997, but sales were weak due to conflicting standards between vendors. Many had to run two modem banks or pick a side.</template></category>
+<category><pattern>WHEN AND HOW WAS THE V 90 STANDARD APPROVED</pattern><template>The ITU&#x27;s V.90 draft appeared in February 1998 and was officially approved in September 1998; it combined X2 and K56flex features, making existing modems updatable via firmware.</template></category>
+<category><pattern>WHAT WERE THE ACTUAL DOWNSTREAM SPEEDS USERS EXPERIENCED FOR V 90</pattern><template>Even though V.90 set a headline of 56,000 bit/s downstream, FCC transmit power limits capped practical downstream at about 53,333 bit/s, and most users saw 44,000–52,000 bit/s.</template></category>
+<category><pattern>WHEN WAS V 92 INTRODUCED AND WHAT DID IT CHANGE</pattern><template>V.92 followed in November 2000; it used PCM upstream to increase uploads to 48 kbit/s but reduced downstream speed at the cost of that improvement.</template></category>
+<category><pattern>WHAT DOES TYPING AT ALONE DO</pattern><template>It tests the modem and returns OK if it is alive.</template></category>
+<category><pattern>HOW ARE CALLS PLACED ON A HAYES AT COMMAND LINE</pattern><template>To place a call, use ATD with the number following; T selects touch-tone dialing (ATDT) while P selects pulse dialing (ATDP). Dial modifiers add pauses, and a semicolon keeps the modem in command mode after dialing.</template></category>
+<category><pattern>WHAT IS THE DIFFERENCE BETWEEN ATA AND ATH COMMANDS</pattern><template>ATA answers an incoming call immediately, whereas ATH hangs up; specifically, ATH0 goes on-hook to end the call and ATH1 goes off-hook.</template></category>
+<category><pattern>WHICH COMMAND RESETS THE MODEM TO A STORED CONFIGURATION</pattern><template>ATZ is used for this purpose (with Z0 or Z1 for multiple profiles).</template></category>
+<category><pattern>WHAT DOES AT F DO</pattern><template>It recalls the factory settings as the active configuration.</template></category>
+<category><pattern>HOW CAN YOU ENABLE TYPED COMMANDS TO BE VISIBLE ON A HAYES MODEM</pattern><template>ATE controls echo — E0 disables it, E1 enables it so typed commands are visible. ATV controls result codes: V0 gives numeric codes, V1 gives English words such as CONNECT, BUSY and NO CARRIER.</template></category>
+<category><pattern>WHAT IS THE FUNCTION OF C0 AND C1 IN EXTENDED COMMANDS</pattern><template>&amp;C0 makes the modem assume a carrier is always present while &amp;C1 makes the DCD signal track the real carrier.</template></category>
+<category><pattern>HOW DOES THE COMPUTER HANDLE DROPPING THE DTR LINE</pattern><template>The command &amp;D sets what happens when the computer drops DTR: &amp;D0 ignores it, &amp;D1 returns to command mode, &amp;D2 hangs up first, and &amp;D3 resets the modem.</template></category>
+<category><pattern>WHEN WAS U S ROBOTICS FOUNDED</pattern><template>USR (U.S. Robotics Corporation) was founded in 1976 in Chicago, Illinois.</template></category>
+<category><pattern>WHO WERE THE FOUNDERS OF USR AND WHAT ROLE DID THEY HAVE</pattern><template>The company was founded by a group of entrepreneurs including Casey Cowell, who served as CEO for most of its history, and Paul Collard, who designed modems into the mid-1980s.</template></category>
+<category><pattern>WHEN WAS THE COURIER FIRST SOLD TO CORPORATE CUSTOMERS AND WHEN DID IT BECOME AVAILABLE TO THE PUBLIC</pattern><template>The Courier was sold to corporate customers from 1979 and offered to the public from 1984.</template></category>
+<category><pattern>WHAT IS USR S HIGH SPEED TECHNOLOGY HST PROTOCOL KNOWN FOR</pattern><template>USR aimed its early marketing at BBSs, where its proprietary HST protocol made FidoNet transfers much faster.</template></category>
+<category><pattern>IN WHAT YEAR WAS THE COURIER HST INTRODUCED AND WHEN DID IT REACH 9 600 BIT S</pattern><template>The Courier HST was introduced in 1986 as the Courier HST and reached 9,600 bit/s — four times a 2400 bit/s modem for about twice the price.</template></category>
+<category><pattern>WHEN WERE THE COURIER S DATA RATES EXPANDED TO 14 4 KBIT S 16 8 KBIT S ETC</pattern><template>The HST was later expanded to 14.4 kbit/s in 1989, 16.8 kbit/s in 1992, and finally to 21 and 24 kbit/s.</template></category>
+<category><pattern>WHAT IS THE SPORTSTER LINE KNOWN FOR SUPPORTING</pattern><template>USR introduced the Sportster line, which supported only the V.32 family and later standards while HST stayed with the Couriers; the Sportster shared the Courier motherboard.</template></category>
+<category><pattern>WHEN DID USR MERGE WITH 3COM AND WHAT HAPPENED TO ITS LINES AFTER THAT</pattern><template>In 1997 USR merged with 3Com, which kept the Sportster as its consumer line and the Courier as its business line; 3Com spun USR out again as a separate company in June 2000.</template></category>
+<category><pattern>WHEN WAS AT T S BELL 103A INTRODUCED</pattern><template>AT&amp;T&#x27;s Bell 103A gave full-duplex service at 300 bit/s and was introduced in 1962.</template></category>
+<category><pattern>WHAT SPEED DID THE 1 200 BIT S ERA FOLLOW WITH AT T S 212A</pattern><template>The 1,200 bit/s era followed with AT&amp;T&#x27;s 212A, introduced in November 1976, and its ITU counterpart V.22.</template></category>
+<category><pattern>WHEN WAS V 32 RELEASED</pattern><template>V.32, listed as released in 1984, reached 9,600 bit/s.</template></category>
+<category><pattern>WHY WAS 56 KBIT S THE HIGHEST SPEED POSSIBLE ON AN ANALOGUE PHONE LINE</pattern><template>A digital DS0 channel is 64 kbit/s with 8 kbit/s reserved for signalling, so 56 kbit/s was the highest possible on an analogue line.</template></category>
+<category><pattern>WHEN DID DIAL UP FADE AND WHEN DID AOL END ITS DIAL UP SERVICE</pattern><template>Dial-up peaked during the dot-com bubble and faded as broadband arrived in the late 1990s and spread into the 2000s; in the US availability fell from 40% in the early 2000s to 3% in the early 2010s, and AOL ended its dial-up service on 30 September 2025.</template></category>
+</aiml>
