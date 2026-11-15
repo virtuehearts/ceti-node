@@ -10,6 +10,56 @@ stdlib only) and one Android build (Kotlin), versioned together.
 It supersedes the 0.0.2–0.0.6 testing line — same code, clean
 version. The 0.0.2–0.0.6 zips stay in Drive as superseded builds.
 
+## 0.0.1-beta3 — 2026-11-15
+
+What changed since 0.0.1-beta2: one CETI ladder fix, from Jero's
+laptop testing on beta2 (screenshot, 2026-11-14 19:23 EST).
+
+- **CETI Tier 5b — the loaded model answers when local knowledge
+  has no hit** (`hub/reasoning.py`, `hub/ceti_chat.py`):
+  "please tell me the best way to setup a bbs" returned "I don't
+  know from local knowledge." The trace proved the local model WAS
+  called — Tier 5 ran, grounded in LEXICON DEFINITIONS, AIML
+  CONTEXT (4 BBS templates: decline, peak usage, first BBS, early
+  software), and VECTOR MEMORY (5 nodes) — but the grounded system
+  prompt forbids the model from answering from its own weights
+  when the assembled context does not contain the answer, and
+  none of that context contains setup steps. So the model
+  followed its instructions and refused. Tier 5b now catches
+  that exact refusal: the loaded model is asked again with a
+  prompt that permits answering from its own knowledge, and the
+  result is labelled `local-model-ungrounded` in tier and
+  evidence ("local model, UNGROUNDED — from the model's own
+  knowledge, not local stores"), with numbers_grounded False.
+  Verified live on this box via `POST /api/ceti/chat`: the BBS
+  question answers, tier local-model-ungrounded, 187.8s for the
+  two LFM3 calls on a loaded CPU box (the first attempt timed
+  out at a 180s client limit and was retried at 600s). Honest
+  caveat, kept in the README too: the 1.7B's answer was usable
+  but drifted into node setup ("download the model files",
+  "announce your node") — the mechanism is proven, the answer
+  quality is the small model's; a GPU model (the laptop's
+  Ministral 3B) should do better through the same path.
+- **Deliberately unchanged:** (1) the empty-context guard — when
+  no grounded context exists at all, the model is still never
+  called and the cloud suggestion stands (two existing tests
+  guard this rule and still pass); (2) ungrounded answers are
+  never recorded into vector memory — the record gate only
+  accepts facts/aiml/local-model/math/facts-composition, so
+  model output from its own weights can never become local
+  knowledge; (3) grounded answers, precise questions, and the
+  zero-token direct tiers are untouched — a grounded answer
+  still ends the ladder after one model call. (4) An
+  arbitration refusal ("none of the candidates answers") now
+  falls through to the lower tiers instead of being returned as
+  the final answer.
+- **Tests:** 619 checks green (unit 331: CETI 33, up from 29 —
+  4 new tests: grounded refusal falls back to ungrounded, a
+  grounded answer makes exactly one model call, model-down on
+  the fallback goes to the cloud suggestion, arbitration refusal
+  falls through; plus the record gate now also rejects
+  local-model-ungrounded; script suites 288, unchanged).
+
 ## 0.0.1-beta2 — 2026-11-14
 
 What changed since 0.0.1-beta, same day: the SSH terminal and the

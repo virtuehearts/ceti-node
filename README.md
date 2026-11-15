@@ -67,7 +67,7 @@ That's it — no installs to babysit, no accounts to create.
 
 1. Install the newest Python from
    [python.org](https://www.python.org/downloads/).
-2. Download [`laptop-uncensored-node-0.0.1-beta2.zip`](https://drive.google.com/uc?id=1Xx-G03SKjncIqJR9HNrLHHD-Tq9dZg-L&export=download) (47 MB) and unzip it.
+2. Download [`laptop-uncensored-node-0.0.1-beta3.zip`](https://drive.google.com/uc?id=1wg3Nie3zYAUEVF9SkwmkUIR9CqAEnQO1&export=download) (47 MB) and unzip it.
 3. Run `autorun.bat` (Windows) or `autorun.sh` (Linux). It checks
    the setup, downloads the models, starts the servers, and opens
    the web UI.
@@ -203,17 +203,38 @@ Gmail account** — same address to ask.
 
 ## Status
 
-- **Version:** 0.0.1-beta2. (Beta2 follows beta the same day,
-  2026-11-14: the SSH fix below, plus the README rewritten to
-  the CETI public story. The lettered line ended at n.)
-- **Tests:** 615 checks green at this build (unit 327: Hub 124,
-  Brain 6, CETI 29, SSH terminal 37, Research 42, Sessions 5,
+- **Version:** 0.0.1-beta3. (Beta3 follows beta2 overnight,
+  2026-11-15: the CETI Tier 5b fix below. The lettered line
+  ended at n.)
+- **Tests:** 619 checks green at this build (unit 331: Hub 124,
+  Brain 6, CETI 33, SSH terminal 37, Research 42, Sessions 5,
   Local models 8, Code agent 9, Workspace 6, TTS bundle 11,
   Toggle reasoning 6, Llama install 14, Llama gate 9,
   TTS control 20; script suites 288:
   nodeapi 101, community 16, image 13, node_client 12,
   text_handler 8, transfer 13, transfers/serving 14, tunnel 19,
   two_nodes 36, edge_cases 35, presence 21).
+- **New in 0.0.1-beta3:** **CETI Tier 5b — the loaded model
+  answers when local knowledge has no hit.** "Please tell me the
+  best way to setup a bbs" used to come back "I don't know from
+  local knowledge." — even though the local model was called and
+  was UP. The grounded Tier 5 prompt forbids the model from
+  answering from its own weights when the assembled context
+  (lexicon + AIML + vector memory) does not contain the answer.
+  Now, when the grounded call returns that exact refusal, the
+  loaded model is asked again from its own knowledge and the
+  answer is labelled **local-model-ungrounded** in the tier and
+  evidence, with numbers ungrounded, so it is never passed off
+  as grounded local knowledge. Verified live: the BBS question
+  answers (188s for the two calls on a small CPU model; much
+  faster on a GPU model). Deliberately unchanged: when there is
+  no local context at all, the model is still never called (the
+  cloud suggestion stands); ungrounded answers are never written
+  into vector memory, so model output can never become local
+  knowledge; and an arbitration refusal now falls through to the
+  lower tiers instead of ending the ladder. Grounded answers,
+  precise questions, and the zero-token direct tiers are
+  untouched.
 - **New in 0.0.1-beta2:** (1) **SSH fixed on Windows.** ConPTY
   was the default from 0.0.1u through beta and never delivered a
   byte on the laptop — every run was a live pid with empty pipes
