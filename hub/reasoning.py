@@ -3,32 +3,35 @@
 `ceti_chat.answer()` delegates here. Unified-memory design (it reuses
 `ceti_chat`'s fact/AIML helpers so the two cannot drift apart):
 
+  All-layers-reason (2026-11-15, Jero's call): every layer outputs
+  what it found, and the local model constructs the answer from all
+  of it. No layer returns its hit directly any more — the model
+  always reasons over the assembled knowledge. The direct answers
+  survive only as the fallback when the model is down.
+
   Tier 0  MATH      — deterministic Python arithmetic (safe AST parser,
                       no eval of arbitrary code). Numbers are exact.
-  Tier 1  FACTS     — all matching facts, predicate-aware (the current
-                      ladder returns the FIRST fact for a subject, so
-                      "currency of Japan" wrongly answers "capital:
-                      Tokyo"), plus two-hop COMPOSITION
-                      ("capital of the country whose currency is yen"
-                      -> yen is Japan's currency -> capital Tokyo).
-  Tier 2  AIML      — cassette pattern match, reused from ceti_chat.
-                      On a miss, the retrieval step (_aiml_search)
-                      scores the cassettes by content-word overlap
-                      and feeds the best templates to the model as
-                      context in Tier 5, so open-ended questions
-                      still ground in the stores.
+                      The result is a context fact for the model.
+  Tier 1  FACTS     — all matching facts, predicate-aware, plus
+                      two-hop COMPOSITION ("capital of the country
+                      whose currency is yen" -> yen is Japan's
+                      currency -> capital Tokyo). Competing facts
+                      are all fed to the model, not arbitrated
+                      separately — composition IS the arbitration.
+  Tier 2  AIML      — every matching cassette pattern, as context.
   Tier 3  LEXICON   — synonym/definition expansion BEFORE vector
                       search, so "dial-up forums" also searches
                       "bulletin board system". Built-in seed from the
                       cassette vocabulary + a loader for a real
                       WordNet-style file (see load_lexicon).
   Tier 4  VECTOR    — embed the EXPANDED query, search vector memory.
-  Tier 5  MODEL     — local model ONLY, with the assembled context
-                      (math + facts + AIML + lexicon + vector hits)
-                      and a strict "answer only from this context"
-                      prompt, plus a numbers-grounded guard: every
-                      number in the answer must appear in the context
-                      or the question.
+  Tier 5  CONSTRUCT — the local model builds the answer from ALL the
+                      assembled context (math + facts + AIML +
+                      lexicon + vector hits) under a strict
+                      "answer only from this context" prompt, plus
+                      a numbers-grounded guard: every number in the
+                      answer must appear in the context or the
+                      question. A refusal goes to Tier 5b.
   Tier 5b UNGROUNDED — when Tier 5 ran and the model refused
                       ("I don't know from local knowledge"): the
                       loaded local model is asked again from its own
@@ -42,6 +45,10 @@
                       local context worth handing to the model (the
                       model is not called on an empty context: that
                       is just paying a 1.7B model to hallucinate).
+                      Also the fallback when the model is down and
+                      no direct hit exists: the best direct hit
+                      (math, composition, fact, AIML) answers
+                      instead of failing the question.
 
 Stdlib only. Read-only except the local-model call (same as ceti_chat).
 """
@@ -754,8 +761,14 @@ def _aiml_search(orig_words, roots, top_n=4):
 # --------------------------------------------------------------- model ---
 
 _SYSTEM = (
-    "You are CETI, a local brain. Answer ONLY using the LOCAL CONTEXT "
-    "below. If the context does not contain the answer, reply exactly: "
+    "You are CETI, a local brain. Below is LOCAL KNOWLEDGE assembled "
+    "from every local store: the math result (computed in Python, "
+    "never by you), facts, AIML templates, lexicon definitions, and "
+    "vector memories. Draw on ALL of it and construct the fullest "
+    "answer the knowledge supports, in plain words — combine the "
+    "pieces into a coherent answer, not a bare one-line fact. Answer "
+    "ONLY using the LOCAL CONTEXT below. If the context does not "
+    "contain the answer, reply exactly: "
     "I don't know from local knowledge. "
     "Do not use outside knowledge. Do not invent numbers, dates or "
     "names. Keep the answer short, in plain words.")
@@ -836,54 +849,11 @@ def _model_tier(query, context_sections, system=None, max_tokens=2048,
             "ungrounded_numbers": bad}, lines
 
 
-_ARBITRATE_SYSTEM = (
-    "You are CETI, a local brain. Below is LOCAL KNOWLEDGE: candidate "
-    "facts and AIML templates that all matched the question. Pick the "
-    "one (or the few) that actually answer the question and answer "
-    "with it, in plain words, keeping the answer short. If several "
-    "pieces are needed together to answer, combine them. Use ONLY the "
-    "knowledge below. If none of it answers the question, reply "
-    "exactly: I don't know from local knowledge. "
-    "Do not use outside knowledge. Do not invent numbers, dates or "
-    "names.")
-
-
-def _arbitrate_tier(query, fact_candidates, aiml_matches):
-    """Local model arbitrates over competing facts / AIML templates.
-    Returns (result, lines). The model runs with thinking OFF and a
-    short answer budget: arbitration is selection, not deep reasoning,
-    so it stays fast. Returns None when the model is unavailable or
-    answers empty, so the caller can fall through to the lower tiers
-    instead of failing the question outright."""
-    lines = []
-    fact_text = "\n".join(
-        "- %s %s %s (source: %s)" % (m["subject"], m["predicate"],
-                                      m["object"], m["source"])
-        for m in fact_candidates)
-    aiml_text = "\n".join(
-        "- %s pattern: %s — %s" % (m["cassette"], m["pattern"],
-                                   m["template"])
-        for m in aiml_matches)
-    sections = [("CANDIDATE FACTS", fact_text),
-                ("CANDIDATE AIML TEMPLATES", aiml_text)]
-    lines.append("ARBITRATE — %d fact candidate(s), %d AIML template(s); "
-                 "local model picks the best" % (len(fact_candidates),
-                                                 len(aiml_matches)))
-    hit, mtrace = _model_tier(query, sections, system=_ARBITRATE_SYSTEM,
-                              max_tokens=512, reasoning=False)
-    lines.extend(mtrace)
-    if hit is None:
-        return None, lines
-    if not (hit.get("answer") or "").strip():
-        lines.append("ARBITRATE — model returned an empty answer; "
-                     "falling through to the lower tiers")
-        return None, lines
-    hit = dict(hit)
-    hit["tier"] = "arbitrated"
-    hit["evidence"] = ("arbitrated over %d fact(s) + %d AIML template(s); "
-                       % (len(fact_candidates), len(aiml_matches))) \
-        + hit["evidence"]
-    return hit, lines
+# NOTE (2026-11-15, all-layers-reason): _arbitrate_tier and
+# _ARBITRATE_SYSTEM were deleted here. Arbitration was a separate
+# model call that picked between competing facts/templates; the
+# construct call (Tier 5) now gets ALL of them and composes from
+# them, so a separate selection step no longer exists.
 
 
 _UNGROUNDED_SYSTEM = (
@@ -953,99 +923,67 @@ def _model_tier_ungrounded(query, context_sections):
     return hit, lines
 
 
-# Tier 1c — elaboration (2026-11-14). A clear fact hit used to return
-# the bare fact verbatim, even when the sysop asked for MORE ("tell me
-# more about FidoNet") — the ladder never gave the local model the
-# already-hit knowledge to build on. That is CETI's main angle: the
-# previous hits plus reasoning, so the model elaborates from local
-# knowledge instead of the ladder short-circuiting to one line.
-# Triggers: an explicit elaboration phrase in the question only
-# ("tell me more", "explain", ...). A precise predicate hit
-# ("when did X start?") still returns directly with zero model
-# tokens, and so does a plain subject question ("what is FidoNet?")
-# — elaboration is the sysop asking for more, not the ladder
-# guessing. The model gets every matched fact plus the related
-# AIML templates; when there is nothing beyond the one bare fact,
-# elaboration is skipped and the direct answer stands. Model down /
-# empty / "nothing more" falls back to the direct fact — elaboration
-# never fails the question.
-_ELABORATE_RE = re.compile(
-    r"(tell me more|more about|tell me about|explain|elaborat|describ|"
-    r"go into (more )?detail|in (more )?detail|what else|go on|"
-    r"dive (deeper|in)|walk me through|break ?down|history of|"
-    r"overview of|give me the (full|whole|complete) "
-    r"(story|picture|history|rundown))",
-    re.IGNORECASE)
+# NOTE (2026-11-15, all-layers-reason): _elaborate_tier,
+# _wants_elaboration, _ELABORATE_RE and _ELABORATE_SYSTEM were
+# deleted here. Elaboration (Tier 1c, 2026-11-14) fed a fact hit +
+# related templates to the model only when the sysop explicitly
+# asked for more ("tell me more", "explain", ...). The construct
+# call (Tier 5) now does that for EVERY question — the model always
+# gets every matched fact and template and builds the fuller answer
+# — so the phrase trigger and the separate elaboration step no
+# longer exist. A precise question still costs one model call now;
+# that is the trade-off Jero chose.
 
 
-def _wants_elaboration(query):
-    """True when the sysop asked for more than a one-line fact."""
-    return bool(_ELABORATE_RE.search(query or ""))
-
-
-_ELABORATE_SYSTEM = (
-    "You are CETI, a local brain. Below is LOCAL KNOWLEDGE about the "
-    "subject: facts and AIML templates from the local store. The sysop "
-    "asked for MORE than a one-line fact — write a fuller answer that "
-    "explains the subject using ONLY the knowledge below, in plain "
-    "words. Combine the pieces into a short, coherent answer (a few "
-    "sentences, or a short paragraph). Do not use outside knowledge. "
-    "Do not invent numbers, dates or names. If the knowledge below "
-    "does not support a fuller answer, reply exactly: "
-    "I don't know more from local knowledge.")
-
-
-def _elaborate_tier(query, facts, aiml_ctx):
-    """Local model elaborates on already-hit local knowledge.
-    facts is the matched-facts list; aiml_ctx is _aiml_search-style
-    dicts (cassette/pattern/template). Returns (result, lines) —
-    None when there is nothing to elaborate with or the model adds
-    nothing, so the caller keeps the direct answer."""
-    lines = []
-    facts = facts or []
-    aiml_ctx = aiml_ctx or []
-    if len(facts) <= 1 and not aiml_ctx:
-        lines.append("ELABORATE — skipped: only the one matched fact, "
-                     "nothing more to build on")
-        return None, lines
-    fact_text = "\n".join(
-        "- %s %s %s (source: %s)" % (m["subject"], m["predicate"],
-                                     m["object"], m["source"])
-        for m in facts)
-    aiml_text = "\n".join(
-        "- %s pattern: %s — %s" % (c["cassette"], c["pattern"],
-                                   c["template"])
-        for c in aiml_ctx)
-    lines.append("ELABORATE — %d fact(s) + %d AIML template(s); local "
-                 "model builds the fuller answer"
-                 % (len(facts), len(aiml_ctx)))
-    hit, mtrace = _model_tier(
-        query, [("MATCHED FACTS", fact_text),
-                ("RELATED AIML TEMPLATES", aiml_text)],
-        system=_ELABORATE_SYSTEM, max_tokens=768, reasoning=False)
-    lines.extend(mtrace)
-    if hit is None:
-        return None, lines
-    if not (hit.get("answer") or "").strip() \
-            or hit["answer"].strip() == \
-            "I don't know more from local knowledge.":
-        lines.append("ELABORATE — model had nothing more to add; "
-                     "keeping the direct answer")
-        return None, lines
-    hit = dict(hit)
-    hit["tier"] = "elaborated"
-    hit["evidence"] = ("elaborated from %d fact(s) + %d AIML template(s); "
-                       % (len(facts), len(aiml_ctx))) + hit["evidence"]
-    return hit, lines
+def _direct_fallback(math_hit, comp, fact_hit, aiml_matches,
+                     fact_candidates):
+    """Best direct answer when the construct model is unavailable
+    (model down / empty answer). Old ladder priority: math, then
+    two-hop composition, then a clear fact, then an AIML template,
+    then the first competing fact. Returns the old-style result
+    dict (tier/answer/evidence) or None when no layer hit at all.
+    The caller adds reasoning_trace, memories, cloud_suggested and
+    numbers_grounded."""
+    if math_hit:
+        return dict(math_hit)
+    if comp:
+        return dict(comp)
+    if fact_hit:
+        return dict(fact_hit)
+    if aiml_matches:
+        m = aiml_matches[0]
+        return {"tier": "aiml", "answer": m["answer"],
+                "evidence": "cassette %s pattern: %s" % (m["cassette"],
+                                                          m["pattern"])}
+    if fact_candidates:
+        m = fact_candidates[0]
+        return {"tier": "facts",
+                "answer": "%s — %s: %s" % (m["subject"], m["predicate"],
+                                           m["object"]),
+                "evidence": "fact: %s %s %s (source: %s)" % (
+                    m["subject"], m["predicate"], m["object"],
+                    m["source"])}
+    return None
 
 
 # ------------------------------------------------------------ entrypoint ---
 
 def answer_with_reasoning(query, roots=None, ident_hash=None,
                           lexicon=None, session_id=None):
-    """Run the unified-memory ladder. Returns tier, answer, evidence,
-    reasoning_trace (one line per layer, saying what it contributed),
-    memories (vector hits), cloud_suggested, numbers_grounded.
+    """Run the construct ladder (all-layers-reason, 2026-11-15).
+    Every layer outputs what it found — math result, facts, AIML
+    templates, lexicon definitions, vector memories, session files —
+    and the local model constructs the answer from all of it. No
+    layer returns its hit directly any more. Returns tier, answer,
+    evidence, reasoning_trace (one line per layer, saying what it
+    contributed), memories (vector hits), cloud_suggested,
+    numbers_grounded.
+
+    The direct answers survive only as the fallback when the model
+    is down: the best direct hit (math, composition, fact, AIML)
+    answers instead of failing the question. When no layer found
+    anything, the model is never called and the cloud suggestion
+    stands, as before.
 
     When `lexicon` is None the shipped lexicon (if any) is loaded
     lazily for this query's words via get_lexicon(); pass {} explicitly
@@ -1062,121 +1000,34 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
                 "memories": [], "cloud_suggested": False,
                 "numbers_grounded": True}
 
-    # Tier 0 — math, deterministic, before anything else.
+    # Tier 0 — math, computed in Python (never the model). The
+    # result is a context fact for the construct call, and the
+    # direct answer if the model is down.
     math_hit = _math_tier(query)
     if math_hit:
         trace.append("MATH — hit: " + math_hit["evidence"])
-        math_hit["reasoning_trace"] = trace
-        math_hit["memories"] = []
-        math_hit["cloud_suggested"] = False
-        math_hit["numbers_grounded"] = True
-        return math_hit
-    trace.append("MATH — miss: no arithmetic in the question")
+    else:
+        trace.append("MATH — miss: no arithmetic in the question")
 
     # Tier 1 — facts, predicate-aware, with two-hop composition first
-    # (composition needs its own parse; plain facts second).
+    # (composition needs its own parse; plain facts second). A clear
+    # hit, competing candidates, and the composition result ALL
+    # become context for the construct call — nothing returns
+    # directly any more.
     comp, ctrace = _composition_tier(query, roots)
     trace.extend(ctrace)
-    if comp:
-        comp["reasoning_trace"] = trace
-        comp["memories"] = []
-        comp["cloud_suggested"] = False
-        comp["numbers_grounded"] = True
-        return comp
     fact_hit, ftrace, fact_candidates = _facts_tier(query, roots)
     trace.extend(ftrace)
-    if fact_hit:
-        # Tier 1c — elaboration: a clear fact hit is not the end of
-        # the answer when the sysop explicitly asked for more
-        # ("tell me more", "explain", ...). Feed the hit facts +
-        # related AIML templates to the local model and let it build
-        # the fuller answer. A precise question with no elaboration
-        # phrase still returns the bare fact directly, zero model
-        # tokens. Falls back to the direct fact when there is nothing
-        # more to build on or the model adds nothing.
-        if _wants_elaboration(query):
-            aiml_ctx = _aiml_search(_content_words(query), roots)
-            elab_hit, etrace = _elaborate_tier(
-                query, fact_hit.get("facts") or [], aiml_ctx)
-            trace.extend(etrace)
-            if elab_hit:
-                elab_hit["reasoning_trace"] = trace
-                elab_hit["memories"] = []
-                elab_hit["cloud_suggested"] = False
-                return elab_hit
-        fact_hit["reasoning_trace"] = trace
-        fact_hit["memories"] = []
-        fact_hit["cloud_suggested"] = False
-        fact_hit["numbers_grounded"] = True
-        return fact_hit
 
-    # Tier 2 — AIML: collect every matching pattern, not just the
-    # first. A single pattern with no competing facts returns
-    # directly; several patterns (or competing facts) go to
-    # arbitration below (Tier 1b).
+    # Tier 2 — AIML: every matching pattern becomes context.
     aiml_matches = ceti_chat._aiml_all_matches(query, roots)
-    if not fact_candidates and len(aiml_matches) == 1:
-        m = aiml_matches[0]
-        # Tier 1c — elaboration on a single AIML hit, when the sysop
-        # asked for more and there are related facts to build on.
-        # A bare template alone is already the answer.
-        if _wants_elaboration(query):
-            facts = facts_search_all(query, roots)
-            if facts:
-                elab_hit, etrace = _elaborate_tier(query, facts,
-                                                   aiml_matches)
-                trace.extend(etrace)
-                if elab_hit:
-                    elab_hit["reasoning_trace"] = trace
-                    elab_hit["memories"] = []
-                    elab_hit["cloud_suggested"] = False
-                    return elab_hit
-        trace.append("AIML — hit: cassette %s pattern: %s" % (
-            m["cassette"], m["pattern"]))
-        return {"tier": "aiml", "answer": m["answer"],
-                "evidence": "cassette %s pattern: %s" % (m["cassette"],
-                                                          m["pattern"]),
-                "reasoning_trace": trace, "memories": [],
-                "cloud_suggested": False, "numbers_grounded": True}
-    if not fact_candidates and not aiml_matches:
-        trace.append("AIML — miss: no category pattern matched")
+    if aiml_matches:
+        trace.append("AIML — %d pattern(s) matched: %s" % (
+            len(aiml_matches),
+            "; ".join("%s: %s" % (m["cassette"], m["pattern"])
+                      for m in aiml_matches)))
     else:
-        # Tier 1c before Tier 1b: when the sysop asked for MORE, the
-        # competing hits are material to elaborate with, not just to
-        # pick between — compose from all of them first. Selection
-        # (arbitration) is the fallback when elaboration adds nothing.
-        if _wants_elaboration(query):
-            elab_hit, etrace = _elaborate_tier(query, fact_candidates,
-                                               aiml_matches)
-            trace.extend(etrace)
-            if elab_hit:
-                elab_hit["reasoning_trace"] = trace
-                elab_hit["memories"] = []
-                elab_hit["cloud_suggested"] = False
-                return elab_hit
-        # Tier 1b — arbitration: several facts and/or AIML templates
-        # compete. Feed them all to the local model and let it pick
-        # the best answer from local knowledge only.
-        arb_hit, atrace = _arbitrate_tier(query, fact_candidates,
-                                          aiml_matches)
-        trace.extend(atrace)
-        if arb_hit and _is_refusal(arb_hit.get("answer")):
-            # The model refused: none of the candidates answers the
-            # question. That is a failure to answer, not an answer —
-            # fall through to the lower tiers (and Tier 5b) instead
-            # of returning the refusal as the final word.
-            trace.append("ARBITRATE — model refused (none of the "
-                         "candidates answers); falling through to "
-                         "the lower tiers")
-            arb_hit = None
-        if arb_hit:
-            arb_hit["reasoning_trace"] = trace
-            arb_hit["memories"] = []
-            arb_hit["cloud_suggested"] = False
-            return arb_hit
-        # Arbitration failed (model down / empty answer): fall through
-        # to the lower tiers; vector memory or session files may
-        # still answer.
+        trace.append("AIML — miss: no category pattern matched")
 
     # Tier 3 — lexicon expansion (feeds Tier 4 and Tier 5).
     expanded, expansions, definitions = expand_query(query, lexicon)
@@ -1236,13 +1087,59 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
     # time, searched by the same content-word bar as vector memory.
     sess_hits, strace = _attachment_hits(query, ident_hash, session_id)
     trace.extend(strace)
-    if not definitions and not memories and not aiml_ctx and not sess_hits:
+
+    # Assemble every layer's output into context sections. Nothing
+    # here is an answer yet — the construct call below builds the
+    # answer from all of it.
+    math_text = ("- %s (computed in Python)"
+                 % math_hit["calculation"]) if math_hit else ""
+    _seen_facts = set()
+    _all_facts = []
+    for _src in ((comp or {}).get("facts") or [],
+                 (fact_hit or {}).get("facts") or [],
+                 fact_candidates):
+        for _m in _src:
+            _key = (_m["subject"], _m["predicate"], _m["object"])
+            if _key not in _seen_facts:
+                _seen_facts.add(_key)
+                _all_facts.append(_m)
+    fact_text = "\n".join(
+        "- %s %s %s (source: %s)" % (m["subject"], m["predicate"],
+                                      m["object"], m["source"])
+        for m in _all_facts)
+    _seen_aiml = set()
+    _all_aiml = []
+    for _c in list(aiml_matches) + list(aiml_ctx):
+        _key = (_c["cassette"], _c["pattern"])
+        if _key not in _seen_aiml:
+            _seen_aiml.add(_key)
+            _all_aiml.append(_c)
+    aiml_text = "\n".join(
+        "- %s pattern: %s — %s" % (c["cassette"], c["pattern"],
+                                   # Exact matches carry the rendered
+                                   # answer (star substituted); retrieved
+                                   # templates carry the raw template.
+                                   c.get("answer") or c["template"])
+        for c in _all_aiml)
+    sess_text = "\n".join(
+        "- %s: %s" % (h["source"], h["text"]) for h in sess_hits)
+    context_sections = [
+        ("MATH", math_text),
+        ("FACTS", fact_text),
+        ("LEXICON DEFINITIONS", lexicon_text),
+        ("AIML CONTEXT", aiml_text),
+        ("SESSION FILES", sess_text),
+        ("VECTOR MEMORY", "\n".join(
+            "- #%s (%s, %.2f): %s" % (h["id"], h["source"], h["score"],
+                                      h["text"]) for h in memories)),
+    ]
+    if not any(_b.strip() for _t, _b in context_sections):
         trace.append("LOCAL MODEL — skipped: no grounded context (no "
-                     "lexicon definition, no vector hit shares a "
-                     "content word with the question, no AIML "
-                     "template shares one, and no session file shares "
-                     "one); calling the model "
-                     "on nothing would be asking it to hallucinate")
+                     "math, no fact, no AIML pattern, no lexicon "
+                     "definition, no vector hit shares a content "
+                     "word with the question, and no session file "
+                     "shares one); calling the model on nothing "
+                     "would be asking it to hallucinate")
         trace.append("CLOUD — suggested only, never called: no local "
                      "tier answered and no grounded context existed")
         return {"tier": "cloud-suggested",
@@ -1260,21 +1157,11 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
                                 len(memories), dropped, len(aiml_ctx))),
                 "reasoning_trace": trace, "memories": memories,
                 "cloud_suggested": True, "numbers_grounded": True}
-
-    # Tier 5 — local model with everything assembled.
-    aiml_text = "\n".join(
-        "- %s pattern: %s — %s" % (c["cassette"], c["pattern"], c["template"])
-        for c in aiml_ctx)
-    sess_text = "\n".join(
-        "- %s: %s" % (h["source"], h["text"]) for h in sess_hits)
-    context_sections = [
-        ("LEXICON DEFINITIONS", lexicon_text),
-        ("AIML CONTEXT", aiml_text),
-        ("SESSION FILES", sess_text),
-        ("VECTOR MEMORY", "\n".join(
-            "- #%s (%s, %.2f): %s" % (h["id"], h["source"], h["score"],
-                                      h["text"]) for h in memories)),
-    ]
+    # Tier 5 — construct: the local model builds the answer from
+    # every layer's output at once.
+    trace.append("CONSTRUCT — %d section(s) to the local model: %s" % (
+        len([1 for _t, _b in context_sections if _b.strip()]),
+        ", ".join(_t for _t, _b in context_sections if _b.strip())))
     model_hit, mtrace = _model_tier(query, context_sections)
     trace.extend(mtrace)
     if model_hit and _is_refusal(model_hit.get("answer")):
@@ -1306,6 +1193,21 @@ def answer_with_reasoning(query, roots=None, ident_hash=None,
         model_hit["memories"] = memories
         model_hit["cloud_suggested"] = False
         return model_hit
+
+    # Model unavailable (or an empty answer): fall back to the best
+    # direct hit instead of failing the question. Old ladder
+    # priority: math, then two-hop composition, then a clear fact,
+    # then an AIML template, then the first competing fact.
+    direct = _direct_fallback(math_hit, comp, fact_hit, aiml_matches,
+                              fact_candidates)
+    if direct:
+        trace.append("CONSTRUCT — model unavailable; falling back to "
+                     "the direct %s answer" % direct["tier"])
+        direct["reasoning_trace"] = trace
+        direct["memories"] = memories
+        direct["cloud_suggested"] = False
+        direct["numbers_grounded"] = True
+        return direct
 
     # Tier 6 — cloud suggested, never called.
     trace.append("CLOUD — suggested only, never called: no local tier "

@@ -18,12 +18,16 @@ newlines). Tier order, first hit wins:
   4. vector memory — the expanded query embedded and searched;
      only hits sharing a content word with the question count as
      grounded context (see the empty-context guard in reasoning.py).
-  5. local-model — local model ONLY, with the assembled context
+  5. local-model — CONSTRUCT: the local model builds the answer
+     from ALL the assembled context (math + facts + AIML +
+     lexicon + vector hits). No layer returns directly any more;
+     the direct answers survive only as the fallback when the
+     model is down. A strict "answer only from this context"
+     prompt, plus a numbers-grounded guard. Never called on empty
+     context.
   5b. local-model-ungrounded — the loaded model from its own
       knowledge, ONLY after the grounded Tier 5 call refused;
       labelled UNGROUNDED, never recorded into vector memory
-     and a strict "answer only from this context" prompt, plus a
-     numbers-grounded guard. Never called on empty context.
   6. cloud-suggested — NOT called. Every local tier missed, so
      the answer says so and suggests cloud. Nothing leaves this
      machine from this path.
@@ -145,9 +149,10 @@ def _render_template(template, stars):
 def _aiml_all_matches(query, roots):
     """Every AIML category whose pattern matches the question, in
     cassette order. Returns a list of dicts with cassette, pattern,
-    template (tags stripped) and the rendered answer. Used by the
-    arbitration step: when several patterns match, the local model
-    picks the best instead of the ladder taking the first."""
+    template (tags stripped) and the rendered answer. All of them
+    become context for the construct call: when several patterns
+    match, the local model builds from all of them instead of the
+    ladder taking the first."""
     qn = _norm(query)
     out = []
     for name, text in _iter_cassettes(roots):
