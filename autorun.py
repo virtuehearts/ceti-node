@@ -37,6 +37,7 @@ Add an OpenRouter / Nvidia key in the web UI Settings page (stored in
 your browser only), or set OPENROUTER_API_KEY / NVIDIA_API_KEY in WSL.
 """
 import argparse
+import ntpath
 import os
 import platform
 import subprocess
@@ -124,15 +125,20 @@ def start_tts(log_path: str):
         print(f"tts: cannot open log {log_path} ({e}) — skipping local TTS")
         return None
     if os.name == "nt":
-        # `call` + the quoted path: bare `cmd /c <script>` breaks
-        # when the extract path has a space or a parenthesis (a
-        # duplicate folder is `...beta4 (1)`). cmd /c strips the
-        # quotes and re-splits the path, which filled the System
-        # log with `'s' / 'bat' / 'RT' / 'tTTS' is not recognized`
-        # and `... was unexpected at this time.` on beta4. `call`
-        # takes the quoted path as one file. Same fix as
-        # hub/servers.py _tts_cmd — keep the two in sync.
-        cmd = ["cmd", "/c", "call", script]
+        # Basename only (0.0.1-beta7): the Popen below already runs
+        # with cwd=tts_dir, so `call start_tts.bat` resolves in that
+        # directory and the extract path never reaches the cmd
+        # command line. Both earlier forms passed the absolute path
+        # and cmd chewed it on space/paren paths (a duplicate folder
+        # is `...beta6 (1)`): bare `cmd /c <script>` (beta4) and
+        # `cmd /c call <script>` (beta5, beta6 — beta6 still showed
+        # `'s' / 'bat' / 'RT' / 'tTTS' is not recognized` +
+        # `... was unexpected at this time.` on the laptop). The
+        # basename has no spaces, no parens, no quotes. Same fix as
+        # hub/servers.py _tts_cmd — keep the two in sync. (ntpath,
+        # not os.path: on Windows they are the same, and ntpath
+        # makes the Windows-path intent explicit.)
+        cmd = ["cmd", "/c", "call", ntpath.basename(script)]
     else:
         cmd = ["bash", script]
     try:

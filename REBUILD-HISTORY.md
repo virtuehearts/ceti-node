@@ -10,6 +10,76 @@ stdlib only) and one Android build (Kotlin), versioned together.
 It supersedes the 0.0.2–0.0.6 testing line — same code, clean
 version. The 0.0.2–0.0.6 zips stay in Drive as superseded builds.
 
+## 0.0.1-beta8 — 2026-11-18
+
+What changed since 0.0.1-beta7: the SSH terminal post-Enter
+vertical-"Ask" fix.
+
+Jero reported the HF chat TUI connects and paints correctly,
+but after pressing Enter the "Ask" input goes vertical (one
+char per line) in the Hub's SSH pane — while the same
+connection in a plain Windows terminal works fine. Root cause
+is the one documented in 0.0.1t: Windows OpenSSH reads the
+remote PTY size from the console, and with no console it
+negotiates 0x0; the TUI paints fine at connect (a default
+size) but re-reads the 0x0 PTY size when it redraws the input
+after Enter, and the input box collapses to width 1. The 0.0.1t
+fix only covered the case where the Hub itself has a console
+(inherit it); a Hub with no console — or a console whose
+buffer is broken — still got 0x0.
+
+- **SSH console ensure** (`hub/sshterm.py`
+  `_ensure_ssh_console`, `tests/test_sshterm.py`): before
+  spawning ssh, the pipe session now guarantees a console
+  with a sane screen buffer. When the Hub has no console at
+  all, it allocates one, hides it at once, and sizes it to
+  the pane — so the remote PTY is the pane size instead of
+  0x0. When it has a console whose buffer is broken (0, 1,
+  or tiny), it repairs the buffer to the pane size. A console
+  whose buffer is already sane is left alone, so no window
+  the operator is looking at is resized. Any failure falls
+  back to CREATE_NO_WINDOW, exactly as before. The helper is
+  win32-only and never raises; on any other platform it
+  returns False and the pipe session is unchanged.
+- **Tests:** 622 checks green (unit 334 + script 288).
+  One new test: the console ensure is a no-op off Windows.
+  (The four live checks — TTS MP3 and model answers through
+  the mailbox — failed on the first run only because the
+  whole local stack was down after a VM replacement; with
+  the stack back up they pass.)
+
+## 0.0.1-beta7 — 2026-11-17
+
+What changed since 0.0.1-beta6: the TTS START fix, for real.
+Beta6 still showed the same failure on the laptop — `'s' /
+'bat' / 'RT' / 'tTTS' is not recognized` + `... was unexpected
+at this time.` — because `cmd /c call <absolute path>` still
+puts the path on the cmd command line, and cmd chews a quoted
+path with parens. The `call` form (beta5, beta6) was never run
+on real Windows, only inspected as a string here.
+
+- **TTS START via basename** (`hub/servers.py` `_tts_cmd`,
+  `autorun.py` `start_tts`, `tests/test_tts_control.py`): the
+  launch now passes only the script's basename to cmd —
+  `cmd /c call start_tts.bat`. Both callers already run it with
+  the working directory set to the script's folder (tts_start
+  sets cwd=tts_dir, autorun sets cwd=tts_dir), so the batch
+  resolves there and the extract path never reaches the cmd
+  command line at all. The basename has no spaces, no parens,
+  no quotes — nothing for cmd to misparse. The `.bat` itself is
+  unchanged. This fixes BOTH the boot-time auto-start
+  (autorun.py) and the Hub's START button, so TTS comes up with
+  no setup. (Implementation note: the basename uses
+  `ntpath.basename`, not `os.path.basename` — on Linux
+  os.path.basename does not split on backslashes, so the
+  Windows-path tests failed until this was caught.)
+- **Tests:** 621 checks green (unit 333 + script 288).
+  No count change: the TTS control tests were updated to the
+  basename form (the Windows-only launch test now proves the
+  basename shape — the .bat sits in a space/paren path, cmd
+  only ever sees `start_tts.bat`, and the batch still
+  executes).
+
 ## 0.0.1-beta6 — 2026-11-16
 
 What changed since 0.0.1-beta5: the Windows CI check, so
