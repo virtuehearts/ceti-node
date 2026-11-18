@@ -502,11 +502,22 @@ def _tts_cmd(script, is_windows=None):
     button used the bare form, so on the laptop it never launched
     anything — the button silently did nothing while the UI said
     "Starting TTS server…". On Linux/macOS the script itself is
-    executable (shebang + exec bit)."""
+    executable (shebang + exec bit).
+
+    (0.0.1-beta4 follow-up) Bare `cmd /c <script>` is still broken
+    when the extract path contains a space or a parenthesis — a
+    duplicate download folder is `...beta4 (1)`, a username or
+    OneDrive path can carry spaces. cmd /c strips the quotes
+    Python adds around such a path and re-splits it, so the System
+    log filled with `'s' / 'bat' / 'RT' / 'tTTS' is not recognized`
+    fragments and `... was unexpected at this time.` — cmd chewing
+    the path to pieces. `call` takes the quoted path as one file
+    and runs it correctly, spaces and parens included, so the
+    launch goes through `cmd /c call <script>`."""
     if is_windows is None:
         is_windows = os.name == "nt"
     if is_windows:
-        return ["cmd", "/c", script]
+        return ["cmd", "/c", "call", script]
     return [script]
 
 

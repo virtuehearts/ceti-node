@@ -63,6 +63,38 @@ class CetiChatTest(unittest.TestCase):
         # longer drive anything).
         cls.orig_vector = reasoning._vector_tier
         cls.orig_model = reasoning._model_tier
+        # Default stand-ins, installed per test (see setUp): the
+        # construct ladder always calls the model now, so the
+        # default model returns the assembled context as the
+        # answer — tests assert on what the ladder fed the model
+        # without running a real server. The default vector tier
+        # returns no hits. Tests that need a live tier patch their
+        # own and restore these defaults in _restore_reasoning.
+        def _fake_construct(query, sections, system=None,
+                            max_tokens=None, reasoning=None, **kw):
+            text = "\n".join(body for _t, body in sections
+                             if body.strip())
+            return ({"tier": "local-model",
+                     "answer": text or "(no context)",
+                     "evidence": "local model, grounded in: " + ", ".join(
+                         t for t, _b in sections if _b.strip()),
+                     "numbers_grounded": True},
+                    ["LOCAL MODEL — answered"])
+
+        def _fake_vector(expanded_query, ident_hash):
+            return ([], ["VECTOR MEMORY — no nodes above 0.35"])
+
+        cls.fake_model = _fake_construct
+        cls.fake_vector = _fake_vector
+        reasoning._model_tier = cls.fake_model
+        reasoning._vector_tier = cls.fake_vector
+
+    def setUp(self):
+        # Every test starts from the default stand-ins (a previous
+        # test's _restore_reasoning may have left the real tiers
+        # installed).
+        reasoning._model_tier = type(self).fake_model
+        reasoning._vector_tier = type(self).fake_vector
 
     @classmethod
     def tearDownClass(cls):
@@ -80,33 +112,38 @@ class CetiChatTest(unittest.TestCase):
             reasoning._model_tier = model
 
     def _restore_reasoning(self):
-        # NOTE: read the originals through the CLASS, not the instance:
-        # a plain function stored as a class attribute binds as a
-        # method when read via self (the test instance becomes arg 1,
-        # so the restored tier then takes 2 args but gets 3).
-        reasoning._vector_tier = type(self).orig_vector
-        reasoning._model_tier = type(self).orig_model
+        # NOTE: restore the DEFAULT STAND-INS, not the real tiers:
+        # no test in this file may call a live model or embedding
+        # server (see the module docstring). Read them through the
+        # CLASS, not the instance: a plain function stored as a
+        # class attribute binds as a method when read via self (the
+        # test instance becomes arg 1, so the restored tier then
+        # takes 2 args but gets 3).
+        reasoning._vector_tier = type(self).fake_vector
+        reasoning._model_tier = type(self).fake_model
 
     def test_db_fact_tier(self):
+        # All-layers-reason: the fact is context now, and the model
+        # constructs the answer from it.
         r = ceti_chat.answer("what country is toronto in")
-        self.assertEqual(r["tier"], "facts")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("canada", r["answer"])
         self.assertIn("FACTS", r["thinking"])
         self.assertIn("toronto country canada", r["thinking"])
 
     def test_cassette_fact_tier(self):
         r = ceti_chat.answer("what color is mars")
-        self.assertEqual(r["tier"], "facts")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("red", r["answer"])
 
     def test_aiml_exact_tier(self):
         r = ceti_chat.answer("what is fidonet")
-        self.assertEqual(r["tier"], "aiml")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("BBS network", r["answer"])
 
     def test_aiml_wildcard_star(self):
         r = ceti_chat.answer("hello there friend")
-        self.assertEqual(r["tier"], "aiml")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("THERE FRIEND", r["answer"])
 
     def test_aiml_search_finds_fidonet_template(self):
@@ -203,40 +240,75 @@ class CetiChatTest(unittest.TestCase):
         self.assertIn("fed to local model as context", r["thinking"])
 
     def test_math_tier(self):
+        # All-layers-reason: the math result is computed in Python
+        # and fed to the model as a context fact; the model states
+        # it, it never computes it.
         r = ceti_chat.answer("What is 17 * 23 + 41?")
-        self.assertEqual(r["tier"], "math")
-        self.assertEqual(r["answer"], "432")
-        self.assertIn("MATH", r["thinking"])
+        self.assertEqual(r["tier"], "local-model")
+        self.assertIn("432", r["answer"])
+        self.assertIn("17 * 23 + 41 = 432", r["thinking"])
         # Letter x as a multiplication sign (2026-11-06: "17x23+41"
         # used to answer 64 — the "17x" was dropped and 23+41 ran).
         r = ceti_chat.answer("What is 17x23+41?")
-        self.assertEqual(r["tier"], "math")
-        self.assertEqual(r["answer"], "432")
+        self.assertEqual(r["tier"], "local-model")
+        self.assertIn("432", r["answer"])
         r = ceti_chat.answer("What is 17 x 23 + 41?")
-        self.assertEqual(r["tier"], "math")
-        self.assertEqual(r["answer"], "432")
+        self.assertEqual(r["tier"], "local-model")
+        self.assertIn("432", r["answer"])
         r = ceti_chat.answer("What is 15% of 240?")
-        self.assertEqual(r["tier"], "math")
-        self.assertEqual(r["answer"], "36")
+        self.assertEqual(r["tier"], "local-model")
+        self.assertIn("36", r["answer"])
+        self.assertIn("MATH", r["thinking"])
 
     def test_facts_predicate_aware(self):
-        # The old ladder answered both of these with the capital.
-        r = ceti_chat.answer("What is the currency of Japan?")
-        self.assertEqual(r["tier"], "facts")
-        self.assertIn("Japanese yen", r["answer"])
-        self.assertNotIn("Tokyo", r["answer"])
-        r = ceti_chat.answer("What is the population of France?")
-        self.assertEqual(r["tier"], "facts")
-        self.assertIn("69081996", r["answer"])
-        self.assertNotIn("Paris", r["answer"])
+        # The predicate-aware facts layer still picks the right fact
+        # (tested directly on the helper): the old ladder answered
+        # both of these with the capital.
+        hit, _trace, _cands = reasoning._facts_tier(
+            "What is the currency of Japan?")
+        self.assertEqual(hit["tier"], "facts")
+        self.assertIn("Japanese yen", hit["answer"])
+        self.assertNotIn("Tokyo", hit["answer"])
+        # End to end, all-layers-reason: the model gets EVERY Japan
+        # fact as context and selects the predicate match itself.
+        def _select(query, sections, system=None, **kw):
+            facts = dict(sections).get("FACTS", "")
+            # All facts for the subject are context, not just the
+            # predicate match — the model selects.
+            if "currency" in query:
+                self.assertIn("Japanese yen", facts)
+                self.assertIn("Tokyo", facts)
+                ans = "Japan — currency: Japanese yen"
+            else:
+                self.assertIn("69081996", facts)
+                self.assertIn("Paris", facts)
+                ans = "France — population: 69081996"
+            return ({"tier": "local-model", "answer": ans,
+                     "evidence": "local model, grounded in: FACTS",
+                     "numbers_grounded": True},
+                    ["LOCAL MODEL — answered"])
+        self._patch_reasoning(model=_select)
+        try:
+            r = ceti_chat.answer("What is the currency of Japan?")
+            self.assertEqual(r["tier"], "local-model")
+            self.assertIn("Japanese yen", r["answer"])
+            self.assertNotIn("Tokyo", r["answer"])
+            r = ceti_chat.answer("What is the population of France?")
+            self.assertEqual(r["tier"], "local-model")
+            self.assertIn("69081996", r["answer"])
+            self.assertNotIn("Paris", r["answer"])
+        finally:
+            self._restore_reasoning()
 
     def test_facts_composition_two_hops(self):
+        # All-layers-reason: the two hops are context for the
+        # construct call; the hop trace still shows in thinking.
         r = ceti_chat.answer(
             "What is the capital of the country whose currency is the yen?")
-        self.assertEqual(r["tier"], "facts-composition")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("Tokyo", r["answer"])
-        self.assertIn("hop 1", r["evidence"])
-        self.assertIn("hop 2", r["evidence"])
+        self.assertIn("hop 1", r["thinking"])
+        self.assertIn("hop 2", r["thinking"])
 
     def test_local_model_tier_carries_node_ids(self):
         # Hit text shares content words ("prior", "note") with the
@@ -471,68 +543,65 @@ class CetiChatTest(unittest.TestCase):
                              "q%d" % (ceti_chat._SUGGESTIONS_CAP + 4))
 
 
-    def test_clear_fact_hit_never_calls_model(self):
-        # A single clear fact returns directly: the arbitration
-        # model must not be consulted at all.
-        def _boom(query, context_sections, **kw):
-            raise AssertionError("model must not be called on a clear hit")
-        self._patch_reasoning(model=_boom)
+    def test_clear_fact_hit_falls_back_direct_when_model_down(self):
+        # All-layers-reason: a clear fact is constructed by the
+        # model now. When the model is down, the direct fact
+        # answers instead of failing the question.
+        self._patch_reasoning(
+            model=lambda q, ctx, **kw: (None, ["LOCAL MODEL — unavailable"]))
         try:
             r = ceti_chat.answer("What is the currency of Japan?")
         finally:
             self._restore_reasoning()
         self.assertEqual(r["tier"], "facts")
         self.assertIn("Japanese yen", r["answer"])
+        self.assertFalse(r["cloud_suggested"])
 
-    def test_clear_aiml_hit_never_calls_model(self):
-        def _boom(query, context_sections, **kw):
-            raise AssertionError("model must not be called on a clear hit")
-        self._patch_reasoning(model=_boom)
+    def test_clear_aiml_hit_falls_back_direct_when_model_down(self):
+        # Same fallback for a clear AIML hit.
+        self._patch_reasoning(
+            model=lambda q, ctx, **kw: (None, ["LOCAL MODEL — unavailable"]))
         try:
             r = ceti_chat.answer("what is fidonet")
         finally:
             self._restore_reasoning()
         self.assertEqual(r["tier"], "aiml")
         self.assertIn("BBS network", r["answer"])
+        self.assertFalse(r["cloud_suggested"])
 
-    def test_ambiguous_facts_arbitrate(self):
+    def test_competing_facts_constructed_from_all_candidates(self):
         # "What is Japan?": no predicate word, three Japan facts
-        # compete. The local model arbitrates over all three instead
-        # of the ladder taking the first. (An open-ended "Tell me
-        # about Japan" now elaborates instead — see
-        # test_tell_me_about_elaborates_over_competing_facts.)
+        # compete. All-layers-reason: the construct call gets all
+        # three as context and builds the answer from them — no
+        # separate arbitration step any more.
         seen = {}
 
-        def _arb(query, sections, system=None, max_tokens=None,
-                 reasoning=None):
+        def _construct(query, sections, system=None, max_tokens=None,
+                       reasoning=None, **kw):
             seen["sections"] = dict(sections)
-            seen["system"] = system
-            seen["reasoning"] = reasoning
             return ({"tier": "local-model",
                      "answer": "Japan's capital is Tokyo.",
-                     "evidence": "local model, grounded in: CANDIDATE FACTS",
+                     "evidence": "local model, grounded in: FACTS",
                      "numbers_grounded": True},
                     ["LOCAL MODEL — answered"])
         self._patch_reasoning(
             vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
-            model=_arb)
+            model=_construct)
         try:
             r = ceti_chat.answer("What is Japan?")
         finally:
             self._restore_reasoning()
-        self.assertEqual(r["tier"], "arbitrated")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("Tokyo", r["answer"])
-        self.assertIn("ARBITRATE", r["thinking"])
-        facts = seen["sections"].get("CANDIDATE FACTS", "")
+        self.assertIn("CONSTRUCT", r["thinking"])
+        facts = seen["sections"].get("FACTS", "")
         for obj in ("Tokyo", "Japanese yen", "JPY"):
             self.assertIn(obj, facts)
-        # Arbitration is selection, not deep reasoning: thinking off.
-        self.assertIs(seen["reasoning"], False)
-        self.assertIn("Use ONLY the knowledge below", seen["system"])
 
-    def test_arbitration_falls_through_when_model_fails(self):
-        # Ambiguous facts, but the model is down: the ladder must
-        # fall through to the lower tiers instead of failing.
+    def test_construct_falls_back_to_first_fact_when_model_down(self):
+        # "Tell me about Japan": competing facts, but the model is
+        # down. The construct call fails; the best direct hit (the
+        # first competing fact) answers instead of failing.
         self._patch_reasoning(
             vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
             model=lambda q, ctx, **kw: (None, ["LOCAL MODEL — unavailable"]))
@@ -540,8 +609,9 @@ class CetiChatTest(unittest.TestCase):
             r = ceti_chat.answer("Tell me about Japan")
         finally:
             self._restore_reasoning()
-        self.assertEqual(r["tier"], "cloud-suggested")
-        self.assertTrue(r["cloud_suggested"])
+        self.assertEqual(r["tier"], "facts")
+        self.assertIn("Japan", r["answer"])
+        self.assertFalse(r["cloud_suggested"])
 
     def test_grounded_refusal_falls_back_to_ungrounded_model(self):
         # 0.0.1-beta2 Tier 5b: the grounded Tier 5 call ran (AIML
@@ -635,25 +705,25 @@ class CetiChatTest(unittest.TestCase):
         self.assertEqual(r["tier"], "cloud-suggested")
         self.assertTrue(r["cloud_suggested"])
 
-    def test_arbitration_refusal_falls_through(self):
-        # Ambiguous facts, but the model refuses arbitration ("none
-        # of the candidates answers"): that is a failure to answer,
-        # not an answer — the ladder falls through instead of
-        # returning the refusal as the final word.
+    def test_construct_refusal_falls_back_to_direct_fact(self):
+        # "What is Japan?": the construct call refuses and the
+        # ungrounded call refuses too. The ladder falls back to the
+        # best direct hit instead of returning the refusal.
         self._patch_reasoning(
             vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
             model=lambda q, ctx, **kw: (
                 {"tier": "local-model",
                  "answer": "I don't know from local knowledge.",
-                 "evidence": "local model, grounded in: CANDIDATE FACTS",
+                 "evidence": "local model, grounded in: FACTS",
                  "numbers_grounded": True},
                 ["LOCAL MODEL — answered"]))
         try:
             r = ceti_chat.answer("What is Japan?")
         finally:
             self._restore_reasoning()
-        self.assertEqual(r["tier"], "cloud-suggested")
-        self.assertTrue(r["cloud_suggested"])
+        self.assertEqual(r["tier"], "facts")
+        self.assertIn("Japan", r["answer"])
+        self.assertFalse(r["cloud_suggested"])
 
     def test_aiml_all_matches_returns_every_match(self):
         # Two overlapping patterns both match; the helper returns
@@ -673,9 +743,10 @@ class CetiChatTest(unittest.TestCase):
                          ["HELLO *", "HELLO THERE *"])
         self.assertIn("Hello there!", [g["answer"] for g in got])
 
-    def test_ambiguous_aiml_patterns_arbitrate(self):
-        # Two AIML patterns match and no fact competes: the model
-        # arbitrates over both templates.
+    def test_ambiguous_aiml_patterns_constructed(self):
+        # Two AIML patterns match and no fact competes: the
+        # construct call gets both templates as context and builds
+        # the answer from them — no separate arbitration step.
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "cassettes", "two.aiml"),
                    "<aiml>"
@@ -687,29 +758,33 @@ class CetiChatTest(unittest.TestCase):
             roots = brain.resolve_roots(candidates=[d])
             seen = {}
 
-            def _arb(query, sections, system=None, max_tokens=None,
-                     reasoning=None):
+            def _construct(query, sections, system=None, max_tokens=None,
+                           reasoning=None, **kw):
                 seen["sections"] = dict(sections)
                 return ({"tier": "local-model",
                          "answer": "Hello there!",
                          "evidence": "local model, grounded in: "
-                                     "CANDIDATE AIML TEMPLATES",
+                                     "AIML CONTEXT",
                          "numbers_grounded": True},
                         ["LOCAL MODEL — answered"])
             self._patch_reasoning(
                 vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
-                model=_arb)
+                model=_construct)
             try:
                 r = ceti_chat.answer("hello there friend", roots=roots)
             finally:
                 self._restore_reasoning()
-        self.assertEqual(r["tier"], "arbitrated")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("Hello there!", r["answer"])
-        templates = seen["sections"].get("CANDIDATE AIML TEMPLATES", "")
+        self.assertIn("CONSTRUCT", r["thinking"])
+        templates = seen["sections"].get("AIML CONTEXT", "")
         self.assertIn("HELLO *", templates)
         self.assertIn("HELLO THERE *", templates)
 
-    # ---- Tier 1c elaboration (2026-11-14) ----
+    # ---- All-layers-reason (2026-11-15): every question is
+    # constructed by the local model from all layers' output.
+    # Tier 1c elaboration and Tier 1b arbitration are gone — the
+    # construct call does both, for every question. ----
     def _fidonet_roots(self, d):
         _write(os.path.join(d, "cassettes", "fidonet.aiml"),
                "<aiml>"
@@ -721,51 +796,48 @@ class CetiChatTest(unittest.TestCase):
                "</aiml>")
         return brain.resolve_roots(candidates=[d])
 
-    def test_tell_me_more_elaborates_on_fact_hit(self):
+    def test_tell_me_more_constructed_from_fact_and_templates(self):
         # The 2026-11-14 bug, from Jero's screenshot: "tell me more
         # about fidonet" hit one fact and returned it verbatim — the
-        # local model never got the hit knowledge to build on. Now
-        # Tier 1c feeds the matched fact + related AIML templates to
-        # the local model and it composes the fuller answer.
+        # local model never got the hit knowledge to build on.
+        # All-layers-reason: EVERY question is constructed now, so
+        # the matched fact + related AIML templates go to the model
+        # without any elaboration phrase trigger.
         with tempfile.TemporaryDirectory() as d:
             roots = self._fidonet_roots(d)
             seen = {}
 
-            def _elab(query, sections, system=None, max_tokens=None,
-                      reasoning=None):
+            def _construct(query, sections, system=None, max_tokens=None,
+                           reasoning=None, **kw):
                 seen["sections"] = dict(sections)
-                seen["system"] = system
-                seen["reasoning"] = reasoning
                 return ({"tier": "local-model",
                          "answer": "FidoNet began when Tom Jennings "
                                    "started it around Christmas 1983, "
                                    "and it grew into a BBS network.",
                          "evidence": "local model, grounded in: "
-                                     "MATCHED FACTS",
+                                     "FACTS, AIML CONTEXT",
                          "numbers_grounded": True},
                         ["LOCAL MODEL — answered"])
             self._patch_reasoning(
                 vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
-                model=_elab)
+                model=_construct)
             try:
                 r = ceti_chat.answer("tell me more about fidonet",
                                      roots=roots)
             finally:
                 self._restore_reasoning()
-        self.assertEqual(r["tier"], "elaborated")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("Tom Jennings", r["answer"])
-        self.assertIn("ELABORATE", r["thinking"])
-        facts = seen["sections"].get("MATCHED FACTS", "")
+        self.assertIn("CONSTRUCT", r["thinking"])
+        facts = seen["sections"].get("FACTS", "")
         self.assertIn("Tom Jennings", facts)
-        templates = seen["sections"].get("RELATED AIML TEMPLATES", "")
+        templates = seen["sections"].get("AIML CONTEXT", "")
         self.assertIn("BBS network", templates)
-        self.assertIn("ONLY the knowledge below", seen["system"])
-        # Elaboration is composition, not deep reasoning: thinking off.
-        self.assertIs(seen["reasoning"], False)
 
     def test_elaboration_falls_back_to_fact_when_model_fails(self):
         # Model down on an elaboration question: the bare fact still
-        # answers, tier "facts" — elaboration never fails the question.
+        # answers, tier "facts" — the construct never fails the
+        # question when a direct hit exists.
         with tempfile.TemporaryDirectory() as d:
             roots = self._fidonet_roots(d)
             self._patch_reasoning(
@@ -779,50 +851,46 @@ class CetiChatTest(unittest.TestCase):
         self.assertEqual(r["tier"], "facts")
         self.assertIn("Tom Jennings", r["answer"])
 
-    def test_precise_fact_question_still_returns_directly(self):
-        # No elaboration phrase, so the bare fact returns with zero
-        # model tokens — even though the hit is subject-only. The
-        # model mock raises if it is ever invoked.
-        def _boom(query, context_sections, **kw):
-            raise AssertionError("model must not be called on a precise hit")
+    def test_precise_fact_question_is_constructed(self):
+        # All-layers-reason: a precise question is constructed by
+        # the model too — the direct return is gone. The default
+        # fake model (installed in setUp) returns the assembled
+        # context, so the answer carries the matched fact.
         with tempfile.TemporaryDirectory() as d:
             roots = self._fidonet_roots(d)
-            self._patch_reasoning(model=_boom)
-            try:
-                r = ceti_chat.answer("when did fidonet start operating",
-                                     roots=roots)
-            finally:
-                self._restore_reasoning()
-        self.assertEqual(r["tier"], "facts")
+            r = ceti_chat.answer("when did fidonet start operating",
+                                 roots=roots)
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("Tom Jennings", r["answer"])
+        self.assertIn("CONSTRUCT", r["thinking"])
 
-    def test_tell_me_about_elaborates_over_competing_facts(self):
-        # Open-ended "Tell me about Japan": three facts compete, so
-        # the old ladder arbitrated (picked one). Now the sysop asked
-        # for MORE — the model composes from all three instead.
+    def test_tell_me_about_constructed_over_competing_facts(self):
+        # Open-ended "Tell me about Japan": three facts compete.
+        # All-layers-reason: the construct call gets all three and
+        # composes from them.
         seen = {}
 
-        def _elab(query, sections, system=None, max_tokens=None,
-                  reasoning=None):
+        def _construct(query, sections, system=None, max_tokens=None,
+                       reasoning=None, **kw):
             seen["sections"] = dict(sections)
             return ({"tier": "local-model",
                      "answer": "Japan's capital is Tokyo and its "
                                "currency is the Japanese yen (JPY).",
-                     "evidence": "local model, grounded in: MATCHED FACTS",
+                     "evidence": "local model, grounded in: FACTS",
                      "numbers_grounded": True},
                     ["LOCAL MODEL — answered"])
         self._patch_reasoning(
             vector=lambda q, h: ([], ["VECTOR MEMORY — no nodes above 0.35"]),
-            model=_elab)
+            model=_construct)
         try:
             r = ceti_chat.answer("Tell me about Japan")
         finally:
             self._restore_reasoning()
-        self.assertEqual(r["tier"], "elaborated")
+        self.assertEqual(r["tier"], "local-model")
         self.assertIn("Tokyo", r["answer"])
         self.assertIn("Japanese yen", r["answer"])
-        self.assertIn("ELABORATE", r["thinking"])
-        facts = seen["sections"].get("MATCHED FACTS", "")
+        self.assertIn("CONSTRUCT", r["thinking"])
+        facts = seen["sections"].get("FACTS", "")
         for obj in ("Tokyo", "Japanese yen", "JPY"):
             self.assertIn(obj, facts)
 

@@ -13,6 +13,22 @@ health check are stubbed. Covers the System view's TTS SERVER row
   START button on the laptop. tts_log_tail() / tts_starting() feed
   the System view's STARTING state + bridge log, so a failed
   first-run install no longer looks like "still building".
+- (0.0.1-beta4 follow-up) Bare `cmd /c <script>` still breaks when
+  the extract path has a space or a parenthesis (a duplicate folder
+  is `...beta4 (1)`): cmd /c strips the quotes and re-splits the
+  path, filling the log with `'s' / 'bat' / 'RT' / 'tTTS' is not
+  recognized` + `... was unexpected at this time.` The launch now
+  goes through `cmd /c call <script>`, which takes the quoted path
+  as one file. autorun.py's start_tts has the same fix.
+- (Windows CI) TtsWindowsLaunchTest runs the REAL start_tts.bat
+  through _tts_cmd from a path with a space and `(1)` — the exact
+  shape that broke beta4. Windows-only (skipped elsewhere). The
+  temp copy carries a stub venv (a copy of the running python.exe
+  + the `.tts-installed` marker) so the batch skips venv creation
+  and pip install and stops at the smoke check, which fails
+  (no deps in the stub) with the batch's own ERROR line. That
+  proves the batch executed; the test asserts the launch did not
+  produce the beta4 `is not recognized` fragments.
 
 Run from the repo root:
     python3 -m unittest tests.test_tts_control -v
@@ -195,13 +211,28 @@ class TtsCmdTest(unittest.TestCase):
     """The 2026-11-14 START-button bug: on Windows Popen([.bat])
     raises WinError 193 — a .bat is not an executable — so the Hub's
     START button silently did nothing while the UI said "Starting…".
-    The launch must go through cmd /c (same as autorun.py)."""
+    The launch must go through cmd /c (same as autorun.py).
 
-    def test_windows_goes_through_cmd(self):
+    The 2026-11-16 beta4 follow-up: bare `cmd /c <script>` breaks
+    when the extract path has a space or a parenthesis, so the
+    launch goes through `cmd /c call <script>` — `call` takes the
+    quoted path as one file."""
+
+    def test_windows_goes_through_cmd_call(self):
         self.assertEqual(
             servers_mod._tts_cmd("C:\\node\\tts\\start_tts.bat",
                                  is_windows=True),
-            ["cmd", "/c", "C:\\node\\tts\\start_tts.bat"])
+            ["cmd", "/c", "call", "C:\\node\\tts\\start_tts.bat"])
+
+    def test_windows_path_with_space_and_parens(self):
+        # A duplicate download folder is `...beta4 (1)` — the exact
+        # shape that broke beta4. `call` keeps it one argument.
+        self.assertEqual(
+            servers_mod._tts_cmd(
+                "C:\\Users\\Jero\\Desktop\\laptop-uncensored-node-0.0.1-beta4 (1)\\tts\\start_tts.bat",
+                is_windows=True),
+            ["cmd", "/c", "call",
+             "C:\\Users\\Jero\\Desktop\\laptop-uncensored-node-0.0.1-beta4 (1)\\tts\\start_tts.bat"])
 
     def test_posix_runs_script_directly(self):
         self.assertEqual(
@@ -232,7 +263,7 @@ class TtsCmdTest(unittest.TestCase):
 
         def fake_cmd(script, is_windows=None):
             calls.append(script)
-            return ["cmd", "/c", script]
+            return ["cmd", "/c", "call", script]
 
         def fake_popen(cmd, **kw):
             calls.append(cmd)
@@ -249,7 +280,58 @@ class TtsCmdTest(unittest.TestCase):
             servers_mod.tts_health = old_health
             servers_mod._tts_cmd = old_cmd
             tmp.cleanup()
-        self.assertEqual(calls[1], ["cmd", "/c", calls[0]])
+        self.assertEqual(calls[1], ["cmd", "/c", "call", calls[0]])
+
+
+@unittest.skipUnless(os.name == "nt",
+                     "Windows-only: runs the real .bat through cmd")
+class TtsWindowsLaunchTest(unittest.TestCase):
+    """The beta4 bug, end to end on real Windows: run the actual
+    start_tts.bat through _tts_cmd from a path with a space and
+    `(1)` — `...\\ceti-node (1)\\tts\\start_tts.bat` — and prove
+    the batch executes instead of cmd chewing the path into
+    `'s' / 'bat' / 'RT' / 'tTTS' is not recognized` fragments.
+
+    The temp copy carries a stub venv (a copy of the running
+    python.exe as `.venv\\Scripts\\python.exe` + the
+    `.tts-installed` marker) so the batch skips venv creation and
+    pip install and stops at the smoke check. The stub has no
+    deps, so the smoke check fails with the batch's own
+    "dependencies incomplete" ERROR line and exit code 1 — that
+    line is the proof the batch ran. No server starts, no
+    network, no model download; the whole run takes seconds."""
+
+    def test_bat_runs_from_space_paren_path(self):
+        import shutil
+        import subprocess
+        repo_root = os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))
+        tmp = tempfile.TemporaryDirectory()
+        try:
+            # A duplicate-download path: space + parens.
+            tts_dir = os.path.join(tmp.name, "ceti-node (1)", "tts")
+            os.makedirs(tts_dir)
+            shutil.copy(os.path.join(repo_root, "tts", "start_tts.bat"),
+                        os.path.join(tts_dir, "start_tts.bat"))
+            venv_scripts = os.path.join(tts_dir, ".venv", "Scripts")
+            os.makedirs(venv_scripts)
+            shutil.copy(sys.executable,
+                        os.path.join(venv_scripts, "python.exe"))
+            with open(os.path.join(tts_dir, ".venv",
+                                  ".tts-installed"), "w") as f:
+                f.write("")
+            script = os.path.join(tts_dir, "start_tts.bat")
+            proc = subprocess.run(
+                servers_mod._tts_cmd(script, is_windows=True),
+                cwd=tts_dir, capture_output=True, text=True,
+                timeout=120)
+            out = (proc.stdout or "") + (proc.stderr or "")
+            self.assertNotIn("is not recognized", out)
+            self.assertNotIn("was unexpected at this time", out)
+            self.assertIn("dependencies incomplete", out)
+            self.assertEqual(proc.returncode, 1)
+        finally:
+            tmp.cleanup()
 
 
 class TtsLogTailTest(unittest.TestCase):
