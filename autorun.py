@@ -124,7 +124,15 @@ def start_tts(log_path: str):
         print(f"tts: cannot open log {log_path} ({e}) — skipping local TTS")
         return None
     if os.name == "nt":
-        cmd = ["cmd", "/c", script]
+        # `call` + the quoted path: bare `cmd /c <script>` breaks
+        # when the extract path has a space or a parenthesis (a
+        # duplicate folder is `...beta4 (1)`). cmd /c strips the
+        # quotes and re-splits the path, which filled the System
+        # log with `'s' / 'bat' / 'RT' / 'tTTS' is not recognized`
+        # and `... was unexpected at this time.` on beta4. `call`
+        # takes the quoted path as one file. Same fix as
+        # hub/servers.py _tts_cmd — keep the two in sync.
+        cmd = ["cmd", "/c", "call", script]
     else:
         cmd = ["bash", script]
     try:

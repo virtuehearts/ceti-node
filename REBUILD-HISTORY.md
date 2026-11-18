@@ -10,6 +10,64 @@ stdlib only) and one Android build (Kotlin), versioned together.
 It supersedes the 0.0.2–0.0.6 testing line — same code, clean
 version. The 0.0.2–0.0.6 zips stay in Drive as superseded builds.
 
+## 0.0.1-beta6 — 2026-11-16
+
+What changed since 0.0.1-beta5: the Windows CI check, so
+Windows-only breakage stops surfacing only when Jero runs a
+release on his laptop (beta4's TTS START bug is the example).
+
+- **Windows CI** (`.github/workflows/windows.yml`): runs on a
+  GitHub-hosted Windows runner on every push, Python 3.13 — the
+  TTS control tests, the ConPTY self-test (echo mode is the
+  gate), the full unit suite (informational — some tests are
+  Linux-shaped), and the ssh / ssh-pipe self-tests (diagnostic
+  only: they run the real ssh argv to chat.hf.co and report
+  bytes/alive/exit code, separating "ConPTY is broken" from
+  "ssh itself failed"). No secrets, no model downloads.
+- **Windows-only launch test** (`tests/test_tts_control.py`,
+  `TtsWindowsLaunchTest`): runs the real `start_tts.bat`
+  through `_tts_cmd` from a path with a space and `(1)`, using
+  a stub venv (a copy of the running python.exe + the
+  `.tts-installed` marker) so the batch stops at its smoke
+  check — it never installs torch or downloads a model. The
+  batch's own "dependencies incomplete" line is the proof it
+  ran; the test asserts no `is not recognized` fragments.
+- **The workflow file ships in this zip** (`.github/workflows/
+  windows.yml`), so the repo can be updated from the zip and
+  the check runs on the next push. The GitHub push from this
+  box was abandoned 2026-11-16: `gh` device-code login timed
+  out three times (15-min codes) and SSH git is blocked by the
+  sandbox egress proxy (port 22 reset) — the zip upload is the
+  push path.
+- **Tests:** 621 checks green (unit 333 + script 288). Unit +1:
+  the new Windows launch test (skipped on Linux); script
+  suites unchanged.
+
+## 0.0.1-beta5 — 2026-11-16
+
+What changed since 0.0.1-beta4: one fix, from Jero's laptop report
+the same day — TTS would not start on Windows 11, System log
+showing `'s' / 'bat' / 'RT' / 'tTTS' is not recognized` and `...
+was unexpected at this time.`
+
+- **TTS START via `cmd /c call`** (`hub/servers.py` `_tts_cmd`,
+  `autorun.py` `start_tts`, `tests/test_tts_control.py`): beta4
+  launched the bridge with bare `cmd /c <script>`. When the
+  extract path has a space or a parenthesis — a duplicate download
+  lands as `...beta4 (1)` — cmd /c strips the quotes Python adds
+  around the path and re-splits it, so the path gets chewed into
+  fragments and the parens trip `... was unexpected at this time.`
+  `call` takes the quoted path as one file, spaces and parens
+  included, so the launch goes through `cmd /c call <script>` in
+  both places (Hub START button and boot-time start). Nothing else
+  changed from beta4.
+- **Tests:** 620 checks green (unit 332 + script 288). Unit +1:
+  a regression test with a `...beta4 (1)` path asserting the
+  `call` form; script suites unchanged (nodeapi 101, community
+  16, image 13, node_client 12, text_handler 8, transfer 13,
+  transfers/serving 14, tunnel 19, two_nodes 36, edge_cases 35,
+  presence 21).
+
 ## 0.0.1-beta4 — 2026-11-15
 
 What changed since 0.0.1-beta3: the CETI ladder redesign, from

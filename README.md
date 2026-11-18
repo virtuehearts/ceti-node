@@ -67,7 +67,7 @@ That's it — no installs to babysit, no accounts to create.
 
 1. Install the newest Python from
    [python.org](https://www.python.org/downloads/).
-2. Download [`laptop-uncensored-node-0.0.1-beta4.zip`](https://drive.google.com/uc?id=1iuYwK6cH3cUQM65Sj5T0JiD-2-qt14TL&export=download) (47 MB) and unzip it.
+2. Download [`laptop-uncensored-node-0.0.1-beta6.zip`](https://drive.google.com/uc?id=10y0tQSizcpVs7ZQRp801gL2zXGgapSap&export=download) (47 MB) and unzip it.
 3. Run `autorun.bat` (Windows) or `autorun.sh` (Linux). It checks
    the setup, downloads the models, starts the servers, and opens
    the web UI.
@@ -203,16 +203,42 @@ Gmail account** — same address to ask.
 
 ## Status
 
-- **Version:** 0.0.1-beta4. (Beta4 follows beta3 the same morning,
-  2026-11-15: the all-layers-reason redesign below.)
-- **Tests:** 619 checks green at this build (unit 331: Hub 124,
+- **Version:** 0.0.1-beta6. (Beta6 follows beta5 the same day,
+  2026-11-16: the Windows CI check below.)
+- **Tests:** 621 checks green at this build (unit 333: Hub 124,
   Brain 6, CETI 33, SSH terminal 37, Research 42, Sessions 5,
   Local models 8, Code agent 9, Workspace 6, TTS bundle 11,
   Toggle reasoning 6, Llama install 14, Llama gate 9,
-  TTS control 20; script suites 288:
+  TTS control 22; script suites 288:
   nodeapi 101, community 16, image 13, node_client 12,
   text_handler 8, transfer 13, transfers/serving 14, tunnel 19,
   two_nodes 36, edge_cases 35, presence 21).
+- **New in 0.0.1-beta6:** **Windows CI check.** The laptop is
+  the only Windows machine in this project, so Windows-only
+  breakage surfaced only when Jero ran a release there (beta4's
+  TTS START bug). `.github/workflows/windows.yml` now runs the
+  Windows-specific checks on a GitHub-hosted Windows runner on
+  every push: the TTS control tests, the ConPTY self-test (echo
+  mode is the gate), the full unit suite (informational), and the
+  ssh / ssh-pipe self-tests (diagnostic — they run the real ssh
+  argv and report bytes/alive/exit code, separating "ConPTY is
+  broken" from "ssh itself failed"). A new Windows-only test
+  runs the real `start_tts.bat` through `cmd /c call` from a
+  path with a space and `(1)`, using a stub venv so the batch
+  stops at its smoke check — no torch install, no model
+  download. The workflow file ships in this zip, so the repo can
+  be updated from the zip and the check runs on the next push.
+- **New in 0.0.1-beta5:** **TTS START works from any extract
+  path.** Beta4's START button (and the boot-time start) launched
+  the bridge with bare `cmd /c <path>`, which breaks when the
+  folder has a space or a parenthesis — a duplicate download lands
+  as `...beta4 (1)` — cmd strips the quotes and re-splits the
+  path, so the System log filled with `'s' / 'bat' / 'RT' /
+  'tTTS' is not recognized` and `... was unexpected at this
+  time.` The launch now goes through `cmd /c call <script>`,
+  which takes the quoted path as one file. Same fix in both
+  places (`hub/servers.py`, `autorun.py`). Nothing else changed
+  from beta4.
 - **New in 0.0.1-beta4:** **All layers reason — the local model
   constructs every answer.** No layer returns its hit directly
   any more. Every tier outputs what it found — math result
