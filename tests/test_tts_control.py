@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -192,13 +192,19 @@ class TtsLaunchCommandTest(unittest.TestCase):
             with patch.object(servers_mod, "os") as windows_os:
                 windows_os.name = "nt"
                 windows_os.path = os.path
-                with patch.object(servers_mod.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True):
-                    with patch.object(servers_mod.subprocess, "Popen") as popen:
-                        servers_mod.launch_tts(script, "test-log")
+                startupinfo = Mock(dwFlags=0)
+                with patch.multiple(
+                    servers_mod.subprocess, create=True,
+                    STARTUPINFO=lambda: startupinfo, STARTF_USESHOWWINDOW=1,
+                    SW_HIDE=0, CREATE_NEW_CONSOLE=16,
+                ), patch.object(servers_mod.subprocess, "Popen") as popen:
+                    servers_mod.launch_tts(script, "test-log")
+                self.assertEqual(startupinfo.dwFlags, 1)
+                self.assertEqual(startupinfo.wShowWindow, 0)
             popen.assert_called_once_with(
                 ["cmd.exe", "/d", "/c", "call", "start_tts.bat"],
                 cwd=root, stdin=servers_mod.subprocess.DEVNULL, stdout="test-log",
-                stderr=servers_mod.subprocess.STDOUT, creationflags=0x08000000)
+                stderr=servers_mod.subprocess.STDOUT, creationflags=16, startupinfo=startupinfo)
 
     def test_windows_command_uses_basename_for_windows_path(self):
         script = r"C:\Users\Jero\CETI beta (1)\tts\start_tts.bat"
@@ -236,12 +242,15 @@ class TtsLaunchCommandTest(unittest.TestCase):
 class TtsWindowsLaunchTest(unittest.TestCase):
     """Exercise the real hidden launcher and batch file on Windows."""
 
-    def test_background_child_has_no_attached_console(self):
+    def test_background_child_has_no_visible_console(self):
         with tempfile.TemporaryDirectory(prefix="ceti-node (1) ") as root:
             script = Path(root, "start_tts.bat")
             script.write_text(
                 '@echo off\n'
-                f'"{sys.executable}" -c "import ctypes; print(ctypes.windll.kernel32.GetConsoleCP())"\n',
+                f'"{sys.executable}" -c "import ctypes as c; '
+                'get_console = c.windll.kernel32.GetConsoleWindow; '
+                'get_console.restype = c.c_void_p; '
+                'print(c.windll.user32.IsWindowVisible(c.c_void_p(get_console())))"\n',
                 encoding="ascii",
             )
             log = Path(root, "tts.log")

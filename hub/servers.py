@@ -510,9 +510,16 @@ def _tts_windows_options():
 
 
 def launch_tts(script, log):
-    options = _tts_windows_options()
-    if os.name != "nt":
-        options["start_new_session"] = True
+    if os.name == "nt":
+        # Children of a console-less cmd.exe may allocate a visible console.
+        # Give cmd.exe a hidden console for the whole batch process tree.
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        options = {"creationflags": subprocess.CREATE_NEW_CONSOLE,
+                   "startupinfo": startupinfo}
+    else:
+        options = {"start_new_session": True}
     return subprocess.Popen(
         _tts_cmd(script), cwd=os.path.dirname(script), stdin=subprocess.DEVNULL,
         stdout=log, stderr=subprocess.STDOUT, **options)
