@@ -1,18 +1,18 @@
 @echo off
 setlocal
-REM Mya TTS (PocketTTS bridge) — local text-to-speech for the CETI Hub.
+REM Mya TTS (PocketTTS bridge) - local text-to-speech for the CETI Hub.
 REM Plain Windows Python (no WSL, no Docker).
 REM
 REM Start it:
 REM   start_tts.bat
-REM   set TTS_PORT=8001 & start_tts.bat
+REM   Set TTS_PORT=8001 before running start_tts.bat to change ports.
 REM
 REM First run creates a venv (tts\.venv) and installs the dependencies
-REM (torch CPU + pocket-tts + FastAPI, ~1 GB — takes a few minutes),
+REM (torch CPU + pocket-tts + FastAPI, ~1 GB - takes a few minutes),
 REM then downloads the kyutai/pocket-tts model from Hugging Face
 REM (~215 MB) into tts\data\hf-cache. Later runs reuse both.
 REM
-REM Idempotent: safe to run twice — a fresh venv is created only when
+REM Idempotent: safe to run twice - a fresh venv is created only when
 REM missing, and pip install runs only once (marker .venv\.tts-installed).
 REM Auth is OFF (localhost only, like the Hub itself).
 cd /d "%~dp0" || exit /b 1
@@ -24,7 +24,7 @@ if not exist ".venv\Scripts\python.exe" (
   echo tts: creating .venv ...
   python -m venv .venv
   if errorlevel 1 (
-    echo tts: ERROR: venv creation failed — is Python 3.11+ on PATH? Not starting.
+    echo tts: ERROR: venv creation failed - is Python 3.11+ on PATH? Not starting.
     exit /b 1
   )
 )
@@ -33,16 +33,16 @@ if not exist ".venv\.tts-installed" (
   echo tts: installing dependencies, first run may take a few minutes ...
   REM Fail LOUDLY: the old script ran on past a failed pip install
   REM and died in uvicorn, while the Hub UI kept saying DOWN /
-  REM "starting…". Never write the marker on a failed install, so a
+  REM "starting...". Never write the marker on a failed install, so a
   REM retry re-runs pip instead of launching a half-built venv.
   .venv\Scripts\python.exe -m pip install --quiet --upgrade pip
   if errorlevel 1 (
-    echo tts: ERROR: pip upgrade failed — check network and Python version. Not starting.
+    echo tts: ERROR: pip upgrade failed - check network and Python version. Not starting.
     exit /b 1
   )
   .venv\Scripts\python.exe -m pip install --quiet -r requirements.txt
   if errorlevel 1 (
-    echo tts: ERROR: dependency install failed — check network and Python version. Not starting.
+    echo tts: ERROR: dependency install failed - check network and Python version. Not starting.
     exit /b 1
   )
   type nul > ".venv\.tts-installed"
@@ -50,11 +50,11 @@ if not exist ".venv\.tts-installed" (
 )
 
 REM Smoke check before serving: a venv whose install half-failed
-REM must not reach uvicorn and die silently — stop here with a line
+REM must not reach uvicorn and die silently - stop here with a line
 REM the Hub UI now shows.
-.venv\Scripts\python -c "import uvicorn, pocket_tts, torch, fastapi"
+.venv\Scripts\python.exe -c "import uvicorn, pocket_tts, torch, fastapi"
 if errorlevel 1 (
-  echo tts: ERROR: dependencies incomplete after install (uvicorn/pocket_tts/torch/fastapi import failed) — delete tts\.venv and retry. Not starting.
+  echo tts: ERROR: dependencies incomplete after install - import check failed. delete tts\.venv and retry. Not starting.
   exit /b 1
 )
 
@@ -64,4 +64,4 @@ set "HF_HOME=%CD%\data\hf-cache"
 set "HUGGINGFACE_HUB_CACHE=%CD%\data\hf-cache"
 
 echo tts: starting on http://127.0.0.1:%TTS_PORT% (voice %DEFAULT_VOICE%)
-.venv\Scripts\python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port %TTS_PORT%
+.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port %TTS_PORT%
