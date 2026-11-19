@@ -1,47 +1,16 @@
-"""TTS server control + voice panel tests (0.0.1k). Stdlib unittest
-only, no real server, no real bridge: subprocess and the bridge
-health check are stubbed. Covers the System view's TTS SERVER row
-(start/stop) and voice panel (list voices, set default voice):
-- tts_voices() reads the bridge's voices.db, falls back to the two
-  built-ins when the DB is missing/unreadable.
-- tts_start() launches the start script and records the PID;
-  tts_stop() kills it (and removes the PID file).
-- set_default_voice() changes ONLY tts_voice, preserving the
-  serving backend/model/endpoint (set_serving would clobber them).
-- (0.0.1-beta) _tts_cmd() routes Windows through cmd /c — Popen on
-  a bare .bat raises WinError 193, which silently broke the Hub's
-  START button on the laptop. tts_log_tail() / tts_starting() feed
-  the System view's STARTING state + bridge log, so a failed
-  first-run install no longer looks like "still building".
-- (0.0.1-beta4 follow-up) Bare `cmd /c <script>` still breaks when
-  the extract path has a space or a parenthesis (a duplicate folder
-  is `...beta4 (1)`): cmd /c strips the quotes and re-splits the
-  path, filling the log with `'s' / 'bat' / 'RT' / 'tTTS' is not
-  recognized` + `... was unexpected at this time.` The launch now
-  goes through `cmd /c call <script>`, which takes the quoted path
-  as one file. autorun.py's start_tts has the same fix.
-- (Windows CI) TtsWindowsLaunchTest runs the REAL start_tts.bat
-  through _tts_cmd from a path with a space and `(1)` — the exact
-  shape that broke beta4. Windows-only (skipped elsewhere). The
-  temp copy carries a stub venv (a copy of the running python.exe
-  + the `.tts-installed` marker) so the batch skips venv creation
-  and pip install and stops at the smoke check, which fails
-  (no deps in the stub) with the batch's own ERROR line. That
-  proves the batch executed; the test asserts the launch did not
-  produce the beta4 `is not recognized` fragments.
-
-Run from the repo root:
-    python3 -m unittest tests.test_tts_control -v
-"""
+"""TTS process control, voice configuration, and launcher regression tests."""
 import json
 import os
 import sqlite3
 import sys
 import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import autorun
 import hub.servers as servers_mod
 import hub.nodeapi as nodeapi_mod
 
@@ -105,7 +74,7 @@ class TtsStartStopTest(unittest.TestCase):
         servers_mod.data_dir = lambda: self.tmp.name
         # A fake tts/ dir with a start script so tts_start() proceeds.
         os.makedirs(os.path.join(self.tmp.name, "tts"))
-        with open(os.path.join(self.tmp.name, "tts", "start_tts.sh"), "w") as f:
+        with open(os.path.join(self.tmp.name, "tts", "start_tts.bat" if os.name == "nt" else "start_tts.sh"), "w") as f:
             f.write("#!/bin/sh\n")
         self.popen_calls = []
         self.run_calls = []
@@ -143,8 +112,14 @@ class TtsStartStopTest(unittest.TestCase):
     def test_start_launches_and_records_pid(self):
         self.assertTrue(servers_mod.tts_start())
         self.assertEqual(len(self.popen_calls), 1)
-        pid = open(os.path.join(self.tmp.name, "tts.pid")).read().strip()
+        pid = Path(self.tmp.name, "tts.pid").read_text().strip()
         self.assertEqual(pid, "4242")
+
+    def test_launch_failure_is_logged_without_pid(self):
+        with patch.object(servers_mod.subprocess, "Popen", side_effect=OSError("cannot spawn")):
+            self.assertFalse(servers_mod.tts_start())
+        self.assertIn("cannot spawn", Path(self.tmp.name, "tts.log").read_text())
+        self.assertFalse(Path(self.tmp.name, "tts.pid").exists())
 
     def test_start_when_already_up_does_not_launch(self):
         servers_mod.tts_health = lambda: True
@@ -152,7 +127,7 @@ class TtsStartStopTest(unittest.TestCase):
         self.assertEqual(self.popen_calls, [])
 
     def test_start_without_tts_dir_fails(self):
-        os.remove(os.path.join(self.tmp.name, "tts", "start_tts.sh"))
+        os.remove(os.path.join(self.tmp.name, "tts", "start_tts.bat" if os.name == "nt" else "start_tts.sh"))
         self.assertFalse(servers_mod.tts_start())
         self.assertEqual(self.popen_calls, [])
 
@@ -160,7 +135,10 @@ class TtsStartStopTest(unittest.TestCase):
         with open(os.path.join(self.tmp.name, "tts.pid"), "w") as f:
             f.write("4242")
         self.assertTrue(servers_mod.tts_stop())
-        self.assertEqual(self.killed, [(4242, 15)])
+        if os.name == "nt":
+            self.assertEqual(self.run_calls, [["taskkill", "/PID", "4242", "/T", "/F"]])
+        else:
+            self.assertEqual(self.killed, [(4242, 15)])
         self.assertFalse(os.path.exists(os.path.join(self.tmp.name, "tts.pid")))
 
     def test_stop_without_pid_file_reports_false(self):
@@ -207,99 +185,83 @@ class DefaultVoiceTest(unittest.TestCase):
         self.assertEqual(self._serving()["tts_voice"], "mya-02")
 
 
-class TtsCmdTest(unittest.TestCase):
-    """The 2026-11-14 START-button bug: on Windows Popen([.bat])
-    raises WinError 193 — a .bat is not an executable — so the Hub's
-    START button silently did nothing while the UI said "Starting…".
-    The launch must go through cmd /c (same as autorun.py).
+class TtsLaunchCommandTest(unittest.TestCase):
+    def test_windows_launch_is_hidden_and_uses_basename(self):
+        with tempfile.TemporaryDirectory(prefix="ceti-node (1) ") as root:
+            script = os.path.join(root, "start_tts.bat")
+            with patch.object(servers_mod, "os") as windows_os:
+                windows_os.name = "nt"
+                windows_os.path = os.path
+                startupinfo = Mock(dwFlags=0)
+                with patch.multiple(
+                    servers_mod.subprocess, create=True,
+                    STARTUPINFO=lambda: startupinfo, STARTF_USESHOWWINDOW=1,
+                    SW_HIDE=0, CREATE_NEW_CONSOLE=16,
+                ), patch.object(servers_mod.subprocess, "Popen") as popen:
+                    servers_mod.launch_tts(script, "test-log")
+                self.assertEqual(startupinfo.dwFlags, 1)
+                self.assertEqual(startupinfo.wShowWindow, 0)
+            popen.assert_called_once_with(
+                ["cmd.exe", "/d", "/c", "call", "start_tts.bat"],
+                cwd=root, stdin=servers_mod.subprocess.DEVNULL, stdout="test-log",
+                stderr=servers_mod.subprocess.STDOUT, creationflags=16, startupinfo=startupinfo)
 
-    The 2026-11-16 beta4 follow-up: bare `cmd /c <script>` breaks
-    when the extract path has a space or a parenthesis, so the
-    launch goes through `cmd /c call <script>` — `call` takes the
-    quoted path as one file."""
+    def test_windows_command_uses_basename_for_windows_path(self):
+        script = r"C:\Users\Jero\CETI beta (1)\tts\start_tts.bat"
+        self.assertEqual(servers_mod._tts_cmd(script, is_windows=True),
+                         ["cmd.exe", "/d", "/c", "call", "start_tts.bat"])
 
-    def test_windows_goes_through_cmd_call(self):
-        self.assertEqual(
-            servers_mod._tts_cmd("C:\\node\\tts\\start_tts.bat",
-                                 is_windows=True),
-            ["cmd", "/c", "call", "C:\\node\\tts\\start_tts.bat"])
+    def test_autorun_uses_shared_launcher_and_records_pid(self):
+        with tempfile.TemporaryDirectory() as root:
+            tts = Path(root, "tts")
+            tts.mkdir()
+            script = tts / ("start_tts.bat" if os.name == "nt" else "start_tts.sh")
+            script.touch()
+            log = Path(root, "tts.log")
+            with patch.object(autorun, "ROOT", root), patch.object(servers_mod, "launch_tts") as launch:
+                launch.return_value.pid = 42
+                self.assertIs(autorun.start_tts(str(log)), launch.return_value)
+                self.assertEqual(launch.call_args.args[0], str(script))
+                self.assertTrue(launch.call_args.args[1].closed)
+            self.assertEqual(Path(root, "tts.pid").read_text(), "42")
 
-    def test_windows_path_with_space_and_parens(self):
-        # A duplicate download folder is `...beta4 (1)` — the exact
-        # shape that broke beta4. `call` keeps it one argument.
-        self.assertEqual(
-            servers_mod._tts_cmd(
-                "C:\\Users\\Jero\\Desktop\\laptop-uncensored-node-0.0.1-beta4 (1)\\tts\\start_tts.bat",
-                is_windows=True),
-            ["cmd", "/c", "call",
-             "C:\\Users\\Jero\\Desktop\\laptop-uncensored-node-0.0.1-beta4 (1)\\tts\\start_tts.bat"])
-
-    def test_posix_runs_script_directly(self):
-        self.assertEqual(
-            servers_mod._tts_cmd("/node/tts/start_tts.sh",
-                                 is_windows=False),
-            ["/node/tts/start_tts.sh"])
-
-    def test_start_launches_through_tts_cmd(self):
-        # Wiring: tts_start() must launch via _tts_cmd, not the bare
-        # script path — prove it by patching _tts_cmd to the Windows
-        # form even on this Linux box.
-        tmp = tempfile.TemporaryDirectory()
-        old_root = servers_mod.REPO_ROOT
-        old_data = servers_mod.data_dir
-        old_popen = servers_mod.subprocess.Popen
-        old_health = servers_mod.tts_health
-        old_cmd = servers_mod._tts_cmd
-        servers_mod.REPO_ROOT = tmp.name
-        servers_mod.data_dir = lambda: tmp.name
-        servers_mod.tts_health = lambda: False
-        os.makedirs(os.path.join(tmp.name, "tts"))
-        with open(os.path.join(tmp.name, "tts", "start_tts.sh"), "w") as f:
-            f.write("#!/bin/sh\n")
-        calls = []
-
-        class FakeProc:
-            pid = 4242
-
-        def fake_cmd(script, is_windows=None):
-            calls.append(script)
-            return ["cmd", "/c", "call", script]
-
-        def fake_popen(cmd, **kw):
-            calls.append(cmd)
-            return FakeProc()
-
-        servers_mod._tts_cmd = fake_cmd
-        servers_mod.subprocess.Popen = fake_popen
-        try:
-            self.assertTrue(servers_mod.tts_start())
-        finally:
-            servers_mod.REPO_ROOT = old_root
-            servers_mod.data_dir = old_data
-            servers_mod.subprocess.Popen = old_popen
-            servers_mod.tts_health = old_health
-            servers_mod._tts_cmd = old_cmd
-            tmp.cleanup()
-        self.assertEqual(calls[1], ["cmd", "/c", "call", calls[0]])
+    @unittest.skipIf(os.name == "nt", "POSIX script launch")
+    def test_posix_launch_captures_stdout_and_stderr(self):
+        with tempfile.TemporaryDirectory(prefix="ceti-node (1) ") as root:
+            script = Path(root, "start_tts.sh")
+            log = Path(root, "tts.log")
+            script.write_text("echo stdout\necho stderr >&2\n")
+            with log.open("wb") as output:
+                proc = servers_mod.launch_tts(str(script), output)
+            self.assertEqual(proc.wait(timeout=10), 0)
+            self.assertEqual(log.read_text().splitlines(), ["stdout", "stderr"])
 
 
 @unittest.skipUnless(os.name == "nt",
                      "Windows-only: runs the real .bat through cmd")
 class TtsWindowsLaunchTest(unittest.TestCase):
-    """The beta4 bug, end to end on real Windows: run the actual
-    start_tts.bat through _tts_cmd from a path with a space and
-    `(1)` — `...\\ceti-node (1)\\tts\\start_tts.bat` — and prove
-    the batch executes instead of cmd chewing the path into
-    `'s' / 'bat' / 'RT' / 'tTTS' is not recognized` fragments.
+    """Exercise the real hidden launcher and batch file on Windows."""
 
-    The temp copy carries a stub venv (a copy of the running
-    python.exe as `.venv\\Scripts\\python.exe` + the
-    `.tts-installed` marker) so the batch skips venv creation and
-    pip install and stops at the smoke check. The stub has no
-    deps, so the smoke check fails with the batch's own
-    "dependencies incomplete" ERROR line and exit code 1 — that
-    line is the proof the batch ran. No server starts, no
-    network, no model download; the whole run takes seconds."""
+    def test_background_child_has_no_visible_console(self):
+        with tempfile.TemporaryDirectory(prefix="ceti-node (1) ") as root:
+            script = Path(root, "start_tts.bat")
+            script.write_text(
+                '@echo off\n'
+                f'"{sys.executable}" -c "import ctypes as c; '
+                'get_console = c.windll.kernel32.GetConsoleWindow; '
+                'get_console.restype = c.c_void_p; '
+                'print(c.windll.user32.IsWindowVisible(c.c_void_p(get_console())))"\n',
+                encoding="ascii",
+            )
+            log = Path(root, "tts.log")
+            with log.open("wb") as output:
+                proc = servers_mod.launch_tts(str(script), output)
+            try:
+                self.assertEqual(proc.wait(timeout=30), 0)
+            finally:
+                if proc.poll() is None:
+                    servers_mod.stop_tts_process_tree(proc.pid)
+            self.assertEqual(log.read_text().strip(), "0")
 
     def test_bat_runs_from_space_paren_path(self):
         import shutil
@@ -313,23 +275,24 @@ class TtsWindowsLaunchTest(unittest.TestCase):
             os.makedirs(tts_dir)
             shutil.copy(os.path.join(repo_root, "tts", "start_tts.bat"),
                         os.path.join(tts_dir, "start_tts.bat"))
-            venv_scripts = os.path.join(tts_dir, ".venv", "Scripts")
-            os.makedirs(venv_scripts)
-            shutil.copy(sys.executable,
-                        os.path.join(venv_scripts, "python.exe"))
-            with open(os.path.join(tts_dir, ".venv",
-                                  ".tts-installed"), "w") as f:
-                f.write("")
+            venv = Path(tts_dir, ".venv")
+            subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)],
+                           check=True, timeout=120)
+            (venv / ".tts-installed").touch()
             script = os.path.join(tts_dir, "start_tts.bat")
-            proc = subprocess.run(
-                servers_mod._tts_cmd(script, is_windows=True),
-                cwd=tts_dir, capture_output=True, text=True,
-                timeout=120)
-            out = (proc.stdout or "") + (proc.stderr or "")
+            log = Path(tts_dir, "tts.log")
+            with log.open("wb") as output:
+                proc = servers_mod.launch_tts(script, output)
+            try:
+                returncode = proc.wait(timeout=120)
+            finally:
+                if proc.poll() is None:
+                    servers_mod.stop_tts_process_tree(proc.pid)
+            out = log.read_text(errors="replace")
             self.assertNotIn("is not recognized", out)
             self.assertNotIn("was unexpected at this time", out)
             self.assertIn("dependencies incomplete", out)
-            self.assertEqual(proc.returncode, 1)
+            self.assertEqual(returncode, 1)
         finally:
             tmp.cleanup()
 
