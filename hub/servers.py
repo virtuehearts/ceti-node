@@ -1,5 +1,6 @@
 """Start, stop and health-check the chat and embedding servers."""
 import json
+import ntpath
 import os
 import subprocess
 import sys
@@ -496,29 +497,26 @@ def tts_running():
 
 
 def _tts_cmd(script, is_windows=None):
-    """Argv that runs the TTS start script. On Windows a .bat is not
-    an executable: Popen([script]) raises WinError 193, so it must go
-    through cmd /c (same as autorun.py's start_tts). The Hub's START
-    button used the bare form, so on the laptop it never launched
-    anything — the button silently did nothing while the UI said
-    "Starting TTS server…". On Linux/macOS the script itself is
-    executable (shebang + exec bit).
-
-    (0.0.1-beta4 follow-up) Bare `cmd /c <script>` is still broken
-    when the extract path contains a space or a parenthesis — a
-    duplicate download folder is `...beta4 (1)`, a username or
-    OneDrive path can carry spaces. cmd /c strips the quotes
-    Python adds around such a path and re-splits it, so the System
-    log filled with `'s' / 'bat' / 'RT' / 'tTTS' is not recognized`
-    fragments and `... was unexpected at this time.` — cmd chewing
-    the path to pieces. `call` takes the quoted path as one file
-    and runs it correctly, spaces and parens included, so the
-    launch goes through `cmd /c call <script>`."""
+    """Use the script's basename on Windows. The launcher sets its cwd."""
     if is_windows is None:
         is_windows = os.name == "nt"
     if is_windows:
-        return ["cmd", "/c", "call", script]
-    return [script]
+        return ["cmd.exe", "/d", "/c", "call", ntpath.basename(script)]
+    return ["bash", script]
+
+
+def _tts_windows_options():
+    return {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+
+
+def launch_tts(script, log):
+    options = _tts_windows_options()
+    if os.name != "nt":
+        options["start_new_session"] = True
+    return subprocess.Popen(
+        _tts_cmd(script), cwd=os.path.dirname(script), stdin=subprocess.DEVNULL,
+        stdout=log, stderr=subprocess.STDOUT, **options)
+
 
 
 def tts_log_tail(n=25):
@@ -542,7 +540,8 @@ def tts_starting():
     if tts_health():
         return False
     try:
-        pid = int(open(tts_pid_path()).read().strip())
+        with open(tts_pid_path()) as f:
+            pid = int(f.read().strip())
     except (OSError, ValueError):
         return False
     if os.name == "nt":
@@ -552,7 +551,7 @@ def tts_starting():
         try:
             out = subprocess.run(
                 ["tasklist", "/FI", "PID eq %d" % pid],
-                capture_output=True, text=True, timeout=10)
+                capture_output=True, text=True, timeout=10, **_tts_windows_options())
             return str(pid) in (out.stdout or "")
         except Exception:
             return True
@@ -576,22 +575,23 @@ def tts_start():
     if not os.path.isfile(script):
         return False
     try:
-        log = open(tts_log_path(), "ab")
+        with open(tts_log_path(), "ab") as log:
+            try:
+                proc = launch_tts(script, log)
+            except OSError as error:
+                log.write(f"tts: launch failed: {error}\n".encode("utf-8"))
+                return False
     except OSError:
-        return False
-    kwargs = {}
-    if os.name == "nt":
-        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        kwargs["start_new_session"] = True
-    try:
-        proc = subprocess.Popen(_tts_cmd(script), cwd=tts_dir,
-                                stdout=log, stderr=subprocess.STDOUT, **kwargs)
-    except Exception:
         return False
     with open(tts_pid_path(), "w") as f:
         f.write(str(proc.pid))
     return True
+
+
+def stop_tts_process_tree(pid):
+    subprocess.run(
+        ["taskkill", "/PID", str(pid), "/T", "/F"],
+        capture_output=True, timeout=10, **_tts_windows_options())
 
 
 def tts_stop():
@@ -604,12 +604,13 @@ def tts_stop():
     if not os.path.exists(path):
         return False
     try:
-        pid = int(open(path).read().strip())
+        with open(path) as f:
+            pid = int(f.read().strip())
     except Exception:
         return False
     try:
         if os.name == "nt":
-            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+            stop_tts_process_tree(pid)
         else:
             os.kill(pid, 15)
     except Exception:
