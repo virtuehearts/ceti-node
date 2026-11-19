@@ -236,6 +236,24 @@ class TtsLaunchCommandTest(unittest.TestCase):
 class TtsWindowsLaunchTest(unittest.TestCase):
     """Exercise the real hidden launcher and batch file on Windows."""
 
+    def test_background_child_has_no_attached_console(self):
+        with tempfile.TemporaryDirectory(prefix="ceti-node (1) ") as root:
+            script = Path(root, "start_tts.bat")
+            script.write_text(
+                '@echo off\n'
+                f'"{sys.executable}" -c "import ctypes; print(ctypes.windll.kernel32.GetConsoleCP())"\n',
+                encoding="ascii",
+            )
+            log = Path(root, "tts.log")
+            with log.open("wb") as output:
+                proc = servers_mod.launch_tts(str(script), output)
+            try:
+                self.assertEqual(proc.wait(timeout=30), 0)
+            finally:
+                if proc.poll() is None:
+                    servers_mod.stop_tts_process_tree(proc.pid)
+            self.assertEqual(log.read_text().strip(), "0")
+
     def test_bat_runs_from_space_paren_path(self):
         import shutil
         import subprocess
